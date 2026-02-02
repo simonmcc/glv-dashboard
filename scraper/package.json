@@ -5,8 +5,15 @@
   "type": "module",
   "scripts": {
     "discover": "npx tsx src/discover-api.ts",
+    "test-api": "npx tsx src/test-api-client.ts",
     "build": "tsc",
     "start": "node dist/index.js"
+  },
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./types": "./dist/types.js",
+    "./api-client": "./dist/api-client.js"
   },
   "dependencies": {
     "playwright": "^1.40.0"
