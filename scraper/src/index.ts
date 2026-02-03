@@ -9,6 +9,8 @@ export {
   ScoutsApiClient,
   createApiClient,
   type ComplianceSummary,
+  type DataExplorerRequest,
+  type DataExplorerResponse,
 } from './api-client.js';
 
 // Re-export all types

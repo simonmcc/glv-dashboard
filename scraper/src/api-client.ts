@@ -8,28 +8,70 @@
 import {
   ApiClientConfig,
   ApiError,
-  DataExplorerQuery,
-  DataExplorerResult,
-  DataExplorerFilter,
-  DataExplorerSort,
   DashboardView,
   LearningComplianceRecord,
   NavigationItem,
   VIEW_TABLES,
-  DASHBOARD_VIEWS,
-  ComplianceStatus,
 } from './types.js';
 
 const DEFAULT_BASE_URL = 'https://tsa-memportal-prod-fun01.azurewebsites.net/api';
 
+// ==========================================================================
+// API Request/Response Types (matching actual API format)
+// ==========================================================================
+
+export interface DataExplorerRequest {
+  table: string;
+  query?: string;
+  selectFields?: string[];
+  pageNo?: number;
+  pageSize?: number;
+  orderBy?: string;
+  order?: 'asc' | 'desc' | null;
+  distinct?: boolean;
+  isDashboardQuery?: boolean;
+  contactId?: string;
+  id?: string;
+  name?: string;
+}
+
+export interface DataExplorerResponse<T = Record<string, unknown>> {
+  data: T[] | null;
+  nextPage: string | null;
+  count: number;
+  aggregateResult: unknown | null;
+  error: string | null;
+}
+
+// Default fields for Learning Compliance queries
+// Note: Use camelCase in requests, API returns with spaces in response
+const LEARNING_COMPLIANCE_FIELDS = [
+  'FirstName',
+  'LastName',
+  'MembershipNumber',
+  'TeamName',
+  'TeamId',
+  'RoleName',
+  'RoleId',
+  'Name',           // Learning type (SafeGuarding, Safety, FirstAid, DataProtection, etc.)
+  'Status',
+  'ExpiryDate',
+  'DaysSinceExpiry',
+  'EmailAddress',
+  'MemberSuspended',
+  'StartDate',
+];
+
 export class ScoutsApiClient {
   private baseUrl: string;
   private token: string | null;
+  private contactId: string | null;
   private onTokenExpired?: () => void;
 
   constructor(config: ApiClientConfig = {}) {
     this.baseUrl = config.baseUrl || DEFAULT_BASE_URL;
     this.token = config.token || null;
+    this.contactId = null;
     this.onTokenExpired = config.onTokenExpired;
   }
 
@@ -54,6 +96,28 @@ export class ScoutsApiClient {
     return this.token !== null && this.token.length > 0;
   }
 
+  /**
+   * Set the contact ID for queries
+   */
+  setContactId(contactId: string): void {
+    this.contactId = contactId;
+  }
+
+  /**
+   * Get the contact ID
+   */
+  getContactId(): string | null {
+    return this.contactId;
+  }
+
+  /**
+   * Initialize the client by fetching contact details
+   */
+  async initialize(): Promise<void> {
+    const contact = await this.getContactDetail();
+    this.contactId = contact.id;
+  }
+
   // ==========================================================================
   // Core HTTP Methods
   // ==========================================================================
@@ -70,6 +134,7 @@ export class ScoutsApiClient {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${this.token}`,
+      Accept: 'application/json, text/plain, */*',
       ...((options.headers as Record<string, string>) || {}),
     };
 
@@ -106,23 +171,31 @@ export class ScoutsApiClient {
   // ==========================================================================
 
   /**
-   * Execute a Data Explorer query
+   * Execute a Data Explorer query with the correct API format
    */
   async query<T = Record<string, unknown>>(
-    query: DataExplorerQuery
-  ): Promise<DataExplorerResult<T>> {
-    return this.request<DataExplorerResult<T>>(
+    request: DataExplorerRequest
+  ): Promise<DataExplorerResponse<T>> {
+    const body = {
+      table: request.table,
+      query: request.query || '',
+      selectFields: request.selectFields || [],
+      pageNo: request.pageNo ?? 1,
+      pageSize: request.pageSize ?? 50,
+      orderBy: request.orderBy || '',
+      order: request.order || null,
+      distinct: request.distinct ?? true,
+      isDashboardQuery: request.isDashboardQuery ?? false,
+      contactId: request.contactId || this.contactId || '',
+      id: request.id || '',
+      name: request.name || '',
+    };
+
+    return this.request<DataExplorerResponse<T>>(
       '/DataExplorer/GetResultsAsync',
       {
         method: 'POST',
-        body: JSON.stringify({
-          table: query.table,
-          skip: query.skip ?? 0,
-          take: query.take ?? 25,
-          filters: query.filters ?? [],
-          sorts: query.sorts ?? [],
-          columns: query.columns ?? [],
-        }),
+        body: JSON.stringify(body),
       }
     );
   }
@@ -162,11 +235,12 @@ export class ScoutsApiClient {
   }
 
   /**
-   * Get data for the current user context
+   * Get user's contact details
    */
-  async getData(): Promise<unknown> {
-    return this.request<unknown>('/GetDataAsync', {
+  async getContactDetail(): Promise<{ id: string; [key: string]: unknown }> {
+    return this.request<{ id: string }>('/GetContactDetailAsync', {
       method: 'POST',
+      body: JSON.stringify({}),
     });
   }
 
@@ -188,110 +262,51 @@ export class ScoutsApiClient {
    */
   async queryLearningCompliance(
     options: {
-      skip?: number;
-      take?: number;
-      filters?: DataExplorerFilter[];
-      sorts?: DataExplorerSort[];
-      columns?: string[];
+      query?: string;
+      pageNo?: number;
+      pageSize?: number;
+      orderBy?: string;
+      order?: 'asc' | 'desc';
+      selectFields?: string[];
     } = {}
-  ): Promise<DataExplorerResult<LearningComplianceRecord>> {
+  ): Promise<DataExplorerResponse<LearningComplianceRecord>> {
     return this.query<LearningComplianceRecord>({
       table: VIEW_TABLES.LEARNING_COMPLIANCE,
-      ...options,
+      selectFields: options.selectFields || LEARNING_COMPLIANCE_FIELDS,
+      query: options.query || '',
+      pageNo: options.pageNo || 1,
+      pageSize: options.pageSize || 50,
+      orderBy: options.orderBy || '',
+      order: options.order || null,
     });
   }
 
   /**
-   * Get all members with expiring safeguarding training
-   */
-  async getSafeguardingExpiring(
-    daysAhead: number = 30,
-    options: { skip?: number; take?: number } = {}
-  ): Promise<DataExplorerResult<LearningComplianceRecord>> {
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + daysAhead);
-
-    return this.queryLearningCompliance({
-      ...options,
-      filters: [
-        {
-          field: 'SafeguardingExpiryDate',
-          operator: 'lte',
-          value: futureDate.toISOString().split('T')[0],
-        },
-        {
-          field: 'SafeguardingExpiryDate',
-          operator: 'isnotnull',
-          value: null,
-        },
-      ],
-      sorts: [{ field: 'SafeguardingExpiryDate', dir: 'asc' }],
-    });
-  }
-
-  /**
-   * Get all members with expired safeguarding
+   * Get all members with expired safeguarding (not suspended)
+   * Note: Field name is "Learning" with value "SafeGuarding"
    */
   async getSafeguardingExpired(
-    options: { skip?: number; take?: number } = {}
-  ): Promise<DataExplorerResult<LearningComplianceRecord>> {
+    options: { pageNo?: number; pageSize?: number } = {}
+  ): Promise<DataExplorerResponse<LearningComplianceRecord>> {
     return this.queryLearningCompliance({
       ...options,
-      filters: [
-        {
-          field: 'SafeguardingStatus',
-          operator: 'eq',
-          value: 'Expired',
-        },
-      ],
-      sorts: [{ field: 'SafeguardingExpiryDate', dir: 'asc' }],
+      query: "Learning = 'SafeGuarding' AND Status = 'Expired'",
+      orderBy: 'Expiry date',
+      order: 'asc',
     });
   }
 
   /**
-   * Get all members with expiring safety training
-   */
-  async getSafetyExpiring(
-    daysAhead: number = 30,
-    options: { skip?: number; take?: number } = {}
-  ): Promise<DataExplorerResult<LearningComplianceRecord>> {
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + daysAhead);
-
-    return this.queryLearningCompliance({
-      ...options,
-      filters: [
-        {
-          field: 'SafetyExpiryDate',
-          operator: 'lte',
-          value: futureDate.toISOString().split('T')[0],
-        },
-        {
-          field: 'SafetyExpiryDate',
-          operator: 'isnotnull',
-          value: null,
-        },
-      ],
-      sorts: [{ field: 'SafetyExpiryDate', dir: 'asc' }],
-    });
-  }
-
-  /**
-   * Get all members with expired safety training
+   * Get all members with expired safety training (not suspended)
    */
   async getSafetyExpired(
-    options: { skip?: number; take?: number } = {}
-  ): Promise<DataExplorerResult<LearningComplianceRecord>> {
+    options: { pageNo?: number; pageSize?: number } = {}
+  ): Promise<DataExplorerResponse<LearningComplianceRecord>> {
     return this.queryLearningCompliance({
       ...options,
-      filters: [
-        {
-          field: 'SafetyStatus',
-          operator: 'eq',
-          value: 'Expired',
-        },
-      ],
-      sorts: [{ field: 'SafetyExpiryDate', dir: 'asc' }],
+      query: "Learning = 'Safety' AND Status = 'Expired'",
+      orderBy: 'Expiry date',
+      order: 'asc',
     });
   }
 
@@ -299,167 +314,87 @@ export class ScoutsApiClient {
    * Get all members requiring First Response who are non-compliant
    */
   async getFirstResponseNonCompliant(
-    options: { skip?: number; take?: number } = {}
-  ): Promise<DataExplorerResult<LearningComplianceRecord>> {
+    options: { pageNo?: number; pageSize?: number } = {}
+  ): Promise<DataExplorerResponse<LearningComplianceRecord>> {
     return this.queryLearningCompliance({
       ...options,
-      filters: [
-        {
-          field: 'FirstResponseRequired',
-          operator: 'eq',
-          value: true,
-        },
-        {
-          field: 'FirstResponseStatus',
-          operator: 'neq',
-          value: 'Compliant',
-        },
-      ],
-      sorts: [{ field: 'FirstResponseExpiryDate', dir: 'asc' }],
+      query: "Learning = 'FirstAid' AND Status <> 'In-Progress' AND Status <> 'Valid'",
+      orderBy: 'Expiry date',
+      order: 'asc',
     });
   }
 
   /**
-   * Get all members with incomplete Growing Roots (joining journey)
+   * Get all learning compliance records (no filter)
    */
-  async getGrowingRootsIncomplete(
-    options: { skip?: number; take?: number } = {}
-  ): Promise<DataExplorerResult<LearningComplianceRecord>> {
+  async getAllLearningCompliance(
+    options: { pageNo?: number; pageSize?: number } = {}
+  ): Promise<DataExplorerResponse<LearningComplianceRecord>> {
     return this.queryLearningCompliance({
       ...options,
-      filters: [
-        {
-          field: 'GrowingRootsStatus',
-          operator: 'neq',
-          value: 'Complete',
-        },
-        {
-          field: 'GrowingRootsStatus',
-          operator: 'isnotnull',
-          value: null,
-        },
-      ],
-      sorts: [{ field: 'RoleStartDate', dir: 'asc' }],
+      query: '',
+      orderBy: 'Last name',
+      order: 'asc',
     });
   }
 
   /**
-   * Get compliance summary for a specific team
+   * Get compliance for a specific team
    */
   async getTeamCompliance(
     teamId: string,
-    options: { skip?: number; take?: number } = {}
-  ): Promise<DataExplorerResult<LearningComplianceRecord>> {
+    options: { pageNo?: number; pageSize?: number } = {}
+  ): Promise<DataExplorerResponse<LearningComplianceRecord>> {
     return this.queryLearningCompliance({
       ...options,
-      filters: [
-        {
-          field: 'TeamId',
-          operator: 'eq',
-          value: teamId,
-        },
-      ],
-      sorts: [{ field: 'FullName', dir: 'asc' }],
+      query: `Team = '${teamId}'`,
+      orderBy: 'Last name',
+      order: 'asc',
     });
   }
-
-  /**
-   * Get all non-compliant members (any compliance issue)
-   */
-  async getAllNonCompliant(
-    options: { skip?: number; take?: number } = {}
-  ): Promise<DataExplorerResult<LearningComplianceRecord>> {
-    // This uses OR logic - any of these conditions makes someone non-compliant
-    // The API may not support OR directly, so we may need to make multiple calls
-    // For now, we'll get expired safeguarding as the most critical
-    return this.queryLearningCompliance({
-      ...options,
-      filters: [
-        {
-          field: 'SafeguardingStatus',
-          operator: 'eq',
-          value: 'Expired',
-        },
-      ],
-      sorts: [{ field: 'SafeguardingExpiryDate', dir: 'asc' }],
-    });
-  }
-
-  // ==========================================================================
-  // Aggregate / Summary Methods
-  // ==========================================================================
 
   /**
    * Get a compliance summary with counts
    */
   async getComplianceSummary(): Promise<ComplianceSummary> {
     // Fetch all records to compute summary
-    // In production, this should use server-side aggregation if available
-    const allRecords = await this.queryLearningCompliance({
-      take: 1000, // Adjust based on expected team size
-    });
+    const result = await this.getAllLearningCompliance({ pageSize: 1000 });
+
+    const records = result.data || [];
 
     const summary: ComplianceSummary = {
-      total: allRecords.total,
-      safeguarding: {
-        compliant: 0,
-        expiringSoon: 0,
-        expired: 0,
-      },
-      safety: {
-        compliant: 0,
-        expiringSoon: 0,
-        expired: 0,
-      },
-      firstResponse: {
-        compliant: 0,
-        required: 0,
-        nonCompliant: 0,
-      },
-      growingRoots: {
-        complete: 0,
-        incomplete: 0,
-      },
+      total: result.count,
+      recordsFetched: records.length,
+      safeguarding: { compliant: 0, expired: 0, total: 0 },
+      safety: { compliant: 0, expired: 0, total: 0 },
+      firstResponse: { compliant: 0, nonCompliant: 0, total: 0 },
     };
 
-    const now = new Date();
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(now.getDate() + 30);
+    for (const record of records) {
+      const name = (record as any).Name || (record as any).name;
+      const status = (record as any).Status || (record as any).status;
 
-    for (const record of allRecords.data) {
-      // Safeguarding
-      if (record.SafeguardingStatus === 'Expired') {
-        summary.safeguarding.expired++;
-      } else if (record.SafeguardingStatus === 'Due Soon') {
-        summary.safeguarding.expiringSoon++;
-      } else if (record.SafeguardingStatus === 'Compliant') {
-        summary.safeguarding.compliant++;
-      }
-
-      // Safety
-      if (record.SafetyStatus === 'Expired') {
-        summary.safety.expired++;
-      } else if (record.SafetyStatus === 'Due Soon') {
-        summary.safety.expiringSoon++;
-      } else if (record.SafetyStatus === 'Compliant') {
-        summary.safety.compliant++;
-      }
-
-      // First Response
-      if (record.FirstResponseRequired) {
-        summary.firstResponse.required++;
-        if (record.FirstResponseStatus === 'Compliant') {
+      if (name === 'SafeGuarding') {
+        summary.safeguarding.total++;
+        if (status === 'Expired' || !status) {
+          summary.safeguarding.expired++;
+        } else {
+          summary.safeguarding.compliant++;
+        }
+      } else if (name === 'Safety') {
+        summary.safety.total++;
+        if (status === 'Expired' || !status) {
+          summary.safety.expired++;
+        } else {
+          summary.safety.compliant++;
+        }
+      } else if (name === 'FirstAid') {
+        summary.firstResponse.total++;
+        if (status === 'In-Progress' || status === 'Valid') {
           summary.firstResponse.compliant++;
         } else {
           summary.firstResponse.nonCompliant++;
         }
-      }
-
-      // Growing Roots
-      if (record.GrowingRootsStatus === 'Complete') {
-        summary.growingRoots.complete++;
-      } else if (record.GrowingRootsStatus) {
-        summary.growingRoots.incomplete++;
       }
     }
 
@@ -473,24 +408,21 @@ export class ScoutsApiClient {
 
 export interface ComplianceSummary {
   total: number;
+  recordsFetched: number;
   safeguarding: {
     compliant: number;
-    expiringSoon: number;
     expired: number;
+    total: number;
   };
   safety: {
     compliant: number;
-    expiringSoon: number;
     expired: number;
+    total: number;
   };
   firstResponse: {
     compliant: number;
-    required: number;
     nonCompliant: number;
-  };
-  growingRoots: {
-    complete: number;
-    incomplete: number;
+    total: number;
   };
 }
 
