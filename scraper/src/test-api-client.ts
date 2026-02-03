@@ -18,8 +18,11 @@ import { ScoutsApiClient } from './api-client.js';
 const SCOUTS_URL = 'https://membership.scouts.org.uk/';
 
 // Get credentials from environment variables
+// Supports SCOUT_PASSWORD or SCOUT_PASSWORD_B64 (base64 encoded) for special characters
 const SCOUT_USERNAME = process.env.SCOUT_USERNAME;
-const SCOUT_PASSWORD = process.env.SCOUT_PASSWORD;
+const SCOUT_PASSWORD = process.env.SCOUT_PASSWORD_B64
+  ? Buffer.from(process.env.SCOUT_PASSWORD_B64, 'base64').toString('utf-8')
+  : process.env.SCOUT_PASSWORD;
 const hasCredentials = !!(SCOUT_USERNAME && SCOUT_PASSWORD);
 
 async function handleCookieConsent(page: Page): Promise<void> {
@@ -53,11 +56,52 @@ async function handleCookieConsent(page: Page): Promise<void> {
 
 async function performAutomatedLogin(page: Page): Promise<void> {
   console.log('🔐 Performing automated login...');
+  console.log(`   Current URL: ${page.url()}`);
 
-  // Wait for the B2C login page to load
-  // The page redirects to prodscoutsb2c.b2clogin.com
-  await page.waitForURL('**/b2clogin.com/**', { timeout: 30000 });
+  // Wait for the page to settle and JavaScript to run
+  await page.waitForTimeout(3000);
+  console.log(`   URL after wait: ${page.url()}`);
+
+  // Check if we're already on B2C
+  if (page.url().includes('b2clogin.com')) {
+    console.log('   Already on B2C login page');
+  } else {
+    // The site should automatically redirect to B2C for unauthenticated users
+    // Wait for the redirect with a longer timeout
+    console.log('   Waiting for B2C redirect...');
+
+    try {
+      await page.waitForURL('**/b2clogin.com/**', { timeout: 30000 });
+    } catch {
+      // Debug: see what's on the page
+      const bodyText = await page.evaluate(() => document.body?.innerText?.slice(0, 500) || 'No body');
+      console.log(`   Page content preview: ${bodyText.slice(0, 200)}...`);
+
+      // If we're still on membership.scouts.org.uk, check if maybe we're already logged in
+      if (page.url().includes('membership.scouts.org.uk')) {
+        console.log('   Still on membership site - may already be logged in?');
+        // Check for signs of being logged in
+        const hasToken = await page.evaluate(`
+          (function() {
+            for (var i = 0; i < sessionStorage.length; i++) {
+              var key = sessionStorage.key(i);
+              if (key && key.toLowerCase().includes('token')) return true;
+            }
+            return false;
+          })()
+        `);
+        if (hasToken) {
+          console.log('   Found token in storage - already authenticated!');
+          return;
+        }
+      }
+
+      throw new Error('Failed to reach B2C login page');
+    }
+  }
+
   console.log('   Reached B2C login page');
+  console.log(`   B2C URL: ${page.url()}`);
 
   // Wait for the login form to be ready
   await page.waitForTimeout(2000);
@@ -306,12 +350,30 @@ async function main(): Promise<void> {
     console.log('   Running in interactive mode - please log in manually\n');
   }
 
+  // Set HEADLESS=false to show browser even with credentials
+  const forceVisible = process.env.HEADLESS === 'false';
+  const runHeadless = hasCredentials && !forceVisible;
+
   const browser = await chromium.launch({
-    headless: hasCredentials, // Headless if we have credentials, visible if manual
+    headless: runHeadless,
+    args: runHeadless ? [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+    ] : [],
   });
 
-  const context = await browser.newContext();
+  // Use a realistic browser context to avoid detection
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    viewport: { width: 1280, height: 720 },
+    locale: 'en-GB',
+  });
   const page = await context.newPage();
+
+  // Hide webdriver property to avoid detection
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => false });
+  });
 
   // Set up request listener to capture Bearer token
   const capturedToken: { value: string | null } = { value: null };
@@ -327,7 +389,9 @@ async function main(): Promise<void> {
   try {
     // Navigate to Scouts membership portal
     console.log('📍 Navigating to membership.scouts.org.uk...');
-    await page.goto(SCOUTS_URL, { waitUntil: 'networkidle' });
+    await page.goto(SCOUTS_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    // Give extra time for redirects to start
+    await page.waitForTimeout(2000);
 
     // Handle cookie consent
     await handleCookieConsent(page);
