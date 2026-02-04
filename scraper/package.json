@@ -1,21 +1,10 @@
 {
   "name": "glv-dashboard-scraper",
   "version": "0.1.0",
-  "description": "API discovery and data fetching for GLV Dashboard",
+  "description": "API discovery tool for GLV Dashboard",
   "type": "module",
   "scripts": {
-    "discover": "npx tsx src/discover-api.ts",
-    "test-api": "npx tsx src/test-api-client.ts",
-    "access-ni": "npx tsx src/access-ni-disclosure.ts",
-    "check-disclosures": "npx tsx src/check-disclosures.ts",
-    "build": "tsc",
-    "start": "node dist/index.js"
-  },
-  "main": "dist/index.js",
-  "exports": {
-    ".": "./dist/index.js",
-    "./types": "./dist/types.js",
-    "./api-client": "./dist/api-client.js"
+    "discover": "npx tsx src/discover-api.ts"
   },
   "dependencies": {
     "playwright": "^1.40.0"
