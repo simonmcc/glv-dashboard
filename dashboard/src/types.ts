@@ -87,6 +87,19 @@ export interface MemberDisclosureResult {
 }
 
 /**
+ * Joining Journey record from JoiningJourneyView
+ */
+export interface JoiningJourneyRecord {
+  'First name': string;
+  'Last name': string;
+  'Membership number': string;
+  'Item': string;
+  'Status': string;
+  'Due date'?: string | null;
+  'Completed date'?: string | null;
+}
+
+/**
  * Learning module from GetLmsDetailsAsync
  */
 export interface LearningModule {

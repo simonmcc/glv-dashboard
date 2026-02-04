@@ -427,123 +427,18 @@ async function authenticate(page: Page, username: string, password: string): Pro
 }
 
 async function navigateAndCapture(page: Page): Promise<void> {
-  // Navigate to Data Explorer
+  // Navigate directly to Data Explorer
   console.log('\n📊 Navigating to Data Explorer...');
 
-  // For SPAs with hash routing, we need to navigate differently
-  await page.evaluate(() => {
-    window.location.hash = '/dataexplorer';
+  await page.goto('https://membership.scouts.org.uk/#/dataexplorer', {
+    waitUntil: 'domcontentloaded',
+    timeout: 30000,
   });
 
-  // Wait for navigation and API calls
-  await page.waitForTimeout(5000);
+  // Wait for page to load
+  await page.waitForTimeout(3000);
   console.log(`📍 Current URL: ${page.url()}`);
-
-  // Try to interact with the Data Explorer to trigger API calls
-  console.log('🔍 Exploring Data Explorer interface...');
-
-  // Log what elements we can see
-  const visibleText = await page.evaluate(() => {
-    return document.body.innerText.substring(0, 500);
-  });
-  console.log('📄 Page content preview:', visibleText.substring(0, 200) + '...');
-
-  // Look for common UI elements and click them
-  const explorerSelectors = [
-    'text=Training',
-    'text=Learning',
-    'text=Members',
-    'text=Compliance',
-    'text=Search',
-    'text=Report',
-    'button:has-text("Search")',
-    'button:has-text("Load")',
-    'button:has-text("View")',
-    'button:has-text("Run")',
-    'button:has-text("Generate")',
-    '[class*="dropdown"]',
-    '[class*="select"]',
-    'select',
-  ];
-
-  for (const selector of explorerSelectors) {
-    try {
-      const element = await page.$(selector);
-      if (element && await element.isVisible()) {
-        console.log(`🖱️ Clicking: ${selector}`);
-        await element.click();
-        await page.waitForTimeout(3000);
-      }
-    } catch (e) {
-      // Element may not be interactive
-    }
-  }
-
-  // Navigate to Member Search
-  console.log('\n🔎 Navigating to Member Search...');
-  await page.evaluate(() => {
-    window.location.hash = '/membersearch';
-  });
-  await page.waitForTimeout(5000);
-  console.log(`📍 Current URL: ${page.url()}`);
-
-  // Log what elements we can see
-  const searchPageText = await page.evaluate(() => {
-    return document.body.innerText.substring(0, 500);
-  });
-  console.log('📄 Page content preview:', searchPageText.substring(0, 200) + '...');
-
-  // Try to interact with Member Search
-  console.log('🔍 Exploring Member Search interface...');
-
-  const searchSelectors = [
-    'input[type="search"]',
-    'input[type="text"]',
-    'input[placeholder*="search" i]',
-    'input[placeholder*="name" i]',
-    'input[placeholder*="member" i]',
-  ];
-
-  for (const selector of searchSelectors) {
-    try {
-      const element = await page.$(selector);
-      if (element && await element.isVisible()) {
-        console.log(`🖱️ Typing in: ${selector}`);
-        // Type a common name to trigger search API
-        await element.fill('Smith');
-        await page.waitForTimeout(3000);
-        await element.fill('');
-        break;
-      }
-    } catch (e) {
-      // Element may not be found
-    }
-  }
-
-  // Also try navigating directly via URL with some test parameters
-  console.log('\n📊 Trying direct navigation patterns...');
-
-  const additionalPaths = [
-    '/#/home',
-    '/#/dashboard',
-    '/#/training',
-    '/#/reports',
-  ];
-
-  for (const path of additionalPaths) {
-    try {
-      console.log(`📍 Navigating to ${path}`);
-      await page.goto(`https://membership.scouts.org.uk${path}`, {
-        waitUntil: 'domcontentloaded',
-        timeout: 10000,
-      });
-      await page.waitForTimeout(2000);
-    } catch (e) {
-      // Path may not exist
-    }
-  }
-
-  console.log('\n✅ Automated navigation complete');
+  console.log('\n✅ Ready for manual exploration');
 }
 
 function generateApiDocumentation(): string {

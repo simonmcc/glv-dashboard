@@ -4,7 +4,7 @@
  * Routes all API calls through the backend proxy to avoid CORS issues.
  */
 
-import type { LearningRecord, ApiResponse, ComplianceSummary, DisclosureRecord, DisclosureSummary, MemberDisclosureResult, MemberLearningResult } from './types';
+import type { LearningRecord, ApiResponse, ComplianceSummary, DisclosureRecord, DisclosureSummary, MemberDisclosureResult, MemberLearningResult, JoiningJourneyRecord } from './types';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
@@ -189,6 +189,85 @@ export class ScoutsApiClient {
     }
 
     return Array.from(seen.values());
+  }
+
+  async getJoiningJourney(pageSize: number = 500): Promise<ApiResponse<JoiningJourneyRecord>> {
+    console.log('[API] Fetching joining journey data');
+
+    // The InProgressActionDashboardView contains onboarding action items
+    // "Category key" values for joining journey items:
+    // - signDeclaration: Declaration
+    // - referenceRequest: References
+    // - welcomeConversation: Welcome Conversation
+    // - getCriminalRecordCheck: Criminal Record Check
+    // - safeguardconfidentialEnquiryCheck: Internal Check
+    // - managerTrusteeCheck: Trustee Eligibility Check
+    // - growingRoots: Growing Roots
+    // - coreLearning: Core Learning
+
+    // Query all onboarding actions - filter client-side for "Outstanding" status
+    // Note: API field names have spaces, e.g., "Category key", "On boarding action status"
+    const result = await this.query<Record<string, unknown>>({
+      table: 'InProgressActionDashboardView',
+      selectFields: [],  // Get all fields - specific fields may cause errors
+      query: '',  // Get all records - filter client-side
+      pageNo: 1,
+      pageSize,
+      distinct: true,
+    });
+
+    if (result.error) {
+      console.error('[API] Joining journey query error:', result.error);
+      return { data: [], nextPage: null, count: 0, error: result.error };
+    }
+
+    // Transform API response - log fields to understand structure
+    if (result.data && result.data.length > 0) {
+      console.log('[API] InProgressActionDashboardView fields:', Object.keys(result.data[0]));
+      console.log('[API] Sample record:', result.data[0]);
+    }
+
+    // Map Category key to human-readable item names
+    const categoryKeyToItem: Record<string, string> = {
+      'signDeclaration': 'Declaration',
+      'referenceRequest': 'References',
+      'welcomeConversation': 'Welcome Conversation',
+      'getCriminalRecordCheck': 'Criminal Record Check',
+      'safeguardconfidentialEnquiryCheck': 'Internal Check',
+      'managerTrusteeCheck': 'Trustee Eligibility Check',
+      'growingRoots': 'Growing Roots',
+      'coreLearning': 'Core Learning',
+    };
+
+    // Filter for Outstanding items only (incomplete onboarding actions)
+    const outstandingRecords = (result.data || []).filter(record => {
+      const onboardingStatus = String(record['On boarding action status'] || '');
+      return onboardingStatus === 'Outstanding';
+    });
+
+    console.log(`[API] Filtered to ${outstandingRecords.length} outstanding records from ${result.data?.length || 0} total`);
+
+    const data = outstandingRecords.map((record): JoiningJourneyRecord => {
+      const categoryKey = String(record['Category key'] || '');
+      return {
+        'First name': String(record['First name'] || ''),
+        'Last name': String(record['Last name'] || ''),
+        'Membership number': String(record['Membership number'] || ''),
+        'Item': categoryKeyToItem[categoryKey] || categoryKey || 'Unknown',
+        'Status': 'Incomplete',
+        'Due date': record['Due date'] as string | null || null,
+        'Completed date': record['Completed date'] as string | null || null,
+      };
+    });
+
+    console.log(`[API] Transformed ${data.length} joining journey records`);
+
+    return {
+      data,
+      nextPage: result.nextPage,
+      count: result.count,
+      error: result.error,
+    };
   }
 
   async getAllDisclosures(pageSize: number = 500): Promise<ApiResponse<DisclosureRecord>> {

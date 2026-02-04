@@ -6,9 +6,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ScoutsApiClient } from '../api-client';
-import type { LearningRecord, ComplianceSummary, MemberLearningResult } from '../types';
+import type { LearningRecord, ComplianceSummary, MemberLearningResult, JoiningJourneyRecord } from '../types';
 import { SummaryTiles } from './SummaryTiles';
 import { ComplianceTable } from './ComplianceTable';
+import { JoiningJourneyTable } from './JoiningJourneyTable';
 
 interface DashboardProps {
   token: string;
@@ -91,6 +92,7 @@ function computeModuleStatus(currentLevel: string, expiryDate: Date | null): str
 export function Dashboard({ token, contactId, onLogout, onTokenExpired }: DashboardProps) {
   const [records, setRecords] = useState<LearningRecord[]>([]);
   const [summary, setSummary] = useState<ComplianceSummary | null>(null);
+  const [joiningJourneyRecords, setJoiningJourneyRecords] = useState<JoiningJourneyRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -126,7 +128,10 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       // Usage: checkLearning(['0012162494', '0012345678'])
       (window as any).checkLearning = (membershipNumbers: string[]) =>
         client.checkLearningByMembershipNumbers(membershipNumbers);
-      console.log('[Dashboard] Test functions: checkLearning([membershipNumbers]), checkDisclosures([membershipNumbers])');
+      // Test joining journey view
+      // Usage: testJoiningJourney()
+      (window as any).testJoiningJourney = () => client.getJoiningJourney(50);
+      console.log('[Dashboard] Test functions: checkLearning([...]), checkDisclosures([...]), testJoiningJourney()');
 
       // First get member list from LearningComplianceDashboardView to get membership numbers
       console.log('[Dashboard] Fetching member list...');
@@ -159,6 +164,14 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       // Compute summary
       const summaryData = client.computeComplianceSummary(data);
       setSummary(summaryData);
+
+      // Fetch joining journey data
+      console.log('[Dashboard] Fetching joining journey data...');
+      const joiningJourneyResponse = await client.getJoiningJourney(500);
+      if (!joiningJourneyResponse.error && joiningJourneyResponse.data) {
+        setJoiningJourneyRecords(joiningJourneyResponse.data);
+        console.log(`[Dashboard] Got ${joiningJourneyResponse.data.length} joining journey records`);
+      }
 
       setLastUpdated(new Date());
     } catch (err) {
@@ -234,6 +247,12 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
         <section>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Learning Records</h2>
           <ComplianceTable records={records} isLoading={isLoading} />
+        </section>
+
+        {/* Joining Journey Table */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Joining Journey</h2>
+          <JoiningJourneyTable records={joiningJourneyRecords} isLoading={isLoading} />
         </section>
       </main>
 

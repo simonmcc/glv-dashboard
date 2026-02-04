@@ -38,181 +38,243 @@ POST /api/DataExplorer/GetResultsAsync
 ```json
 {
   "table": "LearningComplianceDashboardView",
-  "skip": 0,
-  "take": 25,
-  "filters": [],
-  "sorts": [],
-  "columns": []
+  "query": "",
+  "selectFields": [],
+  "pageNo": 1,
+  "pageSize": 50,
+  "orderBy": "",
+  "order": null,
+  "distinct": true,
+  "isDashboardQuery": false,
+  "contactId": "<your-contact-id>",
+  "id": "",
+  "name": ""
 }
 ```
 
 #### Key Parameters
 
-- `table`: The view/data source to query (see Available Views below)
-- `skip`: Pagination offset
-- `take`: Number of records to return
-- `filters`: Array of filter conditions
-- `sorts`: Array of sort specifications
-- `columns`: Array of column names to return (empty = all columns)
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `table` | string | The view/data source to query (see Available Views below) |
+| `query` | string | SQL-like filter expression (e.g., `"Status = 'Expired'"`) |
+| `selectFields` | array | Field names to return (empty = all fields) |
+| `pageNo` | number | Page number (1-based) |
+| `pageSize` | number | Number of records per page |
+| `orderBy` | string | Field to sort by (leave empty - non-empty causes errors) |
+| `order` | null | Sort direction (leave null - non-null causes errors) |
+| `distinct` | boolean | Whether to return distinct records |
+| `isDashboardQuery` | boolean | Set to false for direct queries |
+| `contactId` | string | Your contact ID from authentication |
 
-### 2. Data Explorer - Metadata
+#### Response Structure
 
-**Get available views, fields, and pre-built queries.**
-
+```json
+{
+  "data": [...],
+  "nextPage": "",
+  "count": 246,
+  "aggregateResult": null,
+  "error": null
+}
 ```
-POST /api/DataExplorer/GetMetadataAsync
-```
 
-Returns a list of all available dashboard views and their configurations.
-
-```
-POST /api/DataExplorer/GetMetadataAsync/{viewId}
-```
-
-Returns detailed field definitions and pre-built queries for a specific view.
-
-### 3. Other Useful Endpoints
+### 2. Other Useful Endpoints
 
 | Endpoint | Description |
 |----------|-------------|
 | `POST /api/GetNavigationAsync` | Get user's accessible areas/teams |
 | `POST /api/GetContactDetailAsync` | Get member contact details |
-| `POST /api/GetLmsDetailsAsync` | Get learning management details |
-| `POST /api/GetDataAsync` | General data retrieval |
+| `POST /api/GetLmsDetailsAsync` | Get learning management details with accurate expiry dates |
+| `POST /api/MemberListingAsync` | Search for members by membership number |
+| `POST /api/GenerateSASTokenAsync` | Generate SAS token for Azure Table Storage |
 | `POST /api/UnitTeamsAndRolesListingAsync` | Get teams and roles listing |
 | `POST /api/GetNotifications` | Get user notifications |
 
 ## Available Dashboard Views
 
+All views tested and working as of 2026-02-04.
+
+### Core Compliance Views
+
+| View Name | Records | Description |
+|-----------|---------|-------------|
+| `LearningComplianceDashboardView` | 246 | Training compliance tracking (Safeguarding, Safety, First Response) |
+| `InProgressActionDashboardView` | 516 | **Joining journey / onboarding actions** (Declaration, References, Welcome Conversation) |
+| `DisclosureComplianceDashboardView` | 2 | DBS/AccessNI disclosure status |
+
+### Other Views
+
+| View Name | Records | Description |
+|-----------|---------|-------------|
+| `AppointmentsDashboardView` | 41 | Appointment progress tracking, EDI data |
+| `SuspensionDashboardView` | 0 | Suspended member tracking |
+| `TeamDirectoryReviewsDashboardView` | 37 | Team directory reviews |
+| `PermitsDashboardView` | 20 | Activity permits tracking (Nights Away, etc.) |
+| `WelcomeEnquiryView` | 0 | New member enquiries |
+| `PreloadedAwardsDashboardView` | 32 | Awards and recognitions |
+
+## View Details
+
 ### LearningComplianceDashboardView
 
-**ID:** `07b3b8bb-e64a-ee11-be6f-6045bdc1efd7`
+**Purpose:** Training compliance tracking - the core view for GLV dashboard.
 
-**Purpose:** Training compliance tracking - exactly what we need for the GLV dashboard.
+**Key Fields (21 total):**
+- `First name`, `Last name`, `Membership number`
+- `Learning` - Module name (Safeguarding, Safety, FirstResponse, etc.)
+- `Status` - Current status (In-Progress, Valid, Expired, etc.)
+- `Expiry date`, `Start date`, `Days since expiry`
+- `Team`, `Role`, `Unit name`, `Group`, `District`, `County`
+- `Communication email`, `Suspended`
 
-This view contains:
-- Volunteer learning status
-- Safeguarding compliance
-- Safety training compliance
-- First Response skill tracking
-- Growing Roots progress
+### InProgressActionDashboardView
 
-### Other Available Views
+**Purpose:** Joining journey / onboarding action items. Shows incomplete tasks for new members.
 
-| View Name | Purpose |
-|-----------|---------|
-| `DisclosureComplianceDashboardView` | DBS disclosure status |
-| `SuspensionDashboardView` | Suspended member tracking |
-| `AppointmentsDashboardView` | Appointment progress tracking |
-| `TeamDirectoryReviewsDashboardView` | Team directory reviews |
-| `PermitsDashboardView` | Activity permits tracking |
-| `WelcomeEnquiryView` | New member enquiries |
-| `PreloadedAwardsDashboardView` | Awards and recognitions |
+**Key Fields (29 total):**
+- `First name`, `Last name`, `Membership number`
+- `Category key` - Action type identifier (see below)
+- `On boarding action status` - Status (Outstanding, Completed, etc.)
+- `Status` - Overall status (New, Cancelled, etc.)
+- `Role`, `Team`, `Unit name`, `Group`
+- `Role start date`, `Completed date`
 
-## Pre-Built Queries
+**Category Key Values:**
+| Key | Display Name |
+|-----|--------------|
+| `signDeclaration` | Declaration |
+| `referenceRequest` | References |
+| `welcomeConversation` | Welcome Conversation |
+| `getCriminalRecordCheck` | Criminal Record Check |
+| `safeguardconfidentialEnquiryCheck` | Internal Check |
+| `managerTrusteeCheck` | Trustee Eligibility Check |
+| `growingRoots` | Growing Roots |
+| `coreLearning` | Core Learning |
 
-The LearningComplianceDashboardView includes these pre-built queries:
+**Filtering for Incomplete Items:**
+Query for `On boarding action status = 'Outstanding'` to get incomplete items.
 
-1. **Members requiring First Response skill** - All volunteers requiring First Response, whether due for renewal, overdue or expired
-2. **First Response non-compliant (not suspended)** - Volunteers with expired First Response who aren't suspended
-3. **Safeguarding expired** - Volunteers with expired safeguarding training
-4. **Safety expired** - Volunteers with expired safety training
-5. **Growing Roots incomplete** - Volunteers with outstanding joining journey learning
+### DisclosureComplianceDashboardView
 
-## Example: Query Learning Compliance
+**Purpose:** DBS/AccessNI disclosure tracking.
+
+**Key Fields (28 total):**
+- `First name`, `Surname`, `Membership number`
+- `Disclosure authority` - DBS, AccessNI, etc.
+- `Disclosure status` - Current status
+- `Disclosure issue date`, `Disclosure expiry date`
+- `Days since expiry`
+- `Role`, `Team`, `Unit name`
+
+### AppointmentsDashboardView
+
+**Purpose:** Appointment progress and EDI (Equality, Diversity, Inclusion) data.
+
+**Key Fields (19 total):**
+- `First name`, `Last name`, `Membership number`
+- `Role/Accreditation`, `Start date`, `End date`
+- `Days since role Started`
+- `EDI` - EDI data completion flag
+
+### PermitsDashboardView
+
+**Purpose:** Activity permits (Nights Away, Water Activities, etc.)
+
+**Key Fields (27 total):**
+- `First name`, `Last name`, `Membership number`
+- `Permit category`, `Permit type`
+- `Permit restriction details`
+- `Permit expiry date`, `Permit status`
+
+## Example Queries
+
+### Get All Learning Compliance Records
 
 ```json
 POST /api/DataExplorer/GetResultsAsync
-Content-Type: application/json
-Authorization: Bearer <token>
-
 {
   "table": "LearningComplianceDashboardView",
-  "skip": 0,
-  "take": 100,
-  "filters": [],
-  "sorts": [
-    {
-      "field": "SafeguardingExpiryDate",
-      "dir": "asc"
-    }
-  ],
-  "columns": [
-    "FullName",
-    "RoleName",
-    "TeamName",
-    "SafeguardingStatus",
-    "SafeguardingExpiryDate",
-    "SafetyStatus",
-    "SafetyExpiryDate",
-    "FirstResponseStatus",
-    "FirstResponseExpiryDate"
-  ]
+  "query": "",
+  "selectFields": [],
+  "pageNo": 1,
+  "pageSize": 500,
+  "orderBy": "",
+  "order": null,
+  "distinct": true,
+  "isDashboardQuery": false,
+  "contactId": "<contact-id>",
+  "id": "",
+  "name": ""
 }
 ```
 
-## Available Fields (LearningComplianceDashboardView)
-
-Based on the metadata, key fields include:
-
-### Member Information
-- `FullName` - Member's full name
-- `MembershipNumber` - Unique member ID
-- `RoleName` - Current role
-- `TeamName` - Team/section name
-- `TeamId` - Team identifier
-- `RoleStartDate` - When role started
-
-### Safeguarding
-- `SafeguardingStatus` - Current status (Compliant, Expired, Due Soon, etc.)
-- `SafeguardingExpiryDate` - When safeguarding training expires
-- `SafeguardingCompletedDate` - When last completed
-
-### Safety
-- `SafetyStatus` - Current status
-- `SafetyExpiryDate` - When safety training expires
-- `SafetyCompletedDate` - When last completed
-
-### First Response
-- `FirstResponseStatus` - Current status
-- `FirstResponseExpiryDate` - When First Response expires
-- `FirstResponseRequired` - Whether required for role
-
-### Learning Progress
-- `GrowingRootsStatus` - Joining journey progress
-- `DataProtectionStatus` - Data protection training
-- `WhoWeAreStatus` - Core training module
-
-## Filter Syntax
-
-Filters use this structure:
+### Get Outstanding Joining Journey Items
 
 ```json
+POST /api/DataExplorer/GetResultsAsync
 {
-  "field": "SafeguardingStatus",
-  "operator": "eq",
-  "value": "Expired"
+  "table": "InProgressActionDashboardView",
+  "query": "",
+  "selectFields": [],
+  "pageNo": 1,
+  "pageSize": 500,
+  "orderBy": "",
+  "order": null,
+  "distinct": true,
+  "isDashboardQuery": false,
+  "contactId": "<contact-id>",
+  "id": "",
+  "name": ""
+}
+```
+Then filter client-side for `On boarding action status === 'Outstanding'`.
+
+### Get Accurate Learning Expiry Dates
+
+Use `GetLmsDetailsAsync` for accurate per-member learning expiry dates:
+
+```json
+POST /api/GetLmsDetailsAsync
+{
+  "contactId": "<member-contact-id>"
 }
 ```
 
-### Available Operators
-- `eq` - Equals
-- `neq` - Not equals
-- `contains` - Contains string
-- `startswith` - Starts with
-- `endswith` - Ends with
-- `gt` / `gte` - Greater than / or equal
-- `lt` / `lte` - Less than / or equal
-- `isnull` - Is null
-- `isnotnull` - Is not null
+Returns modules with accurate `expiryDate` values.
 
-## Next Steps for Implementation
+### Search Member by Membership Number
 
-1. **Build API Client** - TypeScript client that wraps these endpoints
-2. **Implement Auth Flow** - Handle B2C authentication in browser/Lambda
-3. **Create Compliance Queries** - Pre-built queries for common GLV needs:
-   - Safeguarding expiring in next 30/60/90 days
-   - Safety training overdue
-   - First Response renewals needed
-   - Growing Roots incomplete
-4. **Build Dashboard UI** - React components to display compliance status
+```json
+POST /api/MemberListingAsync
+{
+  "searchText": "",
+  "pageNo": 1,
+  "pageSize": 10,
+  "filter": "membershipnumber eq '0012301455'"
+}
+```
+
+### Get Disclosure from Table Storage
+
+1. Get SAS token:
+```json
+POST /api/GenerateSASTokenAsync
+{
+  "table": "Disclosures",
+  "partitionkey": "<member-contact-id>",
+  "permissions": "R"
+}
+```
+
+2. Fetch from returned URL with the token.
+
+## Important Notes
+
+1. **orderBy/order parameters**: Must be empty string and null respectively. Non-empty values cause API errors.
+
+2. **selectFields**: Can be empty to get all fields. Specifying fields may cause errors for some views.
+
+3. **Field names have spaces**: e.g., `First name`, `Last name`, `Membership number`, `On boarding action status`
+
+4. **LearningComplianceDashboardView expiry dates are unreliable**: Use `GetLmsDetailsAsync` per member for accurate expiry dates.
