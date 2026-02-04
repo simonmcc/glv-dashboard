@@ -730,7 +730,7 @@ const API_BASE = 'https://tsa-memportal-prod-fun01.azurewebsites.net/api';
 async function searchMemberByNumber(
   token: string,
   membershipNumber: string
-): Promise<{ id: string; fullname: string; firstname: string; lastname: string } | null> {
+): Promise<{ id: string; fullname: string; firstname: string; lastname: string; preferredName: string } | null> {
   try {
     const response = await fetch(`${API_BASE}/MemberListingAsync`, {
       method: 'POST',
@@ -759,11 +759,14 @@ async function searchMemberByNumber(
     const data = await response.json();
     if (data.data && data.data.length > 0) {
       const member = data.data[0];
+      // Use PreferredName if available, otherwise fall back to firstname
+      const preferredName = member.PreferredName?.trim() || member.firstname?.trim() || '';
       return {
         id: member.id,
         fullname: member.fullname,
         firstname: member.firstname,
         lastname: member.lastname,
+        preferredName,
       };
     }
     return null;
@@ -854,7 +857,7 @@ export async function checkDisclosuresByMembershipNumbers(
       continue;
     }
 
-    console.log(`[Disclosures] Found ${member.fullname} (${member.id})`);
+    console.log(`[Disclosures] Found ${member.preferredName} ${member.lastname} (${member.id})`);
 
     // Get disclosures
     const disclosures = await getDisclosuresForContact(token, member.id);
@@ -863,7 +866,7 @@ export async function checkDisclosuresByMembershipNumbers(
     members.push({
       membershipNumber,
       contactId: member.id,
-      firstName: member.firstname,
+      firstName: member.preferredName,
       lastName: member.lastname,
       disclosures,
     });
@@ -938,7 +941,7 @@ export async function checkLearningByMembershipNumbers(
       continue;
     }
 
-    console.log(`[Learning] Found ${member.fullname} (${member.id})`);
+    console.log(`[Learning] Found ${member.preferredName} ${member.lastname} (${member.id})`);
 
     // Get learning details
     const modules = await getLearningForContact(token, member.id);
@@ -947,7 +950,7 @@ export async function checkLearningByMembershipNumbers(
     members.push({
       membershipNumber,
       contactId: member.id,
-      firstName: member.firstname,
+      firstName: member.preferredName,
       lastName: member.lastname,
       modules,
     });
