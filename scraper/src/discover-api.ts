@@ -90,6 +90,15 @@ function getEndpointKey(method: string, url: string): string {
 }
 
 async function promptForCredentials(): Promise<{ username: string; password: string }> {
+  // Check for environment variables first
+  const envUsername = process.env.SCOUT_USERNAME;
+  const envPassword = process.env.SCOUT_PASSWORD;
+
+  if (envUsername && envPassword) {
+    console.log('\n🔐 Using credentials from environment variables (SCOUT_USERNAME, SCOUT_PASSWORD)');
+    return { username: envUsername, password: envPassword };
+  }
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -105,7 +114,8 @@ async function promptForCredentials(): Promise<{ username: string; password: str
 
   console.log('\n🔐 Scouts Membership Login');
   console.log('─'.repeat(40));
-  console.log('Your credentials are used only for this session and are not stored.\n');
+  console.log('Your credentials are used only for this session and are not stored.');
+  console.log('(Set SCOUT_USERNAME and SCOUT_PASSWORD env vars to skip this prompt)\n');
 
   const username = await question('Email/Username: ');
 
@@ -639,11 +649,12 @@ async function main(): Promise<void> {
 
   const { username, password } = await promptForCredentials();
 
-  console.log('\n🚀 Launching browser...');
+  const headless = process.env.HEADLESS !== 'false';
+  console.log(`\n🚀 Launching browser (headless: ${headless})...`);
 
   const browser: Browser = await chromium.launch({
-    headless: false, // Set to true for automated runs, false to see what's happening
-    slowMo: 100,     // Slow down actions for visibility
+    headless,
+    slowMo: headless ? 0 : 100, // Slow down actions for visibility when not headless
   });
 
   const context = await browser.newContext({

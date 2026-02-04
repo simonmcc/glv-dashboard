@@ -30,8 +30,58 @@ export interface ApiResponse<T> {
   error: string | null;
 }
 
+export interface DisclosureRecord {
+  'First name': string;
+  'Last name': string;
+  'Membership number': string;
+  'Communication email'?: string;
+  'Unit name'?: string;
+  'Team name'?: string;
+  'Role name'?: string;
+  'Team type'?: string;
+  'Role start date'?: string | null;
+  'Disclosure authority': string;
+  'Disclosure status': string;
+  'Disclosure issue date'?: string | null;
+  'Disclosure expiry date'?: string | null;
+  'Days since expiry'?: number | null;
+  'Disclosure ID'?: string;
+}
+
+export interface DisclosureSummary {
+  total: number;
+  byStatus: Record<string, number>;
+  expired: number;
+  expiringSoon: number;
+  valid: number;
+}
+
 export type AuthState =
   | { status: 'unauthenticated' }
   | { status: 'authenticating' }
   | { status: 'authenticated'; token: string; contactId: string }
   | { status: 'error'; message: string };
+
+/**
+ * Detailed disclosure record from Azure Table Storage
+ */
+export interface DisclosureDetail {
+  disclosureId: string;
+  status: string;
+  authority: string;
+  type: string;
+  expiryDate: string | null;
+  issueDate: string | null;
+  country: string;
+}
+
+/**
+ * Member with their disclosure details from the check-disclosures API
+ */
+export interface MemberDisclosureResult {
+  membershipNumber: string;
+  contactId: string;
+  firstName: string;
+  lastName: string;
+  disclosures: DisclosureDetail[];
+}

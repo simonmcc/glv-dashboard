@@ -7,7 +7,7 @@
 
 import express from 'express';
 import cors from 'cors';
-import { authenticate } from './auth-service.js';
+import { authenticate, exploreDisclosures, scrapeDisclosures, checkDisclosuresByMembershipNumbers } from './auth-service.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -132,6 +132,81 @@ app.post('/api/proxy', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to proxy request',
+    });
+  }
+});
+
+// Scrape disclosures endpoint - uses Playwright to navigate to member pages
+app.post('/api/scrape-disclosures', async (req, res) => {
+  const { username, password, memberContactIds } = req.body;
+
+  if (!username || !password || !memberContactIds || !Array.isArray(memberContactIds)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Username, password, and memberContactIds array are required',
+    });
+  }
+
+  console.log(`[Scrape] Starting scrape for ${memberContactIds.length} members`);
+
+  try {
+    const result = await scrapeDisclosures(username, password, memberContactIds);
+    return res.json(result);
+  } catch (error) {
+    console.error('[Scrape] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to scrape disclosures',
+    });
+  }
+});
+
+// Check disclosures by membership numbers - the preferred method
+app.post('/api/check-disclosures', async (req, res) => {
+  const { token, membershipNumbers } = req.body;
+
+  if (!token || !membershipNumbers || !Array.isArray(membershipNumbers)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Token and membershipNumbers array are required',
+    });
+  }
+
+  console.log(`[Disclosures] Checking ${membershipNumbers.length} membership numbers`);
+
+  try {
+    const result = await checkDisclosuresByMembershipNumbers(token, membershipNumbers);
+    return res.json(result);
+  } catch (error) {
+    console.error('[Disclosures] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to check disclosures',
+    });
+  }
+});
+
+// Explore disclosures endpoint - discovers member contact IDs and fetches disclosure details
+app.post('/api/explore-disclosures', async (req, res) => {
+  const { token, contactId } = req.body;
+
+  if (!token || !contactId) {
+    return res.status(400).json({
+      success: false,
+      error: 'Token and contactId are required',
+    });
+  }
+
+  console.log('[Explore] Starting disclosure exploration...');
+
+  try {
+    const result = await exploreDisclosures(token, contactId);
+    return res.json(result);
+  } catch (error) {
+    console.error('[Explore] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to explore disclosures',
     });
   }
 });

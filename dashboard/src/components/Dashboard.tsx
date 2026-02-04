@@ -43,6 +43,16 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
         (client as any).contactId = contactId;
       }
 
+      // Expose client for testing table names in browser console
+      // Usage: window.testTable('DisclosureDashboardView')
+      (window as any).apiClient = client;
+      (window as any).testTable = (tableName: string) => client.testTable(tableName);
+      // Check disclosures by membership numbers
+      // Usage: checkDisclosures(['0012162494', '0012345678'])
+      (window as any).checkDisclosures = (membershipNumbers: string[]) =>
+        client.checkDisclosuresByMembershipNumbers(membershipNumbers);
+      console.log('[Dashboard] Test function: checkDisclosures([membershipNumbers])');
+
       // Fetch all learning compliance records
       const response = await client.getAllLearningCompliance(1000);
 
@@ -56,6 +66,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       // Compute summary
       const summaryData = client.computeComplianceSummary(data);
       setSummary(summaryData);
+
       setLastUpdated(new Date());
     } catch (err) {
       const message = (err as Error).message;
@@ -126,9 +137,9 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
           <SummaryTiles summary={summary} isLoading={isLoading} />
         </section>
 
-        {/* Detailed Table */}
+        {/* Learning Compliance Table */}
         <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">All Records</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Learning Records</h2>
           <ComplianceTable records={records} isLoading={isLoading} />
         </section>
       </main>

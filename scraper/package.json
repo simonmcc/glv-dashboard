@@ -6,6 +6,8 @@
   "scripts": {
     "discover": "npx tsx src/discover-api.ts",
     "test-api": "npx tsx src/test-api-client.ts",
+    "access-ni": "npx tsx src/access-ni-disclosure.ts",
+    "check-disclosures": "npx tsx src/check-disclosures.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
