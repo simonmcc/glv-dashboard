@@ -7,7 +7,7 @@
 
 import express from 'express';
 import cors from 'cors';
-import { authenticate, exploreDisclosures, scrapeDisclosures, checkDisclosuresByMembershipNumbers } from './auth-service.js';
+import { authenticate, exploreDisclosures, scrapeDisclosures, checkDisclosuresByMembershipNumbers, checkLearningByMembershipNumbers } from './auth-service.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -157,6 +157,31 @@ app.post('/api/scrape-disclosures', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to scrape disclosures',
+    });
+  }
+});
+
+// Check learning by membership numbers - uses GetLmsDetailsAsync for accurate expiry dates
+app.post('/api/check-learning', async (req, res) => {
+  const { token, membershipNumbers } = req.body;
+
+  if (!token || !membershipNumbers || !Array.isArray(membershipNumbers)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Token and membershipNumbers array are required',
+    });
+  }
+
+  console.log(`[Learning] Checking ${membershipNumbers.length} membership numbers`);
+
+  try {
+    const result = await checkLearningByMembershipNumbers(token, membershipNumbers);
+    return res.json(result);
+  } catch (error) {
+    console.error('[Learning] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to check learning',
     });
   }
 });

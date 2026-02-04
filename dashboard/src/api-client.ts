@@ -4,7 +4,7 @@
  * Routes all API calls through the backend proxy to avoid CORS issues.
  */
 
-import type { LearningRecord, ApiResponse, ComplianceSummary, DisclosureRecord, DisclosureSummary, MemberDisclosureResult } from './types';
+import type { LearningRecord, ApiResponse, ComplianceSummary, DisclosureRecord, DisclosureSummary, MemberDisclosureResult, MemberLearningResult } from './types';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
@@ -402,6 +402,39 @@ export class ScoutsApiClient {
   }
 
 /**
+   * Check learning by membership numbers
+   * Uses MemberListingAsync to find contact IDs, then fetches learning via GetLmsDetailsAsync
+   */
+  async checkLearningByMembershipNumbers(
+    membershipNumbers: string[]
+  ): Promise<{ success: boolean; members?: MemberLearningResult[]; error?: string }> {
+    console.log(`[API] Checking learning for ${membershipNumbers.length} members...`);
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/check-learning`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: this.token,
+          membershipNumbers,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        return { success: false, error: `HTTP ${response.status}: ${text}` };
+      }
+
+      const result = await response.json();
+      console.log('[API] Check learning result:', result);
+      return result;
+    } catch (err) {
+      console.error('[API] Check learning error:', err);
+      return { success: false, error: String(err) };
+    }
+  }
+
+  /**
    * Check disclosures by membership numbers (preferred method)
    * Uses MemberListingAsync to find contact IDs, then fetches disclosures from Table Storage
    */

@@ -85,3 +85,23 @@ export interface MemberDisclosureResult {
   lastName: string;
   disclosures: DisclosureDetail[];
 }
+
+/**
+ * Learning module from GetLmsDetailsAsync
+ */
+export interface LearningModule {
+  title: string;
+  expiryDate: string | null;
+  currentLevel: string;
+}
+
+/**
+ * Member with their learning details from the check-learning API
+ */
+export interface MemberLearningResult {
+  membershipNumber: string;
+  contactId: string;
+  firstName: string;
+  lastName: string;
+  modules: LearningModule[];
+}

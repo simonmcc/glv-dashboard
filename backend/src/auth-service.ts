@@ -40,6 +40,26 @@ export interface ExploreResult {
   error?: string;
 }
 
+export interface LearningModule {
+  title: string;
+  expiryDate: string | null;
+  currentLevel: string;
+}
+
+export interface MemberLearning {
+  membershipNumber: string;
+  contactId: string;
+  firstName: string;
+  lastName: string;
+  modules: LearningModule[];
+}
+
+export interface LearningResult {
+  success: boolean;
+  members?: MemberLearning[];
+  error?: string;
+}
+
 async function handleCookieConsent(page: Page): Promise<void> {
   const cookieSelectors = [
     'button:has-text("Accept All")',
@@ -846,6 +866,90 @@ export async function checkDisclosuresByMembershipNumbers(
       firstName: member.firstname,
       lastName: member.lastname,
       disclosures,
+    });
+  }
+
+  return { success: true, members };
+}
+
+/**
+ * Get learning details for a contact ID using GetLmsDetailsAsync
+ */
+async function getLearningForContact(
+  token: string,
+  contactId: string
+): Promise<LearningModule[]> {
+  try {
+    const response = await fetch(`${API_BASE}/GetLmsDetailsAsync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        contactid: contactId,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!Array.isArray(data)) {
+      console.log(`[API] Unexpected response for learning: ${JSON.stringify(data).substring(0, 200)}`);
+      return [];
+    }
+
+    return data.map((m: Record<string, unknown>) => ({
+      title: String(m.title || ''),
+      expiryDate: m.expiryDate ? String(m.expiryDate) : null,
+      currentLevel: String(m.currentLevel || ''),
+    }));
+  } catch (error) {
+    console.error(`[API] Failed to get learning for ${contactId}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Check learning for a list of membership numbers
+ * Uses MemberListingAsync to find contact IDs, then fetches learning via GetLmsDetailsAsync
+ */
+export async function checkLearningByMembershipNumbers(
+  token: string,
+  membershipNumbers: string[]
+): Promise<LearningResult> {
+  console.log(`[Learning] Checking ${membershipNumbers.length} membership numbers`);
+
+  const members: MemberLearning[] = [];
+
+  for (const membershipNumber of membershipNumbers) {
+    console.log(`[Learning] Looking up ${membershipNumber}...`);
+
+    // Search for member
+    const member = await searchMemberByNumber(token, membershipNumber);
+    if (!member) {
+      console.log(`[Learning] Member not found: ${membershipNumber}`);
+      members.push({
+        membershipNumber,
+        contactId: '',
+        firstName: '',
+        lastName: '',
+        modules: [],
+      });
+      continue;
+    }
+
+    console.log(`[Learning] Found ${member.fullname} (${member.id})`);
+
+    // Get learning details
+    const modules = await getLearningForContact(token, member.id);
+    console.log(`[Learning] Got ${modules.length} learning modules`);
+
+    members.push({
+      membershipNumber,
+      contactId: member.id,
+      firstName: member.firstname,
+      lastName: member.lastname,
+      modules,
     });
   }
 

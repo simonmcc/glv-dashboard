@@ -25,7 +25,7 @@ const statusColors: Record<string, string> = {
 };
 
 export function ComplianceTable({ records, isLoading }: ComplianceTableProps) {
-  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortField, setSortField] = useState<SortField>('expiry');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterLearning, setFilterLearning] = useState<string>('all');
@@ -260,15 +260,12 @@ export function ComplianceTable({ records, isLoading }: ComplianceTableProps) {
               >
                 Expiry Date <SortIcon field="expiry" />
               </th>
-              <th className="px-4 py-3 text-sm font-semibold text-gray-900">
-                Team / Role
-              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filteredRecords.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                   No records match your filters
                 </td>
               </tr>
@@ -320,10 +317,6 @@ export function ComplianceTable({ records, isLoading }: ComplianceTableProps) {
                     ) : (
                       '-'
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {record['Team name'] && <div>{record['Team name']}</div>}
-                    {record['Role name'] && <div className="text-gray-400">{record['Role name']}</div>}
                   </td>
                 </tr>
               ))

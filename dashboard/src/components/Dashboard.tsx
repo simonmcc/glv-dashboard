@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ScoutsApiClient } from '../api-client';
-import type { LearningRecord, ComplianceSummary } from '../types';
+import type { LearningRecord, ComplianceSummary, MemberLearningResult } from '../types';
 import { SummaryTiles } from './SummaryTiles';
 import { ComplianceTable } from './ComplianceTable';
 
@@ -15,6 +15,77 @@ interface DashboardProps {
   contactId: string;
   onLogout: () => void;
   onTokenExpired: () => void;
+}
+
+/**
+ * Transform MemberLearningResult[] from GetLmsDetailsAsync into LearningRecord[] format.
+ * Only includes modules that have actual expiry dates (filters out one-time modules).
+ */
+function transformLearningResults(members: MemberLearningResult[]): LearningRecord[] {
+  const records: LearningRecord[] = [];
+
+  for (const member of members) {
+    // Only include modules that have an expiry date (i.e., need renewal)
+    const expiringModules = member.modules.filter(m => m.expiryDate !== null);
+
+    for (const module of expiringModules) {
+      // Parse the expiry date (format: "MM/DD/YYYY HH:MM:SS")
+      const expiryDate = parseExpiryDate(module.expiryDate);
+      const status = computeModuleStatus(module.currentLevel, expiryDate);
+
+      records.push({
+        'First name': member.firstName,
+        'Last name': member.lastName,
+        'Membership number': member.membershipNumber,
+        'Learning': module.title,
+        'Status': status,
+        'Expiry date': expiryDate ? expiryDate.toISOString() : null,
+      });
+    }
+  }
+
+  return records;
+}
+
+/**
+ * Parse expiry date from API format "MM/DD/YYYY HH:MM:SS" to Date
+ */
+function parseExpiryDate(dateStr: string | null): Date | null {
+  if (!dateStr) return null;
+
+  try {
+    // Format: "04/25/2028 21:22:00"
+    const [datePart, timePart] = dateStr.split(' ');
+    const [month, day, year] = datePart.split('/').map(Number);
+    const [hours, minutes, seconds] = (timePart || '00:00:00').split(':').map(Number);
+
+    return new Date(year, month - 1, day, hours, minutes, seconds);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compute status based on current level and expiry date
+ */
+function computeModuleStatus(currentLevel: string, expiryDate: Date | null): string {
+  if (!expiryDate) {
+    return currentLevel === 'Achieved skill' ? 'Valid' : 'Not Started';
+  }
+
+  const now = new Date();
+  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const sixtyDaysFromNow = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+
+  if (expiryDate < now) {
+    return 'Expired';
+  } else if (expiryDate < thirtyDaysFromNow) {
+    return 'Expiring';
+  } else if (expiryDate < sixtyDaysFromNow) {
+    return 'Renewal Due';
+  } else {
+    return 'Valid';
+  }
 }
 
 export function Dashboard({ token, contactId, onLogout, onTokenExpired }: DashboardProps) {
@@ -51,16 +122,38 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       // Usage: checkDisclosures(['0012162494', '0012345678'])
       (window as any).checkDisclosures = (membershipNumbers: string[]) =>
         client.checkDisclosuresByMembershipNumbers(membershipNumbers);
-      console.log('[Dashboard] Test function: checkDisclosures([membershipNumbers])');
+      // Check learning by membership numbers - uses GetLmsDetailsAsync for accurate expiry dates
+      // Usage: checkLearning(['0012162494', '0012345678'])
+      (window as any).checkLearning = (membershipNumbers: string[]) =>
+        client.checkLearningByMembershipNumbers(membershipNumbers);
+      console.log('[Dashboard] Test functions: checkLearning([membershipNumbers]), checkDisclosures([membershipNumbers])');
 
-      // Fetch all learning compliance records
-      const response = await client.getAllLearningCompliance(1000);
+      // First get member list from LearningComplianceDashboardView to get membership numbers
+      console.log('[Dashboard] Fetching member list...');
+      const memberListResponse = await client.getAllLearningCompliance(1000);
 
-      if (response.error) {
-        throw new Error(response.error);
+      if (memberListResponse.error) {
+        throw new Error(memberListResponse.error);
       }
 
-      const data = response.data || [];
+      // Extract unique membership numbers
+      const uniqueMembershipNumbers = [...new Set(
+        (memberListResponse.data || []).map(r => r['Membership number'])
+      )];
+      console.log(`[Dashboard] Found ${uniqueMembershipNumbers.length} unique members`);
+
+      // Fetch accurate learning data via GetLmsDetailsAsync
+      console.log('[Dashboard] Fetching learning details for each member...');
+      const learningResult = await client.checkLearningByMembershipNumbers(uniqueMembershipNumbers);
+
+      if (!learningResult.success || !learningResult.members) {
+        throw new Error(learningResult.error || 'Failed to fetch learning details');
+      }
+
+      // Transform to LearningRecord format, only including modules that actually expire
+      const data = transformLearningResults(learningResult.members);
+      console.log(`[Dashboard] Transformed to ${data.length} learning records (expiring modules only)`);
+
       setRecords(data);
 
       // Compute summary
