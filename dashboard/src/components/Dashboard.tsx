@@ -6,7 +6,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ScoutsApiClient } from '../api-client';
-import type { LearningRecord, ComplianceSummary, MemberLearningResult, JoiningJourneyRecord, DisclosureRecord, DisclosureSummary, AppointmentRecord, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from '../types';
+import { transformLearningResults } from '../utils';
+import type { LearningRecord, ComplianceSummary, JoiningJourneyRecord, DisclosureRecord, DisclosureSummary, AppointmentRecord, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from '../types';
 import { SummaryTiles } from './SummaryTiles';
 import { ComplianceTable } from './ComplianceTable';
 import { JoiningJourneyTable } from './JoiningJourneyTable';
@@ -22,77 +23,6 @@ interface DashboardProps {
   contactId: string;
   onLogout: () => void;
   onTokenExpired: () => void;
-}
-
-/**
- * Transform MemberLearningResult[] from GetLmsDetailsAsync into LearningRecord[] format.
- * Only includes modules that have actual expiry dates (filters out one-time modules).
- */
-function transformLearningResults(members: MemberLearningResult[]): LearningRecord[] {
-  const records: LearningRecord[] = [];
-
-  for (const member of members) {
-    // Only include modules that have an expiry date (i.e., need renewal)
-    const expiringModules = member.modules.filter(m => m.expiryDate !== null);
-
-    for (const module of expiringModules) {
-      // Parse the expiry date (format: "MM/DD/YYYY HH:MM:SS")
-      const expiryDate = parseExpiryDate(module.expiryDate);
-      const status = computeModuleStatus(module.currentLevel, expiryDate);
-
-      records.push({
-        'First name': member.firstName,
-        'Last name': member.lastName,
-        'Membership number': member.membershipNumber,
-        'Learning': module.title,
-        'Status': status,
-        'Expiry date': expiryDate ? expiryDate.toISOString() : null,
-      });
-    }
-  }
-
-  return records;
-}
-
-/**
- * Parse expiry date from API format "MM/DD/YYYY HH:MM:SS" to Date
- */
-function parseExpiryDate(dateStr: string | null): Date | null {
-  if (!dateStr) return null;
-
-  try {
-    // Format: "04/25/2028 21:22:00"
-    const [datePart, timePart] = dateStr.split(' ');
-    const [month, day, year] = datePart.split('/').map(Number);
-    const [hours, minutes, seconds] = (timePart || '00:00:00').split(':').map(Number);
-
-    return new Date(year, month - 1, day, hours, minutes, seconds);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Compute status based on current level and expiry date
- */
-function computeModuleStatus(currentLevel: string, expiryDate: Date | null): string {
-  if (!expiryDate) {
-    return currentLevel === 'Achieved skill' ? 'Valid' : 'Not Started';
-  }
-
-  const now = new Date();
-  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const sixtyDaysFromNow = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
-
-  if (expiryDate < now) {
-    return 'Expired';
-  } else if (expiryDate < thirtyDaysFromNow) {
-    return 'Expiring';
-  } else if (expiryDate < sixtyDaysFromNow) {
-    return 'Renewal Due';
-  } else {
-    return 'Valid';
-  }
 }
 
 export function Dashboard({ token, contactId, onLogout, onTokenExpired }: DashboardProps) {
