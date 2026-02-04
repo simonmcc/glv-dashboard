@@ -118,3 +118,82 @@ export interface MemberLearningResult {
   lastName: string;
   modules: LearningModule[];
 }
+
+/**
+ * Appointment record from AppointmentsDashboardView
+ */
+export interface AppointmentRecord {
+  'First name': string;
+  'Last name': string;
+  'Membership number': string;
+  'Role/Accreditation': string;
+  'Start date': string | null;
+  'End date': string | null;
+  'Days since role Started': number | null;
+  'Communication email'?: string;
+  'Group'?: string;
+  'District'?: string;
+  'EDI'?: string;
+}
+
+/**
+ * Suspension record from SuspensionDashboardView
+ */
+export interface SuspensionRecord {
+  'First name': string;
+  'Last name': string;
+  'Membership number': string;
+  'Role': string;
+  'Team': string;
+  'Unit name': string;
+  'Suspension date': string | null;
+  'Suspension reason'?: string;
+  'Communication email'?: string;
+}
+
+/**
+ * Team directory review record from TeamDirectoryReviewsDashboardView
+ */
+export interface TeamReviewRecord {
+  'First name'?: string;
+  'Last name'?: string;
+  'Membership number': string;
+  'Role': string;
+  'Team leader': string;
+  'Scheduled review date': string | null;
+  'Review overdue': string;
+  'Group'?: string;
+  'District'?: string;
+}
+
+/**
+ * Permit record from PermitsDashboardView
+ */
+export interface PermitRecord {
+  'First name': string;
+  'Last name': string;
+  'Membership number': string;
+  'Permit category': string;
+  'Permit type'?: string;
+  'Permit status': string;
+  'Permit expiry date': string | null;
+  'Permit restriction details'?: string;
+  'Unit name'?: string;
+  'Team'?: string;
+  'Communication email'?: string;
+}
+
+/**
+ * Award record from PreloadedAwardsDashboardView
+ */
+export interface AwardRecord {
+  'First name': string;
+  'Last name': string;
+  'Membership number': string;
+  'Accreditation': string;
+  'Role': string;
+  'Team'?: string;
+  'Unit name'?: string;
+  'Contact number'?: string;
+  'Communication email'?: string;
+}

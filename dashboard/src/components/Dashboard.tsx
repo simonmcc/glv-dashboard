@@ -6,10 +6,16 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ScoutsApiClient } from '../api-client';
-import type { LearningRecord, ComplianceSummary, MemberLearningResult, JoiningJourneyRecord } from '../types';
+import type { LearningRecord, ComplianceSummary, MemberLearningResult, JoiningJourneyRecord, DisclosureRecord, DisclosureSummary, AppointmentRecord, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from '../types';
 import { SummaryTiles } from './SummaryTiles';
 import { ComplianceTable } from './ComplianceTable';
 import { JoiningJourneyTable } from './JoiningJourneyTable';
+import { DisclosureTable } from './DisclosureTable';
+import { AppointmentsTable } from './AppointmentsTable';
+import { SuspensionsTable } from './SuspensionsTable';
+import { TeamReviewsTable } from './TeamReviewsTable';
+import { PermitsTable } from './PermitsTable';
+import { AwardsTable } from './AwardsTable';
 
 interface DashboardProps {
   token: string;
@@ -93,6 +99,13 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
   const [records, setRecords] = useState<LearningRecord[]>([]);
   const [summary, setSummary] = useState<ComplianceSummary | null>(null);
   const [joiningJourneyRecords, setJoiningJourneyRecords] = useState<JoiningJourneyRecord[]>([]);
+  const [disclosureRecords, setDisclosureRecords] = useState<DisclosureRecord[]>([]);
+  const [disclosureSummary, setDisclosureSummary] = useState<DisclosureSummary | null>(null);
+  const [appointmentRecords, setAppointmentRecords] = useState<AppointmentRecord[]>([]);
+  const [suspensionRecords, setSuspensionRecords] = useState<SuspensionRecord[]>([]);
+  const [teamReviewRecords, setTeamReviewRecords] = useState<TeamReviewRecord[]>([]);
+  const [permitRecords, setPermitRecords] = useState<PermitRecord[]>([]);
+  const [awardRecords, setAwardRecords] = useState<AwardRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -171,6 +184,55 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       if (!joiningJourneyResponse.error && joiningJourneyResponse.data) {
         setJoiningJourneyRecords(joiningJourneyResponse.data);
         console.log(`[Dashboard] Got ${joiningJourneyResponse.data.length} joining journey records`);
+      }
+
+      // Fetch disclosure compliance data
+      console.log('[Dashboard] Fetching disclosure compliance data...');
+      const disclosureResponse = await client.getDisclosureCompliance(500);
+      if (!disclosureResponse.error && disclosureResponse.data) {
+        setDisclosureRecords(disclosureResponse.data);
+        setDisclosureSummary(client.computeDisclosureSummary(disclosureResponse.data));
+        console.log(`[Dashboard] Got ${disclosureResponse.data.length} disclosure records`);
+      }
+
+      // Fetch appointments data
+      console.log('[Dashboard] Fetching appointments data...');
+      const appointmentsResponse = await client.getAppointments(500);
+      if (!appointmentsResponse.error && appointmentsResponse.data) {
+        setAppointmentRecords(appointmentsResponse.data);
+        console.log(`[Dashboard] Got ${appointmentsResponse.data.length} appointment records`);
+      }
+
+      // Fetch suspensions data
+      console.log('[Dashboard] Fetching suspensions data...');
+      const suspensionsResponse = await client.getSuspensions(500);
+      if (!suspensionsResponse.error && suspensionsResponse.data) {
+        setSuspensionRecords(suspensionsResponse.data);
+        console.log(`[Dashboard] Got ${suspensionsResponse.data.length} suspension records`);
+      }
+
+      // Fetch team reviews data
+      console.log('[Dashboard] Fetching team reviews data...');
+      const teamReviewsResponse = await client.getTeamReviews(500);
+      if (!teamReviewsResponse.error && teamReviewsResponse.data) {
+        setTeamReviewRecords(teamReviewsResponse.data);
+        console.log(`[Dashboard] Got ${teamReviewsResponse.data.length} team review records`);
+      }
+
+      // Fetch permits data
+      console.log('[Dashboard] Fetching permits data...');
+      const permitsResponse = await client.getPermits(500);
+      if (!permitsResponse.error && permitsResponse.data) {
+        setPermitRecords(permitsResponse.data);
+        console.log(`[Dashboard] Got ${permitsResponse.data.length} permit records`);
+      }
+
+      // Fetch awards data
+      console.log('[Dashboard] Fetching awards data...');
+      const awardsResponse = await client.getAwards(500);
+      if (!awardsResponse.error && awardsResponse.data) {
+        setAwardRecords(awardsResponse.data);
+        console.log(`[Dashboard] Got ${awardsResponse.data.length} award records`);
       }
 
       setLastUpdated(new Date());
@@ -253,6 +315,42 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
         <section>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Joining Journey</h2>
           <JoiningJourneyTable records={joiningJourneyRecords} isLoading={isLoading} />
+        </section>
+
+        {/* Disclosure Compliance Table */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Disclosure Compliance</h2>
+          <DisclosureTable records={disclosureRecords} summary={disclosureSummary} isLoading={isLoading} />
+        </section>
+
+        {/* Suspensions Table */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Suspensions</h2>
+          <SuspensionsTable records={suspensionRecords} isLoading={isLoading} />
+        </section>
+
+        {/* Appointments Table */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Appointments</h2>
+          <AppointmentsTable records={appointmentRecords} isLoading={isLoading} />
+        </section>
+
+        {/* Team Reviews Table */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Team Directory Reviews</h2>
+          <TeamReviewsTable records={teamReviewRecords} isLoading={isLoading} />
+        </section>
+
+        {/* Permits Table */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Permits</h2>
+          <PermitsTable records={permitRecords} isLoading={isLoading} />
+        </section>
+
+        {/* Awards Table */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Awards & Recognitions</h2>
+          <AwardsTable records={awardRecords} isLoading={isLoading} />
         </section>
       </main>
 

@@ -4,7 +4,7 @@
  * Routes all API calls through the backend proxy to avoid CORS issues.
  */
 
-import type { LearningRecord, ApiResponse, ComplianceSummary, DisclosureRecord, DisclosureSummary, MemberDisclosureResult, MemberLearningResult, JoiningJourneyRecord } from './types';
+import type { LearningRecord, ApiResponse, ComplianceSummary, DisclosureRecord, DisclosureSummary, MemberDisclosureResult, MemberLearningResult, JoiningJourneyRecord, AppointmentRecord, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from './types';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
@@ -640,6 +640,265 @@ export class ScoutsApiClient {
       total: records.length,
       byLearningType,
       byStatus,
+    };
+  }
+
+  /**
+   * Fetch disclosure compliance data from DisclosureComplianceDashboardView
+   */
+  async getDisclosureCompliance(pageSize: number = 500): Promise<ApiResponse<DisclosureRecord>> {
+    console.log('[API] Fetching disclosure compliance data');
+
+    const result = await this.query<Record<string, unknown>>({
+      table: 'DisclosureComplianceDashboardView',
+      selectFields: [],
+      query: '',
+      pageNo: 1,
+      pageSize,
+      distinct: true,
+    });
+
+    if (result.error) {
+      console.error('[API] Disclosure compliance query error:', result.error);
+      return { data: [], nextPage: null, count: 0, error: result.error };
+    }
+
+    const data = (result.data || []).map((record): DisclosureRecord => ({
+      'First name': String(record['First name'] || ''),
+      'Last name': String(record['Surname'] || record['Last name'] || ''),
+      'Membership number': String(record['Membership number'] || ''),
+      'Communication email': record['Communication email'] as string,
+      'Unit name': record['Unit name'] as string,
+      'Team name': record['Team'] as string,
+      'Role name': record['Role'] as string,
+      'Disclosure authority': String(record['Disclosure authority'] || ''),
+      'Disclosure status': String(record['Disclosure status'] || ''),
+      'Disclosure issue date': record['Disclosure issue date'] as string | null,
+      'Disclosure expiry date': record['Disclosure expiry date'] as string | null,
+      'Days since expiry': record['Days since expiry'] as number | null,
+    }));
+
+    console.log(`[API] Transformed ${data.length} disclosure compliance records`);
+
+    return {
+      data,
+      nextPage: result.nextPage,
+      count: result.count,
+      error: result.error,
+    };
+  }
+
+  /**
+   * Fetch appointments data from AppointmentsDashboardView
+   */
+  async getAppointments(pageSize: number = 500): Promise<ApiResponse<AppointmentRecord>> {
+    console.log('[API] Fetching appointments data');
+
+    const result = await this.query<Record<string, unknown>>({
+      table: 'AppointmentsDashboardView',
+      selectFields: [],
+      query: '',
+      pageNo: 1,
+      pageSize,
+      distinct: true,
+    });
+
+    if (result.error) {
+      console.error('[API] Appointments query error:', result.error);
+      return { data: [], nextPage: null, count: 0, error: result.error };
+    }
+
+    const data = (result.data || []).map((record): AppointmentRecord => ({
+      'First name': String(record['First name'] || ''),
+      'Last name': String(record['Last name'] || ''),
+      'Membership number': String(record['Membership number'] || ''),
+      'Role/Accreditation': String(record['Role/Accreditation'] || ''),
+      'Start date': record['Start date'] as string | null,
+      'End date': record['End date'] as string | null,
+      'Days since role Started': record['Days since role Started'] as number | null,
+      'Communication email': record['Communication email'] as string,
+      'Group': record['Group'] as string,
+      'District': record['District'] as string,
+      'EDI': record['EDI'] as string,
+    }));
+
+    console.log(`[API] Transformed ${data.length} appointment records`);
+
+    return {
+      data,
+      nextPage: result.nextPage,
+      count: result.count,
+      error: result.error,
+    };
+  }
+
+  /**
+   * Fetch suspensions data from SuspensionDashboardView
+   */
+  async getSuspensions(pageSize: number = 500): Promise<ApiResponse<SuspensionRecord>> {
+    console.log('[API] Fetching suspensions data');
+
+    const result = await this.query<Record<string, unknown>>({
+      table: 'SuspensionDashboardView',
+      selectFields: [],
+      query: '',
+      pageNo: 1,
+      pageSize,
+      distinct: true,
+    });
+
+    if (result.error) {
+      console.error('[API] Suspensions query error:', result.error);
+      return { data: [], nextPage: null, count: 0, error: result.error };
+    }
+
+    const data = (result.data || []).map((record): SuspensionRecord => ({
+      'First name': String(record['First name'] || ''),
+      'Last name': String(record['Last name'] || ''),
+      'Membership number': String(record['Membership number'] || ''),
+      'Role': String(record['Role'] || ''),
+      'Team': String(record['Team'] || ''),
+      'Unit name': String(record['Unit name'] || ''),
+      'Suspension date': record['Suspension date'] as string | null,
+      'Suspension reason': record['Suspension reason'] as string,
+      'Communication email': record['Communication email'] as string,
+    }));
+
+    console.log(`[API] Transformed ${data.length} suspension records`);
+
+    return {
+      data,
+      nextPage: result.nextPage,
+      count: result.count,
+      error: result.error,
+    };
+  }
+
+  /**
+   * Fetch team directory reviews from TeamDirectoryReviewsDashboardView
+   */
+  async getTeamReviews(pageSize: number = 500): Promise<ApiResponse<TeamReviewRecord>> {
+    console.log('[API] Fetching team directory reviews data');
+
+    const result = await this.query<Record<string, unknown>>({
+      table: 'TeamDirectoryReviewsDashboardView',
+      selectFields: [],
+      query: '',
+      pageNo: 1,
+      pageSize,
+      distinct: true,
+    });
+
+    if (result.error) {
+      console.error('[API] Team reviews query error:', result.error);
+      return { data: [], nextPage: null, count: 0, error: result.error };
+    }
+
+    const data = (result.data || []).map((record): TeamReviewRecord => ({
+      'First name': record['First name'] as string,
+      'Last name': record['Last name'] as string,
+      'Membership number': String(record['Membership number'] || ''),
+      'Role': String(record['Role'] || ''),
+      'Team leader': String(record['Team leader'] || ''),
+      'Scheduled review date': record['Scheduled review date'] as string | null,
+      'Review overdue': String(record['Review overdue'] || ''),
+      'Group': record['Group'] as string,
+      'District': record['District'] as string,
+    }));
+
+    console.log(`[API] Transformed ${data.length} team review records`);
+
+    return {
+      data,
+      nextPage: result.nextPage,
+      count: result.count,
+      error: result.error,
+    };
+  }
+
+  /**
+   * Fetch permits data from PermitsDashboardView
+   */
+  async getPermits(pageSize: number = 500): Promise<ApiResponse<PermitRecord>> {
+    console.log('[API] Fetching permits data');
+
+    const result = await this.query<Record<string, unknown>>({
+      table: 'PermitsDashboardView',
+      selectFields: [],
+      query: '',
+      pageNo: 1,
+      pageSize,
+      distinct: true,
+    });
+
+    if (result.error) {
+      console.error('[API] Permits query error:', result.error);
+      return { data: [], nextPage: null, count: 0, error: result.error };
+    }
+
+    const data = (result.data || []).map((record): PermitRecord => ({
+      'First name': String(record['First name'] || ''),
+      'Last name': String(record['Last name'] || ''),
+      'Membership number': String(record['Membership number'] || ''),
+      'Permit category': String(record['Permit category'] || ''),
+      'Permit type': record['Permit type'] as string,
+      'Permit status': String(record['Permit status'] || ''),
+      'Permit expiry date': record['Permit expiry date'] as string | null,
+      'Permit restriction details': record['Permit restriction details'] as string,
+      'Unit name': record['Unit name'] as string,
+      'Team': record['Team'] as string,
+      'Communication email': record['Communication email'] as string,
+    }));
+
+    console.log(`[API] Transformed ${data.length} permit records`);
+
+    return {
+      data,
+      nextPage: result.nextPage,
+      count: result.count,
+      error: result.error,
+    };
+  }
+
+  /**
+   * Fetch awards data from PreloadedAwardsDashboardView
+   */
+  async getAwards(pageSize: number = 500): Promise<ApiResponse<AwardRecord>> {
+    console.log('[API] Fetching awards data');
+
+    const result = await this.query<Record<string, unknown>>({
+      table: 'PreloadedAwardsDashboardView',
+      selectFields: [],
+      query: '',
+      pageNo: 1,
+      pageSize,
+      distinct: true,
+    });
+
+    if (result.error) {
+      console.error('[API] Awards query error:', result.error);
+      return { data: [], nextPage: null, count: 0, error: result.error };
+    }
+
+    const data = (result.data || []).map((record): AwardRecord => ({
+      'First name': String(record['First name'] || ''),
+      'Last name': String(record['Last name'] || ''),
+      'Membership number': String(record['Membership number'] || ''),
+      'Accreditation': String(record['Accreditation'] || ''),
+      'Role': String(record['Role'] || ''),
+      'Team': record['Team'] as string,
+      'Unit name': record['Unit name'] as string,
+      'Contact number': record['Contact number'] as string,
+      'Communication email': record['Communication email'] as string,
+    }));
+
+    console.log(`[API] Transformed ${data.length} award records`);
+
+    return {
+      data,
+      nextPage: result.nextPage,
+      count: result.count,
+      error: result.error,
     };
   }
 }
