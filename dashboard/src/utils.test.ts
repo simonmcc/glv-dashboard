@@ -70,9 +70,9 @@ describe('transformLearningResults', () => {
     const members: MemberLearningResult[] = [
       {
         membershipNumber: '12345',
+        contactId: 'contact-123',
         firstName: 'John',
         lastName: 'Doe',
-        preferredName: 'Johnny',
         modules: [
           {
             title: 'Safety Training',
@@ -98,9 +98,9 @@ describe('transformLearningResults', () => {
     const members: MemberLearningResult[] = [
       {
         membershipNumber: '12345',
+        contactId: 'contact-123',
         firstName: 'John',
         lastName: 'Doe',
-        preferredName: 'Johnny',
         modules: [
           {
             title: 'One-time Training',
@@ -126,9 +126,9 @@ describe('transformLearningResults', () => {
     const members: MemberLearningResult[] = [
       {
         membershipNumber: '111',
+        contactId: 'contact-111',
         firstName: 'Alice',
         lastName: 'Smith',
-        preferredName: 'Alice',
         modules: [
           { title: 'Module A', currentLevel: 'Achieved skill', expiryDate: '06/15/2025 00:00:00' },
           { title: 'Module B', currentLevel: 'Achieved skill', expiryDate: '01/01/2025 00:00:00' }, // Expired
@@ -136,9 +136,9 @@ describe('transformLearningResults', () => {
       },
       {
         membershipNumber: '222',
+        contactId: 'contact-222',
         firstName: 'Bob',
         lastName: 'Jones',
-        preferredName: 'Bobby',
         modules: [
           { title: 'Module C', currentLevel: 'Not started', expiryDate: '02/01/2025 00:00:00' }, // Expiring
         ],
@@ -162,9 +162,9 @@ describe('transformLearningResults', () => {
     const members: MemberLearningResult[] = [
       {
         membershipNumber: '12345',
+        contactId: 'contact-123',
         firstName: 'John',
         lastName: 'Doe',
-        preferredName: 'Johnny',
         modules: [
           { title: 'Module 1', currentLevel: 'Achieved skill', expiryDate: null },
           { title: 'Module 2', currentLevel: 'Achieved skill', expiryDate: null },
