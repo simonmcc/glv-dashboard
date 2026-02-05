@@ -166,7 +166,7 @@ app.post('/api/scrape-disclosures', async (req, res) => {
   // Mock mode - return empty scrape result
   if (MOCK_MODE) {
     console.log(`[Scrape] Mock mode - returning empty scrape result for ${memberContactIds.length} members`);
-    return res.json({ success: true, disclosures: [] });
+    return res.json({ success: true, members: [] });
   }
 
   console.log(`[Scrape] Starting scrape for ${memberContactIds.length} members`);
@@ -259,7 +259,7 @@ app.post('/api/explore-disclosures', async (req, res) => {
   // Mock mode - return empty exploration result
   if (MOCK_MODE) {
     console.log('[Explore] Mock mode - returning empty exploration result');
-    return res.json({ success: true, members: [], disclosures: [] });
+    return res.json({ success: true, members: [] });
   }
 
   console.log('[Explore] Starting disclosure exploration...');
