@@ -9,9 +9,11 @@ import './tracing.js';
 import express from 'express';
 import cors from 'cors';
 import { authenticate, exploreDisclosures, scrapeDisclosures, checkDisclosuresByMembershipNumbers, checkLearningByMembershipNumbers } from './auth-service.js';
+import { getMockAuth, getMockProxyResponse, getMockLearningDetails } from './mock-data.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const MOCK_MODE = process.env.MOCK_MODE === 'true';
 
 // Middleware
 app.use(cors({
@@ -34,6 +36,12 @@ app.post('/auth/login', async (req, res) => {
       success: false,
       error: 'Username and password are required',
     });
+  }
+
+  // Mock mode - return mock auth immediately
+  if (MOCK_MODE) {
+    console.log(`[Auth] Mock login for: ${username}`);
+    return res.json(getMockAuth());
   }
 
   console.log(`[Auth] Login attempt for: ${username}`);
@@ -81,6 +89,13 @@ app.post('/api/proxy', async (req, res) => {
       success: false,
       error: 'Endpoint and token are required',
     });
+  }
+
+  // Mock mode - return mock data based on table name
+  if (MOCK_MODE) {
+    const tableName = body?.table;
+    console.log(`[Proxy] Mock mode - returning mock data for table: ${tableName}`);
+    return res.json(getMockProxyResponse(tableName));
   }
 
   // Log token details for debugging
@@ -148,6 +163,12 @@ app.post('/api/scrape-disclosures', async (req, res) => {
     });
   }
 
+  // Mock mode - return empty scrape result
+  if (MOCK_MODE) {
+    console.log(`[Scrape] Mock mode - returning empty scrape result for ${memberContactIds.length} members`);
+    return res.json({ success: true, disclosures: [] });
+  }
+
   console.log(`[Scrape] Starting scrape for ${memberContactIds.length} members`);
 
   try {
@@ -171,6 +192,12 @@ app.post('/api/check-learning', async (req, res) => {
       success: false,
       error: 'Token and membershipNumbers array are required',
     });
+  }
+
+  // Mock mode - return mock learning details
+  if (MOCK_MODE) {
+    console.log(`[Learning] Mock mode - returning mock data for ${membershipNumbers.length} members`);
+    return res.json(getMockLearningDetails(membershipNumbers));
   }
 
   console.log(`[Learning] Checking ${membershipNumbers.length} membership numbers`);
@@ -198,6 +225,12 @@ app.post('/api/check-disclosures', async (req, res) => {
     });
   }
 
+  // Mock mode - return mock disclosure data
+  if (MOCK_MODE) {
+    console.log(`[Disclosures] Mock mode - returning mock data for ${membershipNumbers.length} members`);
+    return res.json({ success: true, disclosures: [] });
+  }
+
   console.log(`[Disclosures] Checking ${membershipNumbers.length} membership numbers`);
 
   try {
@@ -223,6 +256,12 @@ app.post('/api/explore-disclosures', async (req, res) => {
     });
   }
 
+  // Mock mode - return empty exploration result
+  if (MOCK_MODE) {
+    console.log('[Explore] Mock mode - returning empty exploration result');
+    return res.json({ success: true, members: [], disclosures: [] });
+  }
+
   console.log('[Explore] Starting disclosure exploration...');
 
   try {
@@ -241,6 +280,9 @@ app.post('/api/explore-disclosures', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`[Server] GLV Dashboard backend running on http://localhost:${PORT}`);
   console.log(`[Server] CORS origin: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
+  if (MOCK_MODE) {
+    console.log('[Server] MOCK MODE ENABLED - Using mock data instead of real API');
+  }
 });
 
 export default app;
