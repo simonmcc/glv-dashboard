@@ -1,7 +1,52 @@
 /**
  * Mock data for testing the dashboard without hitting the real API.
  * Enable with MOCK_MODE=true environment variable.
+ * 
+ * Uses a seeded random number generator to ensure consistent, reproducible data
+ * across API calls for easier testing and debugging.
  */
+
+/**
+ * Seeded random number generator using Linear Congruential Generator algorithm.
+ * This ensures predictable and reproducible "random" data for testing.
+ */
+class SeededRandom {
+  private seed: number;
+
+  constructor(seed: number = 12345) {
+    this.seed = seed;
+  }
+
+  /**
+   * Generate a pseudo-random number between 0 and 1
+   */
+  next(): number {
+    // Linear Congruential Generator parameters (from Numerical Recipes)
+    const a = 1664525;
+    const c = 1013904223;
+    const m = Math.pow(2, 32);
+    
+    this.seed = (a * this.seed + c) % m;
+    return this.seed / m;
+  }
+
+  /**
+   * Generate a random integer between 0 (inclusive) and max (exclusive)
+   */
+  nextInt(max: number): number {
+    return Math.floor(this.next() * max);
+  }
+
+  /**
+   * Reset the seed to start over
+   */
+  reset(seed: number = 12345): void {
+    this.seed = seed;
+  }
+}
+
+// Global seeded random instance - using a fixed seed for consistency
+const rng = new SeededRandom(42);
 
 // Sample member data
 const mockMembers = [
@@ -29,16 +74,19 @@ export function getMockLearningCompliance() {
   const learningTypes = ['Safety', 'Safeguarding', 'First Aid', 'GDPR'];
   const statuses = ['Valid', 'Expiring', 'Expired', 'In-Progress', 'Not Started'];
 
+  // Reset RNG for consistent results
+  rng.reset(42);
+
   const records = [];
   for (const member of mockMembers) {
     for (const learning of learningTypes) {
-      const statusIndex = Math.floor(Math.random() * statuses.length);
+      const statusIndex = rng.nextInt(statuses.length);
       const status = statuses[statusIndex];
       let expiryDate = null;
 
-      if (status === 'Valid') expiryDate = daysFromNow(180 + Math.floor(Math.random() * 365));
-      else if (status === 'Expiring') expiryDate = daysFromNow(Math.floor(Math.random() * 30));
-      else if (status === 'Expired') expiryDate = daysAgo(Math.floor(Math.random() * 90));
+      if (status === 'Valid') expiryDate = daysFromNow(180 + rng.nextInt(365));
+      else if (status === 'Expiring') expiryDate = daysFromNow(rng.nextInt(30));
+      else if (status === 'Expired') expiryDate = daysAgo(rng.nextInt(90));
 
       records.push({
         'First name': member.firstName,
@@ -47,7 +95,7 @@ export function getMockLearningCompliance() {
         'Name': learning,
         'Status': status,
         'Expiry date': expiryDate,
-        'Start date': daysAgo(365 + Math.floor(Math.random() * 730)),
+        'Start date': daysAgo(365 + rng.nextInt(730)),
       });
     }
   }
@@ -62,6 +110,9 @@ export function getMockLearningDetails(membershipNumbers: string[]) {
     { title: 'First Aid', currentLevel: 'Achieved skill' },
     { title: 'GDPR', currentLevel: 'Achieved skill' },
   ];
+
+  // Reset RNG for consistent results
+  rng.reset(100);
 
   const members = membershipNumbers.map((num, idx) => {
     const member = mockMembers.find(m => m.membershipNumber === num) || {
@@ -79,7 +130,7 @@ export function getMockLearningDetails(membershipNumbers: string[]) {
       modules: modules.map(m => ({
         title: m.title,
         currentLevel: m.currentLevel,
-        expiryDate: idx % 3 === 0 ? null : `${(Math.floor(Math.random() * 12) + 1).toString().padStart(2, '0')}/15/${2025 + Math.floor(Math.random() * 3)} 00:00:00`,
+        expiryDate: idx % 3 === 0 ? null : `${(rng.nextInt(12) + 1).toString().padStart(2, '0')}/15/${2025 + rng.nextInt(3)} 00:00:00`,
       })),
     };
   });
@@ -97,10 +148,13 @@ export function getMockJoiningJourney() {
     'coreLearning',
   ];
 
+  // Reset RNG for consistent results
+  rng.reset(200);
+
   const records = [];
   // Only some members have outstanding items
   for (const member of mockMembers.slice(0, 4)) {
-    const numItems = 1 + Math.floor(Math.random() * 3);
+    const numItems = 1 + rng.nextInt(3);
     const memberItems = items.slice(0, numItems);
 
     for (const item of memberItems) {
@@ -110,7 +164,7 @@ export function getMockJoiningJourney() {
         'Membership number': member.membershipNumber,
         'Category key': item,
         'On boarding action status': 'Outstanding',
-        'Due date': daysFromNow(30 + Math.floor(Math.random() * 60)),
+        'Due date': daysFromNow(30 + rng.nextInt(60)),
         'Completed date': null,
       });
     }
@@ -123,15 +177,18 @@ export function getMockDisclosureCompliance() {
   const authorities = ['DBS', 'AccessNI', 'PVG'];
   const statuses = ['Disclosure Valid', 'Disclosure Expired', 'Pending'];
 
+  // Reset RNG for consistent results
+  rng.reset(300);
+
   const records = mockMembers.map((member, idx) => {
     const status = statuses[idx % statuses.length];
     let expiryDate = null;
     let daysExpired = null;
 
-    if (status === 'Disclosure Valid') expiryDate = daysFromNow(365 + Math.floor(Math.random() * 730));
+    if (status === 'Disclosure Valid') expiryDate = daysFromNow(365 + rng.nextInt(730));
     else if (status === 'Disclosure Expired') {
-      expiryDate = daysAgo(30 + Math.floor(Math.random() * 180));
-      daysExpired = Math.floor(Math.random() * 180);
+      expiryDate = daysAgo(30 + rng.nextInt(180));
+      daysExpired = rng.nextInt(180);
     }
 
     return {
@@ -142,7 +199,7 @@ export function getMockDisclosureCompliance() {
       'Unit name': 'Test Scout Group',
       'Disclosure authority': authorities[idx % authorities.length],
       'Disclosure status': status,
-      'Disclosure issue date': daysAgo(365 + Math.floor(Math.random() * 730)),
+      'Disclosure issue date': daysAgo(365 + rng.nextInt(730)),
       'Disclosure expiry date': expiryDate,
       'Days since expiry': daysExpired,
       'Role': 'Section Leader',
@@ -156,14 +213,17 @@ export function getMockDisclosureCompliance() {
 export function getMockAppointments() {
   const roles = ['Section Leader', 'Assistant Leader', 'Group Scout Leader', 'District Commissioner'];
 
+  // Reset RNG for consistent results
+  rng.reset(400);
+
   const records = mockMembers.map((member, idx) => ({
     'First name': member.firstName,
     'Last name': member.lastName,
     'Membership number': member.membershipNumber,
     'Role/Accreditation': roles[idx % roles.length],
-    'Start date': daysAgo(365 + Math.floor(Math.random() * 1825)),
+    'Start date': daysAgo(365 + rng.nextInt(1825)),
     'End date': null,
-    'Days since role Started': 365 + Math.floor(Math.random() * 1825),
+    'Days since role Started': 365 + rng.nextInt(1825),
     'Communication email': `${member.firstName.toLowerCase()}.${member.lastName.toLowerCase()}@example.com`,
     'Group': 'Test Scout Group',
     'District': 'Test District',
@@ -177,6 +237,9 @@ export function getMockSuspensions() {
   // Only 1-2 members suspended
   const suspendedMembers = mockMembers.slice(0, 1);
 
+  // Reset RNG for consistent results
+  rng.reset(500);
+
   const records = suspendedMembers.map(member => ({
     'First name': member.firstName,
     'Last name': member.lastName,
@@ -184,7 +247,7 @@ export function getMockSuspensions() {
     'Role': 'Section Leader',
     'Team': 'Scouts',
     'Unit name': 'Test Scout Group',
-    'Suspension date': daysAgo(30 + Math.floor(Math.random() * 60)),
+    'Suspension date': daysAgo(30 + rng.nextInt(60)),
     'Suspension reason': 'Pending investigation',
     'Communication email': `${member.firstName.toLowerCase()}.${member.lastName.toLowerCase()}@example.com`,
   }));
@@ -193,13 +256,16 @@ export function getMockSuspensions() {
 
 // Team reviews records
 export function getMockTeamReviews() {
+  // Reset RNG for consistent results
+  rng.reset(600);
+
   const records = mockMembers.map((member, idx) => ({
     'First name': member.firstName,
     'Last name': member.lastName,
     'Membership number': member.membershipNumber,
     'Role': 'Section Leader',
     'Team leader': `${mockMembers[(idx + 1) % mockMembers.length].firstName} ${mockMembers[(idx + 1) % mockMembers.length].lastName}`,
-    'Scheduled review date': idx % 3 === 0 ? daysAgo(30) : daysFromNow(60 + Math.floor(Math.random() * 180)),
+    'Scheduled review date': idx % 3 === 0 ? daysAgo(30) : daysFromNow(60 + rng.nextInt(180)),
     'Review overdue': idx % 3 === 0 ? 'Yes' : 'No',
     'Group': 'Test Scout Group',
     'District': 'Test District',
@@ -215,6 +281,9 @@ export function getMockPermits() {
   // Only some members have permits
   const membersWithPermits = mockMembers.slice(0, 5);
 
+  // Reset RNG for consistent results
+  rng.reset(700);
+
   const records = membersWithPermits.map((member, idx) => ({
     'First name': member.firstName,
     'Last name': member.lastName,
@@ -223,9 +292,9 @@ export function getMockPermits() {
     'Permit type': 'Full',
     'Permit status': statuses[idx % statuses.length],
     'Permit expiry date': statuses[idx % statuses.length] === 'Valid'
-      ? daysFromNow(180 + Math.floor(Math.random() * 365))
+      ? daysFromNow(180 + rng.nextInt(365))
       : statuses[idx % statuses.length] === 'Expired'
-        ? daysAgo(30 + Math.floor(Math.random() * 90))
+        ? daysAgo(30 + rng.nextInt(90))
         : null,
     'Permit restriction details': null,
     'Unit name': 'Test Scout Group',
