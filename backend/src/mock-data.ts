@@ -12,12 +12,14 @@
  */
 class SeededRandom {
   private seed: number;
-  // LCG parameters (from Numerical Recipes)
-  private readonly a = 1664525;
-  private readonly c = 1013904223;
-  private readonly m = 4294967296; // 2^32
+  
+  // LCG algorithm constants (from Numerical Recipes)
+  private static readonly LCG_A = 1664525;
+  private static readonly LCG_C = 1013904223;
+  private static readonly LCG_M = 4294967296; // 2^32
+  private static readonly DEFAULT_SEED = 12345;
 
-  constructor(seed: number = 12345) {
+  constructor(seed: number = SeededRandom.DEFAULT_SEED) {
     this.seed = seed;
   }
 
@@ -25,8 +27,8 @@ class SeededRandom {
    * Generate a pseudo-random number between 0 and 1
    */
   next(): number {
-    this.seed = (this.a * this.seed + this.c) % this.m;
-    return this.seed / this.m;
+    this.seed = (SeededRandom.LCG_A * this.seed + SeededRandom.LCG_C) % SeededRandom.LCG_M;
+    return this.seed / SeededRandom.LCG_M;
   }
 
   /**
@@ -39,7 +41,7 @@ class SeededRandom {
   /**
    * Reset the seed to start over
    */
-  reset(seed: number = 12345): void {
+  reset(seed: number = SeededRandom.DEFAULT_SEED): void {
     this.seed = seed;
   }
 }
