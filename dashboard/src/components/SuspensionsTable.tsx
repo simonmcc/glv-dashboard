@@ -40,11 +40,12 @@ export function SuspensionsTable({ records, isLoading }: SuspensionsTableProps) 
             `${b['Last name']} ${b['First name']}`
           );
           break;
-        case 'date':
+        case 'date': {
           const aDate = a['Suspension date'] ? new Date(a['Suspension date']).getTime() : 0;
           const bDate = b['Suspension date'] ? new Date(b['Suspension date']).getTime() : 0;
           comparison = aDate - bDate;
           break;
+        }
         case 'role':
           comparison = (a['Role'] || '').localeCompare(b['Role'] || '');
           break;
@@ -64,7 +65,7 @@ export function SuspensionsTable({ records, isLoading }: SuspensionsTableProps) 
     }
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const renderSortIcon = (field: SortField) => {
     if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
     return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
   };
@@ -123,7 +124,7 @@ export function SuspensionsTable({ records, isLoading }: SuspensionsTableProps) 
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('name')}
               >
-                Name <SortIcon field="name" />
+                Name {renderSortIcon("name")}
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-gray-900">
                 Membership #
@@ -132,7 +133,7 @@ export function SuspensionsTable({ records, isLoading }: SuspensionsTableProps) 
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('role')}
               >
-                Role <SortIcon field="role" />
+                Role {renderSortIcon("role")}
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-gray-900">
                 Team / Unit
@@ -141,7 +142,7 @@ export function SuspensionsTable({ records, isLoading }: SuspensionsTableProps) 
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('date')}
               >
-                Suspension Date <SortIcon field="date" />
+                Suspension Date {renderSortIcon("date")}
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-gray-900">
                 Reason

@@ -46,16 +46,18 @@ export function TeamReviewsTable({ records, isLoading }: TeamReviewsTableProps) 
         case 'leader':
           comparison = (a['Team leader'] || '').localeCompare(b['Team leader'] || '');
           break;
-        case 'date':
+        case 'date': {
           const aDate = a['Scheduled review date'] ? new Date(a['Scheduled review date']).getTime() : Infinity;
           const bDate = b['Scheduled review date'] ? new Date(b['Scheduled review date']).getTime() : Infinity;
           comparison = aDate - bDate;
           break;
-        case 'overdue':
+        }
+        case 'overdue': {
           const aOverdue = a['Review overdue']?.toLowerCase() === 'yes' || a['Review overdue'] === 'true' ? 1 : 0;
           const bOverdue = b['Review overdue']?.toLowerCase() === 'yes' || b['Review overdue'] === 'true' ? 1 : 0;
           comparison = aOverdue - bOverdue;
           break;
+        }
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
@@ -72,7 +74,7 @@ export function TeamReviewsTable({ records, isLoading }: TeamReviewsTableProps) 
     }
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const renderSortIcon = (field: SortField) => {
     if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
     return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
   };
@@ -143,7 +145,7 @@ export function TeamReviewsTable({ records, isLoading }: TeamReviewsTableProps) 
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('leader')}
               >
-                Team Leader <SortIcon field="leader" />
+                Team Leader {renderSortIcon("leader")}
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-gray-900">
                 Membership #
@@ -158,13 +160,13 @@ export function TeamReviewsTable({ records, isLoading }: TeamReviewsTableProps) 
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('date')}
               >
-                Review Date <SortIcon field="date" />
+                Review Date {renderSortIcon("date")}
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('overdue')}
               >
-                Status <SortIcon field="overdue" />
+                Status {renderSortIcon("overdue")}
               </th>
             </tr>
           </thead>

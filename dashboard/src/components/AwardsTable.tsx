@@ -72,7 +72,7 @@ export function AwardsTable({ records, isLoading }: AwardsTableProps) {
     }
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const renderSortIcon = (field: SortField) => {
     if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
     return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
   };
@@ -133,7 +133,7 @@ export function AwardsTable({ records, isLoading }: AwardsTableProps) {
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('name')}
               >
-                Name <SortIcon field="name" />
+                Name {renderSortIcon("name")}
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-gray-900">
                 Membership #
@@ -142,13 +142,13 @@ export function AwardsTable({ records, isLoading }: AwardsTableProps) {
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('accreditation')}
               >
-                Accreditation <SortIcon field="accreditation" />
+                Accreditation {renderSortIcon("accreditation")}
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('role')}
               >
-                Role <SortIcon field="role" />
+                Role {renderSortIcon("role")}
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-gray-900">
                 Team / Unit

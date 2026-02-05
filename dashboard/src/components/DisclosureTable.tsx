@@ -96,11 +96,12 @@ export function DisclosureTable({ records, summary, isLoading }: DisclosureTable
         case 'status':
           comparison = (a['Disclosure status'] || '').localeCompare(b['Disclosure status'] || '');
           break;
-        case 'expiry':
+        case 'expiry': {
           const dateA = a['Disclosure expiry date'] || '';
           const dateB = b['Disclosure expiry date'] || '';
           comparison = dateA.localeCompare(dateB);
           break;
+        }
         case 'authority':
           comparison = (a['Disclosure authority'] || '').localeCompare(b['Disclosure authority'] || '');
           break;
@@ -120,7 +121,7 @@ export function DisclosureTable({ records, summary, isLoading }: DisclosureTable
     }
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const renderSortIcon = (field: SortField) => {
     if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
     return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
   };
@@ -228,7 +229,7 @@ export function DisclosureTable({ records, summary, isLoading }: DisclosureTable
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('name')}
               >
-                Name <SortIcon field="name" />
+                Name {renderSortIcon("name")}
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-gray-900">
                 Membership #
@@ -237,19 +238,19 @@ export function DisclosureTable({ records, summary, isLoading }: DisclosureTable
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('authority')}
               >
-                Authority <SortIcon field="authority" />
+                Authority {renderSortIcon("authority")}
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('status')}
               >
-                Status <SortIcon field="status" />
+                Status {renderSortIcon("status")}
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('expiry')}
               >
-                Expiry Date <SortIcon field="expiry" />
+                Expiry Date {renderSortIcon("expiry")}
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-gray-900">
                 Unit / Role

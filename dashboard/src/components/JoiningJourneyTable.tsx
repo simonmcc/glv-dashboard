@@ -112,7 +112,7 @@ export function JoiningJourneyTable({ records, isLoading }: JoiningJourneyTableP
     }
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const renderSortIcon = (field: SortField) => {
     if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
     return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
   };
@@ -205,7 +205,7 @@ export function JoiningJourneyTable({ records, isLoading }: JoiningJourneyTableP
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('name')}
               >
-                Name <SortIcon field="name" />
+                Name {renderSortIcon("name")}
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-gray-900">
                 Membership #
@@ -214,13 +214,13 @@ export function JoiningJourneyTable({ records, isLoading }: JoiningJourneyTableP
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('item')}
               >
-                Item <SortIcon field="item" />
+                Item {renderSortIcon("item")}
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('status')}
               >
-                Status <SortIcon field="status" />
+                Status {renderSortIcon("status")}
               </th>
             </tr>
           </thead>
