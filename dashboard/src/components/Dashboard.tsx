@@ -56,23 +56,29 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       } else {
         console.log('[Dashboard] Setting contactId on client:', contactId);
         // Use the provided contactId
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (client as any).contactId = contactId;
       }
 
       // Expose client for testing table names in browser console
       // Usage: window.testTable('DisclosureDashboardView')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).apiClient = client;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).testTable = (tableName: string) => client.testTable(tableName);
       // Check disclosures by membership numbers
       // Usage: checkDisclosures(['0012162494', '0012345678'])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).checkDisclosures = (membershipNumbers: string[]) =>
         client.checkDisclosuresByMembershipNumbers(membershipNumbers);
       // Check learning by membership numbers - uses GetLmsDetailsAsync for accurate expiry dates
       // Usage: checkLearning(['0012162494', '0012345678'])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).checkLearning = (membershipNumbers: string[]) =>
         client.checkLearningByMembershipNumbers(membershipNumbers);
       // Test joining journey view
       // Usage: testJoiningJourney()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).testJoiningJourney = () => client.getJoiningJourney(50);
       console.log('[Dashboard] Test functions: checkLearning([...]), checkDisclosures([...]), testJoiningJourney()');
 

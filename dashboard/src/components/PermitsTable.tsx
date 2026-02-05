@@ -64,11 +64,12 @@ export function PermitsTable({ records, isLoading }: PermitsTableProps) {
         case 'status':
           comparison = (a['Permit status'] || '').localeCompare(b['Permit status'] || '');
           break;
-        case 'expiry':
+        case 'expiry': {
           const aDate = a['Permit expiry date'] ? new Date(a['Permit expiry date']).getTime() : Infinity;
           const bDate = b['Permit expiry date'] ? new Date(b['Permit expiry date']).getTime() : Infinity;
           comparison = aDate - bDate;
           break;
+        }
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
@@ -85,7 +86,7 @@ export function PermitsTable({ records, isLoading }: PermitsTableProps) {
     }
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const renderSortIcon = (field: SortField) => {
     if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
     return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
   };
@@ -155,7 +156,7 @@ export function PermitsTable({ records, isLoading }: PermitsTableProps) {
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('name')}
               >
-                Name <SortIcon field="name" />
+                Name {renderSortIcon("name")}
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-gray-900">
                 Membership #
@@ -164,7 +165,7 @@ export function PermitsTable({ records, isLoading }: PermitsTableProps) {
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('category')}
               >
-                Category <SortIcon field="category" />
+                Category {renderSortIcon("category")}
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-gray-900">
                 Type
@@ -173,13 +174,13 @@ export function PermitsTable({ records, isLoading }: PermitsTableProps) {
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('status')}
               >
-                Status <SortIcon field="status" />
+                Status {renderSortIcon("status")}
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('expiry')}
               >
-                Expiry <SortIcon field="expiry" />
+                Expiry {renderSortIcon("expiry")}
               </th>
             </tr>
           </thead>

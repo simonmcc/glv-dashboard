@@ -48,11 +48,12 @@ export function AppointmentsTable({ records, isLoading }: AppointmentsTableProps
         case 'role':
           comparison = (a['Role/Accreditation'] || '').localeCompare(b['Role/Accreditation'] || '');
           break;
-        case 'start':
+        case 'start': {
           const aDate = a['Start date'] ? new Date(a['Start date']).getTime() : 0;
           const bDate = b['Start date'] ? new Date(b['Start date']).getTime() : 0;
           comparison = aDate - bDate;
           break;
+        }
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
@@ -69,7 +70,7 @@ export function AppointmentsTable({ records, isLoading }: AppointmentsTableProps
     }
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const renderSortIcon = (field: SortField) => {
     if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
     return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
   };
@@ -145,7 +146,7 @@ export function AppointmentsTable({ records, isLoading }: AppointmentsTableProps
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('name')}
               >
-                Name <SortIcon field="name" />
+                Name {renderSortIcon("name")}
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-gray-900">
                 Membership #
@@ -154,13 +155,13 @@ export function AppointmentsTable({ records, isLoading }: AppointmentsTableProps
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('role')}
               >
-                Role/Accreditation <SortIcon field="role" />
+                Role/Accreditation {renderSortIcon("role")}
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('start')}
               >
-                Start Date <SortIcon field="start" />
+                Start Date {renderSortIcon("start")}
               </th>
               <th className="px-4 py-3 text-sm font-semibold text-gray-900">
                 Days in Role

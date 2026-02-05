@@ -48,7 +48,7 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError }
       } else {
         onAuthError(result.error || 'Authentication failed');
       }
-    } catch (error) {
+    } catch {
       onAuthError('Failed to connect to authentication server. Is the backend running?');
     } finally {
       setIsLoading(false);
