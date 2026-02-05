@@ -191,6 +191,24 @@ export class ScoutsApiClient {
     return Array.from(seen.values());
   }
 
+  /**
+   * Deduplicate joining journey records by membership number + item.
+   * When a member has multiple roles, they appear multiple times in the API response.
+   * We keep one record per person/item.
+   */
+  private deduplicateJoiningJourney(records: JoiningJourneyRecord[]): JoiningJourneyRecord[] {
+    const seen = new Map<string, JoiningJourneyRecord>();
+
+    for (const record of records) {
+      const key = `${record['Membership number']}-${record.Item}`;
+      if (!seen.has(key)) {
+        seen.set(key, record);
+      }
+    }
+
+    return Array.from(seen.values());
+  }
+
   async getJoiningJourney(pageSize: number = 500): Promise<ApiResponse<JoiningJourneyRecord>> {
     console.log('[API] Fetching joining journey data');
 
@@ -247,7 +265,7 @@ export class ScoutsApiClient {
 
     console.log(`[API] Filtered to ${outstandingRecords.length} outstanding records from ${result.data?.length || 0} total`);
 
-    const data = outstandingRecords.map((record): JoiningJourneyRecord => {
+    const rawData = outstandingRecords.map((record): JoiningJourneyRecord => {
       const categoryKey = String(record['Category key'] || '');
       return {
         'First name': String(record['First name'] || ''),
@@ -260,7 +278,10 @@ export class ScoutsApiClient {
       };
     });
 
-    console.log(`[API] Transformed ${data.length} joining journey records`);
+    // Deduplicate by membership number + item (members with multiple roles appear multiple times)
+    const data = this.deduplicateJoiningJourney(rawData);
+
+    console.log(`[API] Transformed ${rawData.length} records, deduplicated to ${data.length} joining journey records`);
 
     return {
       data,
