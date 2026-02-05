@@ -76,7 +76,7 @@ export function getMockLearningCompliance() {
   const statuses = ['Valid', 'Expiring', 'Expired', 'In-Progress', 'Not Started'];
 
   // Reset RNG for consistent results
-  rng.reset(42);
+  rng.reset(1001);
 
   const records = [];
   for (const member of mockMembers) {
