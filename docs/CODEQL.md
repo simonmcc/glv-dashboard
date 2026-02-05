@@ -15,7 +15,7 @@ The CodeQL workflow is configured in `.github/workflows/codeql.yml` and runs:
 ## Language Coverage
 
 The current configuration scans:
-- **JavaScript/TypeScript** - Covers both the frontend (React/Vite) and backend (Express/Node.js) codebases
+- **JavaScript/TypeScript** - Covers the frontend (React/Vite), backend (Express/Node.js), and scraper (Playwright-based API discovery tool) codebases
 
 ## Build Configuration
 
