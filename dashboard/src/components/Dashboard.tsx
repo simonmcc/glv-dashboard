@@ -40,12 +40,14 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
   const [permitRecords, setPermitRecords] = useState<PermitRecord[]>([]);
   const [awardRecords, setAwardRecords] = useState<AwardRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchData = useCallback(async () => {
     return tracer.startActiveSpan('dashboard.fetchData', async (span) => {
     setIsLoading(true);
+    setLoadingStatus('Initializing...');
     setError(null);
 
     console.log('[Dashboard] fetchData called with contactId:', contactId || '(empty)');
@@ -87,6 +89,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       console.log('[Dashboard] Test functions: checkLearning([...]), checkDisclosures([...]), testJoiningJourney()');
 
       // First get member list from LearningComplianceDashboardView to get membership numbers
+      setLoadingStatus('Loading member list...');
       console.log('[Dashboard] Fetching member list...');
       const memberListResponse = await client.getAllLearningCompliance(1000);
 
@@ -101,6 +104,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       console.log(`[Dashboard] Found ${uniqueMembershipNumbers.length} unique members`);
 
       // Fetch accurate learning data via GetLmsDetailsAsync
+      setLoadingStatus(`Loading learning details for ${uniqueMembershipNumbers.length} members...`);
       console.log('[Dashboard] Fetching learning details for each member...');
       const learningResult = await client.checkLearningByMembershipNumbers(uniqueMembershipNumbers);
 
@@ -119,6 +123,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       setSummary(summaryData);
 
       // Fetch joining journey data
+      setLoadingStatus('Loading joining journey...');
       console.log('[Dashboard] Fetching joining journey data...');
       const joiningJourneyResponse = await client.getJoiningJourney(500);
       if (!joiningJourneyResponse.error && joiningJourneyResponse.data) {
@@ -127,6 +132,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       }
 
       // Fetch disclosure compliance data
+      setLoadingStatus('Loading disclosures...');
       console.log('[Dashboard] Fetching disclosure compliance data...');
       const disclosureResponse = await client.getDisclosureCompliance(500);
       if (!disclosureResponse.error && disclosureResponse.data) {
@@ -136,6 +142,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       }
 
       // Fetch appointments data
+      setLoadingStatus('Loading appointments...');
       console.log('[Dashboard] Fetching appointments data...');
       const appointmentsResponse = await client.getAppointments(500);
       if (!appointmentsResponse.error && appointmentsResponse.data) {
@@ -144,6 +151,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       }
 
       // Fetch suspensions data
+      setLoadingStatus('Loading suspensions...');
       console.log('[Dashboard] Fetching suspensions data...');
       const suspensionsResponse = await client.getSuspensions(500);
       if (!suspensionsResponse.error && suspensionsResponse.data) {
@@ -152,6 +160,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       }
 
       // Fetch team reviews data
+      setLoadingStatus('Loading team reviews...');
       console.log('[Dashboard] Fetching team reviews data...');
       const teamReviewsResponse = await client.getTeamReviews(500);
       if (!teamReviewsResponse.error && teamReviewsResponse.data) {
@@ -160,6 +169,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       }
 
       // Fetch permits data
+      setLoadingStatus('Loading permits...');
       console.log('[Dashboard] Fetching permits data...');
       const permitsResponse = await client.getPermits(500);
       if (!permitsResponse.error && permitsResponse.data) {
@@ -168,6 +178,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       }
 
       // Fetch awards data
+      setLoadingStatus('Loading awards...');
       console.log('[Dashboard] Fetching awards data...');
       const awardsResponse = await client.getAwards(500);
       if (!awardsResponse.error && awardsResponse.data) {
@@ -175,6 +186,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
         console.log(`[Dashboard] Got ${awardsResponse.data.length} award records`);
       }
 
+      setLoadingStatus('');
       setLastUpdated(new Date());
       span.setStatus({ code: SpanStatusCode.OK });
     } catch (err) {
@@ -219,6 +231,11 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
             >
               {isLoading ? 'Loading...' : 'Refresh'}
             </button>
+            {isLoading && loadingStatus && (
+              <span className="text-sm text-purple-600 animate-pulse">
+                {loadingStatus}
+              </span>
+            )}
             <button
               onClick={onLogout}
               className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
