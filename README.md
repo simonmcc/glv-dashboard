@@ -91,6 +91,15 @@ cd ../backend && npm test
 npm run test:coverage
 ```
 
+## Security
+
+This project uses [CodeQL](https://codeql.github.com/) for automated security vulnerability scanning. CodeQL runs:
+- On every push to `main`
+- On every pull request
+- Weekly on a schedule
+
+See [docs/CODEQL.md](docs/CODEQL.md) for more details on the security scanning setup.
+
 ## Environment Variables
 
 ### Dashboard
