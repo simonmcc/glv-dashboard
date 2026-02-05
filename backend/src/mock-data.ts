@@ -12,6 +12,10 @@
  */
 class SeededRandom {
   private seed: number;
+  // LCG parameters (from Numerical Recipes)
+  private readonly a = 1664525;
+  private readonly c = 1013904223;
+  private readonly m = 4294967296; // 2^32
 
   constructor(seed: number = 12345) {
     this.seed = seed;
@@ -21,13 +25,8 @@ class SeededRandom {
    * Generate a pseudo-random number between 0 and 1
    */
   next(): number {
-    // Linear Congruential Generator parameters (from Numerical Recipes)
-    const a = 1664525;
-    const c = 1013904223;
-    const m = Math.pow(2, 32);
-    
-    this.seed = (a * this.seed + c) % m;
-    return this.seed / m;
+    this.seed = (this.a * this.seed + this.c) % this.m;
+    return this.seed / this.m;
   }
 
   /**
