@@ -78,6 +78,13 @@ cd dashboard && npx vitest run src/utils.test.ts
 - `CORS_ORIGIN` — Backend CORS origin (default: `http://localhost:5173`)
 - `HEADLESS` — Set to `false` for visible browser in scraper/auth
 
+## Git Workflow
+
+- Never commit or push directly to main
+- Create a feature branch for all changes
+- Use `gh pr create` to open a pull request
+- All changes must be reviewed and merged via GitHub PR
+
 ## Backend API Endpoints
 
 - `POST /auth/login` — Authenticate via Playwright, returns Bearer token + contactId
