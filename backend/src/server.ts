@@ -5,6 +5,7 @@
  * Can be run locally or deployed to AWS Lambda.
  */
 
+import './tracing.js';
 import express from 'express';
 import cors from 'cors';
 import { authenticate, exploreDisclosures, scrapeDisclosures, checkDisclosuresByMembershipNumbers, checkLearningByMembershipNumbers } from './auth-service.js';
