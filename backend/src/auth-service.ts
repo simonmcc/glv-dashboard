@@ -6,6 +6,9 @@
  */
 
 import { chromium, Page } from 'playwright';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
+
+const tracer = trace.getTracer('glv-backend-auth', '1.0.0');
 
 const SCOUTS_URL = 'https://membership.scouts.org.uk/';
 
@@ -167,6 +170,7 @@ async function performLogin(page: Page, username: string, password: string): Pro
  * Explore the API to discover member contact IDs and fetch disclosure details
  */
 export async function exploreDisclosures(token: string, contactId: string): Promise<ExploreResult> {
+  return tracer.startActiveSpan('exploreDisclosures', async (span) => {
   const API_BASE = 'https://tsa-memportal-prod-fun01.azurewebsites.net/api';
 
   const makeRequest = async (endpoint: string, body: unknown) => {
@@ -529,8 +533,13 @@ export async function exploreDisclosures(token: string, contactId: string): Prom
     return { success: true, members };
   } catch (error) {
     console.error('[Explore] Error:', error);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+    span.recordException(error as Error);
     return { success: false, error: (error as Error).message };
+  } finally {
+    span.end();
   }
+  });
 }
 
 /**
@@ -542,6 +551,8 @@ export async function scrapeDisclosures(
   password: string,
   memberContactIds: string[]
 ): Promise<ExploreResult> {
+  return tracer.startActiveSpan('scrapeDisclosures', async (span) => {
+  span.setAttribute('members.count', memberContactIds.length);
   console.log(`[Scrape] Starting disclosure scrape for ${memberContactIds.length} members`);
 
   const browser = await chromium.launch({
@@ -638,6 +649,8 @@ export async function scrapeDisclosures(
     const members: MemberDisclosure[] = [];
 
     for (const contactId of memberContactIds) {
+      await tracer.startActiveSpan('scrapeDisclosures.member', async (memberSpan) => {
+      memberSpan.setAttribute('member.contact_id', contactId);
       console.log(`[Scrape] Navigating to member ${contactId}...`);
 
       const memberUrl = `https://membership.scouts.org.uk/#/membersearch/${contactId}/viewmember/disclosures`;
@@ -709,17 +722,24 @@ export async function scrapeDisclosures(
       } else {
         console.log(`[Scrape] No disclosure data captured for ${contactId}`);
       }
+      memberSpan.end();
+      });
     }
 
     console.log(`[Scrape] Completed. Found disclosures for ${members.length} members`);
+    span.setStatus({ code: SpanStatusCode.OK });
     return { success: true, members };
 
   } catch (error) {
     console.error('[Scrape] Error:', error);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+    span.recordException(error as Error);
     return { success: false, error: (error as Error).message };
   } finally {
     await browser.close();
+    span.end();
   }
+  });
 }
 
 const API_BASE = 'https://tsa-memportal-prod-fun01.azurewebsites.net/api';
@@ -836,17 +856,22 @@ export async function checkDisclosuresByMembershipNumbers(
   token: string,
   membershipNumbers: string[]
 ): Promise<ExploreResult> {
+  return tracer.startActiveSpan('checkDisclosuresByMembershipNumbers', async (span) => {
+  span.setAttribute('members.count', membershipNumbers.length);
   console.log(`[Disclosures] Checking ${membershipNumbers.length} membership numbers`);
 
   const members: MemberDisclosure[] = [];
 
   for (const membershipNumber of membershipNumbers) {
+    await tracer.startActiveSpan('checkDisclosures.member', async (memberSpan) => {
+    memberSpan.setAttribute('member.membership_number', membershipNumber);
     console.log(`[Disclosures] Looking up ${membershipNumber}...`);
 
     // Search for member
     const member = await searchMemberByNumber(token, membershipNumber);
     if (!member) {
       console.log(`[Disclosures] Member not found: ${membershipNumber}`);
+      memberSpan.setAttribute('member.found', false);
       members.push({
         membershipNumber,
         contactId: '',
@@ -854,14 +879,18 @@ export async function checkDisclosuresByMembershipNumbers(
         lastName: '',
         disclosures: [],
       });
-      continue;
+      memberSpan.end();
+      return;
     }
 
     console.log(`[Disclosures] Found ${member.preferredName} ${member.lastname} (${member.id})`);
+    memberSpan.setAttribute('member.found', true);
+    memberSpan.setAttribute('member.contact_id', member.id);
 
     // Get disclosures
     const disclosures = await getDisclosuresForContact(token, member.id);
     console.log(`[Disclosures] Got ${disclosures.length} disclosure records`);
+    memberSpan.setAttribute('member.disclosure_count', disclosures.length);
 
     members.push({
       membershipNumber,
@@ -870,9 +899,14 @@ export async function checkDisclosuresByMembershipNumbers(
       lastName: member.lastname,
       disclosures,
     });
+    memberSpan.end();
+    });
   }
 
+  span.setStatus({ code: SpanStatusCode.OK });
+  span.end();
   return { success: true, members };
+  });
 }
 
 /**
@@ -920,17 +954,22 @@ export async function checkLearningByMembershipNumbers(
   token: string,
   membershipNumbers: string[]
 ): Promise<LearningResult> {
+  return tracer.startActiveSpan('checkLearningByMembershipNumbers', async (span) => {
+  span.setAttribute('members.count', membershipNumbers.length);
   console.log(`[Learning] Checking ${membershipNumbers.length} membership numbers`);
 
   const members: MemberLearning[] = [];
 
   for (const membershipNumber of membershipNumbers) {
+    await tracer.startActiveSpan('checkLearning.member', async (memberSpan) => {
+    memberSpan.setAttribute('member.membership_number', membershipNumber);
     console.log(`[Learning] Looking up ${membershipNumber}...`);
 
     // Search for member
     const member = await searchMemberByNumber(token, membershipNumber);
     if (!member) {
       console.log(`[Learning] Member not found: ${membershipNumber}`);
+      memberSpan.setAttribute('member.found', false);
       members.push({
         membershipNumber,
         contactId: '',
@@ -938,14 +977,18 @@ export async function checkLearningByMembershipNumbers(
         lastName: '',
         modules: [],
       });
-      continue;
+      memberSpan.end();
+      return;
     }
 
     console.log(`[Learning] Found ${member.preferredName} ${member.lastname} (${member.id})`);
+    memberSpan.setAttribute('member.found', true);
+    memberSpan.setAttribute('member.contact_id', member.id);
 
     // Get learning details
     const modules = await getLearningForContact(token, member.id);
     console.log(`[Learning] Got ${modules.length} learning modules`);
+    memberSpan.setAttribute('member.module_count', modules.length);
 
     members.push({
       membershipNumber,
@@ -954,19 +997,31 @@ export async function checkLearningByMembershipNumbers(
       lastName: member.lastname,
       modules,
     });
+    memberSpan.end();
+    });
   }
 
+  span.setStatus({ code: SpanStatusCode.OK });
+  span.end();
   return { success: true, members };
+  });
 }
 
 export async function authenticate(username: string, password: string): Promise<AuthResult> {
-  const browser = await chromium.launch({
-    headless: true,
-    args: [
-      '--disable-blink-features=AutomationControlled',
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-    ],
+  return tracer.startActiveSpan('authenticate', async (span) => {
+  span.setAttribute('auth.username', username);
+
+  const browser = await tracer.startActiveSpan('playwright.browser.launch', async (launchSpan) => {
+    const b = await chromium.launch({
+      headless: true,
+      args: [
+        '--disable-blink-features=AutomationControlled',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+      ],
+    });
+    launchSpan.end();
+    return b;
   });
 
   const context = await browser.newContext({
@@ -996,18 +1051,26 @@ export async function authenticate(username: string, password: string): Promise<
 
   try {
     // Navigate to the portal
-    await page.goto(SCOUTS_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(2000);
-
-    // Handle cookie consent
-    await handleCookieConsent(page);
+    await tracer.startActiveSpan('playwright.navigate.scouts-portal', async (navSpan) => {
+      await page.goto(SCOUTS_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await page.waitForTimeout(2000);
+      await handleCookieConsent(page);
+      navSpan.end();
+    });
 
     // Perform login
-    await performLogin(page, username, password);
-    await page.waitForTimeout(2000);
+    await tracer.startActiveSpan('playwright.b2c-login', async (loginSpan) => {
+      await performLogin(page, username, password);
+      await page.waitForTimeout(2000);
+      loginSpan.end();
+    });
 
     // Wait for portal to fully load and make initial API calls
-    await page.waitForTimeout(5000);
+    await tracer.startActiveSpan('playwright.wait-for-token', async (tokenSpan) => {
+      await page.waitForTimeout(5000);
+      tokenSpan.setAttribute('auth.token_captured', !!capturedToken);
+      tokenSpan.end();
+    });
 
     if (!capturedToken) {
       throw new Error('Failed to capture Bearer token');
@@ -1089,17 +1152,22 @@ export async function authenticate(username: string, password: string): Promise<
 
     console.log(`[Auth] Returning token - length: ${capturedToken.length}, starts: ${capturedToken.substring(0, 20)}..., ends: ...${capturedToken.substring(capturedToken.length - 20)}`);
 
+    span.setStatus({ code: SpanStatusCode.OK });
     return {
       success: true,
       token: capturedToken,
       contactId,
     };
   } catch (error) {
+    span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+    span.recordException(error as Error);
     return {
       success: false,
       error: (error as Error).message,
     };
   } finally {
     await browser.close();
+    span.end();
   }
+  });
 }

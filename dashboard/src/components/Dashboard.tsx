@@ -5,7 +5,10 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { ScoutsApiClient } from '../api-client';
+
+const tracer = trace.getTracer('glv-dashboard', '1.0.0');
 import { transformLearningResults } from '../utils';
 import type { LearningRecord, ComplianceSummary, JoiningJourneyRecord, DisclosureRecord, DisclosureSummary, AppointmentRecord, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from '../types';
 import { SummaryTiles } from './SummaryTiles';
@@ -41,6 +44,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchData = useCallback(async () => {
+    return tracer.startActiveSpan('dashboard.fetchData', async (span) => {
     setIsLoading(true);
     setError(null);
 
@@ -172,8 +176,11 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       }
 
       setLastUpdated(new Date());
+      span.setStatus({ code: SpanStatusCode.OK });
     } catch (err) {
       const message = (err as Error).message;
+      span.setStatus({ code: SpanStatusCode.ERROR, message });
+      span.recordException(err as Error);
       if (message === 'TOKEN_EXPIRED') {
         onTokenExpired();
       } else {
@@ -181,7 +188,9 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       }
     } finally {
       setIsLoading(false);
+      span.end();
     }
+    });
   }, [token, contactId, onTokenExpired]);
 
   useEffect(() => {

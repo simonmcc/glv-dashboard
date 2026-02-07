@@ -33,6 +33,7 @@ API responses from Scouts use **space-separated field names** (e.g., `"First nam
 ```bash
 cd backend && npm install          # install deps
 cd backend && npm run dev          # dev server with hot-reload (port 3001)
+cd backend && npm run dev:traced   # dev server with OpenTelemetry tracing enabled
 cd backend && npm test             # run tests (vitest)
 cd backend && npm run test:watch   # tests in watch mode
 cd backend && npm run test:coverage # tests with v8 coverage
@@ -77,6 +78,8 @@ cd dashboard && npx vitest run src/utils.test.ts
 - `PORT` — Backend port (default: `3001`)
 - `CORS_ORIGIN` — Backend CORS origin (default: `http://localhost:5173`)
 - `HEADLESS` — Set to `false` for visible browser in scraper/auth
+- `OTEL_ENABLED` — Set to `true` to enable backend OpenTelemetry tracing (or use `npm run dev:traced`)
+- `VITE_OTEL_ENABLED` — Set to `true` to enable frontend browser tracing
 
 ## Git Workflow
 
@@ -84,6 +87,18 @@ cd dashboard && npx vitest run src/utils.test.ts
 - Create a feature branch for all changes
 - Use `gh pr create` to open a pull request
 - All changes must be reviewed and merged via GitHub PR
+
+## Tracing
+
+OpenTelemetry distributed tracing is available for both backend and frontend, exporting to Jaeger via OTLP HTTP.
+
+```bash
+docker compose up -d                              # start Jaeger (UI at http://localhost:16686)
+cd backend && npm run dev:traced                   # backend with tracing
+cd dashboard && VITE_OTEL_ENABLED=true npm run dev # frontend with tracing
+```
+
+Tracing is opt-in and has zero overhead when disabled. Manual spans instrument the slow Playwright auth flow and per-member API loops in `backend/src/auth-service.ts`. Frontend fetch calls are auto-instrumented with W3C trace context propagation to the backend.
 
 ## Backend API Endpoints
 
