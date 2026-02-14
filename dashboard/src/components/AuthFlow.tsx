@@ -5,7 +5,10 @@
  */
 
 import { useState } from 'react';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import type { AuthState } from '../types';
+
+const tracer = trace.getTracer('glv-dashboard', '1.0.0');
 
 interface AuthFlowProps {
   authState: AuthState;
@@ -32,27 +35,34 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError }
     setIsLoading(true);
     onAuthStart();
 
-    try {
-      const response = await fetch(`${BACKEND_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
+    await tracer.startActiveSpan('auth.login', async (span) => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ username, password }),
+        });
 
-      const result = await response.json();
+        const result = await response.json();
 
-      if (result.success && result.token) {
-        onAuthComplete(result.token, result.contactId || '');
-      } else {
-        onAuthError(result.error || 'Authentication failed');
+        if (result.success && result.token) {
+          span.setStatus({ code: SpanStatusCode.OK });
+          onAuthComplete(result.token, result.contactId || '');
+        } else {
+          span.setStatus({ code: SpanStatusCode.ERROR, message: result.error || 'Authentication failed' });
+          onAuthError(result.error || 'Authentication failed');
+        }
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Connection failed' });
+        span.recordException(err as Error);
+        onAuthError('Failed to connect to authentication server. Is the backend running?');
+      } finally {
+        span.end();
+        setIsLoading(false);
       }
-    } catch {
-      onAuthError('Failed to connect to authentication server. Is the backend running?');
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   if (authState.status === 'authenticated') {
