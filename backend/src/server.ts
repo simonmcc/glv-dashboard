@@ -10,7 +10,7 @@ import express from 'express';
 import cors from 'cors';
 import { authenticate, checkLearningByMembershipNumbers } from './auth-service.js';
 import { getMockAuth, getMockProxyResponse, getMockLearningDetails } from './mock-data.js';
-import { log, logError } from './logger.js';
+import { log, logError, logDebug } from './logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -84,10 +84,18 @@ app.post('/auth/login', async (req, res) => {
 app.post('/api/proxy', async (req, res) => {
   const { endpoint, method = 'POST', body, token } = req.body;
 
-  log(`[Proxy] Request: ${method} ${endpoint}`);
-  if (body) {
-    log(`[Proxy] Full body:`, JSON.stringify(body));
-  }
+  // Log high-level metadata only (don't expose sensitive data like membership numbers)
+  const bodyMetadata = body ? {
+    tableName: body.table || undefined,
+    pageSize: body.pageSize || undefined,
+    selectFields: body.selectFields?.length || undefined,
+    keys: Object.keys(body)
+  } : undefined;
+  
+  log(`[Proxy] Request: ${method} ${endpoint}`, bodyMetadata ? `metadata: ${JSON.stringify(bodyMetadata)}` : '');
+  
+  // Full body logging only in debug mode (may contain sensitive data)
+  logDebug(`[Proxy] Full body:`, JSON.stringify(body));
 
   if (!endpoint || !token) {
     log('[Proxy] Missing endpoint or token');
