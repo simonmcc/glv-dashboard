@@ -7,6 +7,8 @@
 
 import { chromium, Page } from 'playwright';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
+import { log, logError } from './logger.js';
+import { createHash } from 'node:crypto';
 
 const tracer = trace.getTracer('glv-backend-auth', '1.0.0');
 
@@ -215,7 +217,7 @@ async function searchMemberByNumber(
     }
     return null;
   } catch (error) {
-    console.error(`[API] Search failed for ${membershipNumber}:`, error);
+    logError(`[API] Search failed for ${membershipNumber}:`, error);
     return null;
   }
 }
@@ -242,7 +244,7 @@ async function getLearningForContact(
     const data = await response.json();
 
     if (!Array.isArray(data)) {
-      console.log(`[API] Unexpected response for learning: ${JSON.stringify(data).substring(0, 200)}`);
+      log(`[API] Unexpected response for learning: ${JSON.stringify(data).substring(0, 200)}`);
       return [];
     }
 
@@ -252,7 +254,7 @@ async function getLearningForContact(
       currentLevel: String(m.currentLevel || ''),
     }));
   } catch (error) {
-    console.error(`[API] Failed to get learning for ${contactId}:`, error);
+    logError(`[API] Failed to get learning for ${contactId}:`, error);
     return [];
   }
 }
@@ -267,19 +269,19 @@ export async function checkLearningByMembershipNumbers(
 ): Promise<LearningResult> {
   return tracer.startActiveSpan('checkLearningByMembershipNumbers', async (span) => {
   span.setAttribute('members.count', membershipNumbers.length);
-  console.log(`[Learning] Checking ${membershipNumbers.length} membership numbers`);
+  log(`[Learning] Checking ${membershipNumbers.length} membership numbers`);
 
   const members: MemberLearning[] = [];
 
   for (const membershipNumber of membershipNumbers) {
     await tracer.startActiveSpan('checkLearning.member', async (memberSpan) => {
     memberSpan.setAttribute('member.membership_number', membershipNumber);
-    console.log(`[Learning] Looking up ${membershipNumber}...`);
+    log(`[Learning] Looking up ${membershipNumber}...`);
 
     // Search for member
     const member = await searchMemberByNumber(token, membershipNumber);
     if (!member) {
-      console.log(`[Learning] Member not found: ${membershipNumber}`);
+      log(`[Learning] Member not found: ${membershipNumber}`);
       memberSpan.setAttribute('member.found', false);
       members.push({
         membershipNumber,
@@ -292,13 +294,13 @@ export async function checkLearningByMembershipNumbers(
       return;
     }
 
-    console.log(`[Learning] Found ${member.preferredName} ${member.lastname} (${member.id})`);
+    log(`[Learning] Found ${member.preferredName} ${member.lastname} (${member.id})`);
     memberSpan.setAttribute('member.found', true);
     memberSpan.setAttribute('member.contact_id', member.id);
 
     // Get learning details
     const modules = await getLearningForContact(token, member.id);
-    console.log(`[Learning] Got ${modules.length} learning modules`);
+    log(`[Learning] Got ${modules.length} learning modules`);
     memberSpan.setAttribute('member.module_count', modules.length);
 
     members.push({
@@ -356,7 +358,10 @@ export async function authenticate(username: string, password: string): Promise<
     // Only capture tokens from requests to the Scouts API
     if (authHeader && authHeader.startsWith('Bearer ') && request.url().includes('tsa-memportal-prod-fun01')) {
       capturedToken = authHeader.replace('Bearer ', '');
-      console.log('[Auth] Captured token from:', request.url());
+      log('[Auth] Captured token from:', request.url());
+      // Use SHA-256 hash for non-sensitive token identification
+      const tokenHash = createHash('sha256').update(capturedToken).digest('hex').substring(0, 16);
+      log(`[Auth] Token length: ${capturedToken.length}, hash: ${tokenHash}`);
     }
   });
 
@@ -403,7 +408,7 @@ export async function authenticate(username: string, password: string): Promise<
       }, capturedToken);
 
       contactId = contactResponse.id;
-      console.log('[Auth] Got contactId from browser context:', contactId);
+      log('[Auth] Got contactId from browser context:', contactId);
 
       // Test: Try simpler query first (ContactHierarchyUnitsView - used by scraper)
       const unitsResponse = await fetch('https://tsa-memportal-prod-fun01.azurewebsites.net/api/DataExplorer/GetResultsAsync', {
@@ -429,7 +434,7 @@ export async function authenticate(username: string, password: string): Promise<
         }),
       });
       const unitsQuery = await unitsResponse.json();
-      console.log('[Auth] Units query (Node.js):', JSON.stringify(unitsQuery).substring(0, 300));
+      log('[Auth] Units query (Node.js):', JSON.stringify(unitsQuery).substring(0, 300));
 
       // Test: Try LearningComplianceDashboardView with exact scraper parameters
       const learningResponse = await fetch('https://tsa-memportal-prod-fun01.azurewebsites.net/api/DataExplorer/GetResultsAsync', {
@@ -455,13 +460,14 @@ export async function authenticate(username: string, password: string): Promise<
         }),
       });
       const learningQuery = await learningResponse.json();
-      console.log('[Auth] Learning query (Node.js):', JSON.stringify(learningQuery).substring(0, 300));
+      log('[Auth] Learning query (Node.js):', JSON.stringify(learningQuery).substring(0, 300));
     } catch (err) {
-      console.error('[Auth] Error in browser context:', err);
+      logError('[Auth] Error in browser context:', err);
       // Contact ID fetch failed, but we have the token
     }
 
-    console.log(`[Auth] Returning token - length: ${capturedToken.length}, starts: ${capturedToken.substring(0, 20)}..., ends: ...${capturedToken.substring(capturedToken.length - 20)}`);
+    const token = capturedToken as string;
+    log(`[Auth] Returning token - length: ${token.length}, starts: ${token.substring(0, 20)}..., ends: ...${token.substring(token.length - 20)}`);
 
     span.setStatus({ code: SpanStatusCode.OK });
     return {
