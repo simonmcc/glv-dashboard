@@ -10,6 +10,7 @@ import express from 'express';
 import cors from 'cors';
 import { authenticate, checkLearningByMembershipNumbers } from './auth-service.js';
 import { getMockAuth, getMockProxyResponse, getMockLearningDetails } from './mock-data.js';
+import { log, logError } from './logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -44,12 +45,12 @@ app.post('/auth/login', async (req, res) => {
 
   // Mock mode - return mock auth with simulated delay
   if (MOCK_MODE) {
-    console.log(`[Auth] Mock login for: ${username} (${MOCK_DELAY_MS}ms delay)`);
+    log(`[Auth] Mock login for: ${username} (${MOCK_DELAY_MS}ms delay)`);
     await delay(MOCK_DELAY_MS);
     return res.json(getMockAuth());
   }
 
-  console.log(`[Auth] Login attempt for: ${username}`);
+  log(`[Auth] Login attempt for: ${username}`);
   const startTime = Date.now();
 
   try {
@@ -57,21 +58,21 @@ app.post('/auth/login', async (req, res) => {
     const duration = Date.now() - startTime;
 
     if (result.success) {
-      console.log(`[Auth] Login successful for ${username} (${duration}ms)`);
+      log(`[Auth] Login successful for ${username} (${duration}ms)`);
       return res.json({
         success: true,
         token: result.token,
         contactId: result.contactId,
       });
     } else {
-      console.log(`[Auth] Login failed for ${username}: ${result.error} (${duration}ms)`);
+      log(`[Auth] Login failed for ${username}: ${result.error} (${duration}ms)`);
       return res.status(401).json({
         success: false,
         error: result.error || 'Authentication failed',
       });
     }
   } catch (error) {
-    console.error(`[Auth] Error for ${username}:`, error);
+    logError(`[Auth] Error for ${username}:`, error);
     return res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -83,13 +84,13 @@ app.post('/auth/login', async (req, res) => {
 app.post('/api/proxy', async (req, res) => {
   const { endpoint, method = 'POST', body, token } = req.body;
 
-  console.log(`[Proxy] Request: ${method} ${endpoint}`);
+  log(`[Proxy] Request: ${method} ${endpoint}`);
   if (body) {
-    console.log(`[Proxy] Full body:`, JSON.stringify(body));
+    log(`[Proxy] Full body:`, JSON.stringify(body));
   }
 
   if (!endpoint || !token) {
-    console.log('[Proxy] Missing endpoint or token');
+    log('[Proxy] Missing endpoint or token');
     return res.status(400).json({
       success: false,
       error: 'Endpoint and token are required',
@@ -99,13 +100,13 @@ app.post('/api/proxy', async (req, res) => {
   // Mock mode - return mock data based on table name
   if (MOCK_MODE) {
     const tableName = body?.table;
-    console.log(`[Proxy] Mock mode - returning mock data for table: ${tableName} (${MOCK_DELAY_MS}ms delay)`);
+    log(`[Proxy] Mock mode - returning mock data for table: ${tableName} (${MOCK_DELAY_MS}ms delay)`);
     await delay(MOCK_DELAY_MS);
     return res.json(getMockProxyResponse(tableName));
   }
 
   // Log token details for debugging
-  console.log(`[Proxy] Token length: ${token.length}, starts: ${token.substring(0, 20)}..., ends: ...${token.substring(token.length - 20)}`);
+  log(`[Proxy] Token length: ${token.length}, starts: ${token.substring(0, 20)}..., ends: ...${token.substring(token.length - 20)}`);
 
   const apiUrl = `https://tsa-memportal-prod-fun01.azurewebsites.net/api${endpoint}`;
 
@@ -122,10 +123,10 @@ app.post('/api/proxy', async (req, res) => {
     });
 
     const duration = Date.now() - startTime;
-    console.log(`[Proxy] Response: ${response.status} (${duration}ms)`);
+    log(`[Proxy] Response: ${response.status} (${duration}ms)`);
 
     if (response.status === 401) {
-      console.log('[Proxy] Token expired');
+      log('[Proxy] Token expired');
       return res.status(401).json({
         success: false,
         error: 'Token expired',
@@ -133,24 +134,24 @@ app.post('/api/proxy', async (req, res) => {
     }
 
     const text = await response.text();
-    console.log(`[Proxy] Raw response (first 500 chars):`, text.substring(0, 500));
+    log(`[Proxy] Raw response (first 500 chars):`, text.substring(0, 500));
 
     let data;
     try {
       data = JSON.parse(text);
     } catch {
-      console.error('[Proxy] Failed to parse response as JSON');
+      logError('[Proxy] Failed to parse response as JSON');
       return res.status(500).json({ success: false, error: 'Invalid JSON response from API' });
     }
 
-    console.log(`[Proxy] Data received:`, {
+    log(`[Proxy] Data received:`, {
       hasData: !!data.data,
       dataLength: data.data?.length,
       error: data.error
     });
     return res.json(data);
   } catch (error) {
-    console.error('[Proxy] Error:', error);
+    logError('[Proxy] Error:', error);
     return res.status(500).json({
       success: false,
       error: 'Failed to proxy request',
@@ -171,18 +172,18 @@ app.post('/api/check-learning', async (req, res) => {
 
   // Mock mode - return mock learning details
   if (MOCK_MODE) {
-    console.log(`[Learning] Mock mode - returning mock data for ${membershipNumbers.length} members (${MOCK_DELAY_MS}ms delay)`);
+    log(`[Learning] Mock mode - returning mock data for ${membershipNumbers.length} members (${MOCK_DELAY_MS}ms delay)`);
     await delay(MOCK_DELAY_MS);
     return res.json(getMockLearningDetails(membershipNumbers));
   }
 
-  console.log(`[Learning] Checking ${membershipNumbers.length} membership numbers`);
+  log(`[Learning] Checking ${membershipNumbers.length} membership numbers`);
 
   try {
     const result = await checkLearningByMembershipNumbers(token, membershipNumbers);
     return res.json(result);
   } catch (error) {
-    console.error('[Learning] Error:', error);
+    logError('[Learning] Error:', error);
     return res.status(500).json({
       success: false,
       error: 'Failed to check learning',
@@ -192,10 +193,10 @@ app.post('/api/check-learning', async (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`[Server] GLV Dashboard backend running on http://localhost:${PORT}`);
-  console.log(`[Server] CORS origin: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
+  log(`[Server] GLV Dashboard backend running on http://localhost:${PORT}`);
+  log(`[Server] CORS origin: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
   if (MOCK_MODE) {
-    console.log(`[Server] MOCK MODE ENABLED - Using mock data with ${MOCK_DELAY_MS}ms delay`);
+    log(`[Server] MOCK MODE ENABLED - Using mock data with ${MOCK_DELAY_MS}ms delay`);
   }
 });
 
