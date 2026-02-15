@@ -17,6 +17,13 @@ Run the backend with mock data instead of connecting to the real Scouts API:
 MOCK_MODE=true npm run dev
 ```
 
+By default, mock responses include a 1 second delay to simulate real API latency. Customize this with `MOCK_DELAY_MS`:
+
+```bash
+MOCK_MODE=true MOCK_DELAY_MS=500 npm run dev   # 500ms delay
+MOCK_MODE=true MOCK_DELAY_MS=0 npm run dev     # No delay
+```
+
 Mock mode provides realistic sample data for all dashboard views:
 
 | Table | Mock Data |
@@ -51,6 +58,7 @@ Mock data uses a seeded random number generator for consistent, reproducible res
 | `PORT` | `3001` | Server port |
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
 | `MOCK_MODE` | `false` | Use mock data instead of real API |
+| `MOCK_DELAY_MS` | `1000` | Simulated response delay in mock mode (ms) |
 | `OTEL_ENABLED` | `false` | Enable OpenTelemetry tracing |
 | `HEADLESS` | `true` | Set to `false` for visible Playwright browser |
 
