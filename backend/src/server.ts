@@ -14,6 +14,9 @@ import { getMockAuth, getMockProxyResponse, getMockLearningDetails } from './moc
 const app = express();
 const PORT = process.env.PORT || 3001;
 const MOCK_MODE = process.env.MOCK_MODE === 'true';
+const MOCK_DELAY_MS = parseInt(process.env.MOCK_DELAY_MS || '1000', 10);
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Middleware
 app.use(cors({
@@ -38,9 +41,10 @@ app.post('/auth/login', async (req, res) => {
     });
   }
 
-  // Mock mode - return mock auth immediately
+  // Mock mode - return mock auth with simulated delay
   if (MOCK_MODE) {
-    console.log(`[Auth] Mock login for: ${username}`);
+    console.log(`[Auth] Mock login for: ${username} (${MOCK_DELAY_MS}ms delay)`);
+    await delay(MOCK_DELAY_MS);
     return res.json(getMockAuth());
   }
 
@@ -94,7 +98,8 @@ app.post('/api/proxy', async (req, res) => {
   // Mock mode - return mock data based on table name
   if (MOCK_MODE) {
     const tableName = body?.table;
-    console.log(`[Proxy] Mock mode - returning mock data for table: ${tableName}`);
+    console.log(`[Proxy] Mock mode - returning mock data for table: ${tableName} (${MOCK_DELAY_MS}ms delay)`);
+    await delay(MOCK_DELAY_MS);
     return res.json(getMockProxyResponse(tableName));
   }
 
@@ -165,7 +170,8 @@ app.post('/api/check-learning', async (req, res) => {
 
   // Mock mode - return mock learning details
   if (MOCK_MODE) {
-    console.log(`[Learning] Mock mode - returning mock data for ${membershipNumbers.length} members`);
+    console.log(`[Learning] Mock mode - returning mock data for ${membershipNumbers.length} members (${MOCK_DELAY_MS}ms delay)`);
+    await delay(MOCK_DELAY_MS);
     return res.json(getMockLearningDetails(membershipNumbers));
   }
 
@@ -188,7 +194,7 @@ app.listen(PORT, () => {
   console.log(`[Server] GLV Dashboard backend running on http://localhost:${PORT}`);
   console.log(`[Server] CORS origin: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
   if (MOCK_MODE) {
-    console.log('[Server] MOCK MODE ENABLED - Using mock data instead of real API');
+    console.log(`[Server] MOCK MODE ENABLED - Using mock data with ${MOCK_DELAY_MS}ms delay`);
   }
 });
 
