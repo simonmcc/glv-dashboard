@@ -76,17 +76,6 @@ export interface DisclosureDetail {
 }
 
 /**
- * Member with their disclosure details from the check-disclosures API
- */
-export interface MemberDisclosureResult {
-  membershipNumber: string;
-  contactId: string;
-  firstName: string;
-  lastName: string;
-  disclosures: DisclosureDetail[];
-}
-
-/**
  * Joining Journey record from JoiningJourneyView
  */
 export interface JoiningJourneyRecord {

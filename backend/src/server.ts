@@ -8,7 +8,7 @@
 import './tracing.js';
 import express from 'express';
 import cors from 'cors';
-import { authenticate, checkDisclosuresByMembershipNumbers, checkLearningByMembershipNumbers } from './auth-service.js';
+import { authenticate, checkLearningByMembershipNumbers } from './auth-service.js';
 import { getMockAuth, getMockProxyResponse, getMockLearningDetails } from './mock-data.js';
 
 const app = express();
@@ -179,37 +179,6 @@ app.post('/api/check-learning', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to check learning',
-    });
-  }
-});
-
-// Check disclosures by membership numbers - the preferred method
-app.post('/api/check-disclosures', async (req, res) => {
-  const { token, membershipNumbers } = req.body;
-
-  if (!token || !membershipNumbers || !Array.isArray(membershipNumbers)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Token and membershipNumbers array are required',
-    });
-  }
-
-  // Mock mode - return mock disclosure data
-  if (MOCK_MODE) {
-    console.log(`[Disclosures] Mock mode - returning mock data for ${membershipNumbers.length} members`);
-    return res.json({ success: true, disclosures: [] });
-  }
-
-  console.log(`[Disclosures] Checking ${membershipNumbers.length} membership numbers`);
-
-  try {
-    const result = await checkDisclosuresByMembershipNumbers(token, membershipNumbers);
-    return res.json(result);
-  } catch (error) {
-    console.error('[Disclosures] Error:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to check disclosures',
     });
   }
 });

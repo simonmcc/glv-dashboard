@@ -104,5 +104,4 @@ Tracing is opt-in and has zero overhead when disabled. Manual spans instrument t
 
 - `POST /auth/login` — Authenticate via Playwright, returns Bearer token + contactId
 - `POST /api/proxy` — Forward requests to Scouts API with token
-- `POST /api/check-disclosures` — Check disclosures by membership numbers
 - `POST /api/check-learning` — Check learning records by membership numbers

@@ -4,7 +4,7 @@
  * Routes all API calls through the backend proxy to avoid CORS issues.
  */
 
-import type { LearningRecord, ApiResponse, ComplianceSummary, DisclosureRecord, DisclosureSummary, MemberDisclosureResult, MemberLearningResult, JoiningJourneyRecord, AppointmentRecord, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from './types';
+import type { LearningRecord, ApiResponse, ComplianceSummary, DisclosureRecord, DisclosureSummary, MemberLearningResult, JoiningJourneyRecord, AppointmentRecord, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from './types';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
@@ -358,39 +358,6 @@ export class ScoutsApiClient {
       return result;
     } catch (err) {
       console.error('[API] Check learning error:', err);
-      return { success: false, error: String(err) };
-    }
-  }
-
-  /**
-   * Check disclosures by membership numbers (preferred method)
-   * Uses MemberListingAsync to find contact IDs, then fetches disclosures from Table Storage
-   */
-  async checkDisclosuresByMembershipNumbers(
-    membershipNumbers: string[]
-  ): Promise<{ success: boolean; members?: MemberDisclosureResult[]; error?: string }> {
-    console.log(`[API] Checking disclosures for ${membershipNumbers.length} members...`);
-
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/check-disclosures`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: this.token,
-          membershipNumbers,
-        }),
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        return { success: false, error: `HTTP ${response.status}: ${text}` };
-      }
-
-      const result = await response.json();
-      console.log('[API] Check disclosures result:', result);
-      return result;
-    } catch (err) {
-      console.error('[API] Check disclosures error:', err);
       return { success: false, error: String(err) };
     }
   }

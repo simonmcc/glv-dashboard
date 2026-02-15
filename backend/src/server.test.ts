@@ -6,14 +6,12 @@ import cors from 'cors';
 // Mock the auth-service module before importing the server
 vi.mock('./auth-service.js', () => ({
   authenticate: vi.fn(),
-  checkDisclosuresByMembershipNumbers: vi.fn(),
   checkLearningByMembershipNumbers: vi.fn(),
 }));
 
 // Import mocked functions
 import {
   authenticate,
-  checkDisclosuresByMembershipNumbers,
   checkLearningByMembershipNumbers,
 } from './auth-service.js';
 
@@ -97,28 +95,6 @@ function createTestApp() {
       return res.status(500).json({
         success: false,
         error: 'Failed to check learning',
-      });
-    }
-  });
-
-  // Check disclosures endpoint
-  app.post('/api/check-disclosures', async (req, res) => {
-    const { token, membershipNumbers } = req.body;
-
-    if (!token || !membershipNumbers || !Array.isArray(membershipNumbers)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Token and membershipNumbers array are required',
-      });
-    }
-
-    try {
-      const result = await checkDisclosuresByMembershipNumbers(token, membershipNumbers);
-      return res.json(result);
-    } catch {
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to check disclosures',
       });
     }
   });
@@ -264,31 +240,6 @@ describe('Backend Server', () => {
 
       expect(response.status).toBe(200);
       expect(checkLearningByMembershipNumbers).toHaveBeenCalledWith('test-token', ['111', '222']);
-    });
-  });
-
-  describe('POST /api/check-disclosures', () => {
-    it('should return 400 if required fields are missing', async () => {
-      const response = await request(app)
-        .post('/api/check-disclosures')
-        .send({ token: 'test' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Token and membershipNumbers array are required');
-    });
-
-    it('should call checkDisclosuresByMembershipNumbers with valid parameters', async () => {
-      vi.mocked(checkDisclosuresByMembershipNumbers).mockResolvedValue({
-        success: true,
-        members: [],
-      });
-
-      const response = await request(app)
-        .post('/api/check-disclosures')
-        .send({ token: 'test-token', membershipNumbers: ['111', '222'] });
-
-      expect(response.status).toBe(200);
-      expect(checkDisclosuresByMembershipNumbers).toHaveBeenCalledWith('test-token', ['111', '222']);
     });
   });
 
