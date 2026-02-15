@@ -2,9 +2,10 @@
  * Main Dashboard Component
  *
  * Orchestrates the dashboard layout and data fetching.
+ * Uses lazy loading to fetch section data when scrolled into view.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { ScoutsApiClient } from '../api-client';
 
@@ -20,6 +21,8 @@ import { SuspensionsTable } from './SuspensionsTable';
 import { TeamReviewsTable } from './TeamReviewsTable';
 import { PermitsTable } from './PermitsTable';
 import { AwardsTable } from './AwardsTable';
+import { LazySection } from './LazySection';
+import type { LoadState } from './LazySection';
 
 interface DashboardProps {
   token: string;
@@ -28,181 +31,258 @@ interface DashboardProps {
   onTokenExpired: () => void;
 }
 
+// Section state for lazy loading
+interface SectionState<T> {
+  state: LoadState;
+  data: T;
+  error: string | null;
+}
+
 export function Dashboard({ token, contactId, onLogout, onTokenExpired }: DashboardProps) {
+  // Primary data (loaded immediately - always visible at top)
   const [records, setRecords] = useState<LearningRecord[]>([]);
   const [summary, setSummary] = useState<ComplianceSummary | null>(null);
-  const [joiningJourneyRecords, setJoiningJourneyRecords] = useState<JoiningJourneyRecord[]>([]);
-  const [disclosureRecords, setDisclosureRecords] = useState<DisclosureRecord[]>([]);
-  const [disclosureSummary, setDisclosureSummary] = useState<DisclosureSummary | null>(null);
-  const [appointmentRecords, setAppointmentRecords] = useState<AppointmentRecord[]>([]);
-  const [suspensionRecords, setSuspensionRecords] = useState<SuspensionRecord[]>([]);
-  const [teamReviewRecords, setTeamReviewRecords] = useState<TeamReviewRecord[]>([]);
-  const [permitRecords, setPermitRecords] = useState<PermitRecord[]>([]);
-  const [awardRecords, setAwardRecords] = useState<AwardRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadingStatus, setLoadingStatus] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
+  const [primaryLoading, setPrimaryLoading] = useState(true);
+  const [primaryError, setPrimaryError] = useState<string | null>(null);
+
+  // Lazy-loaded sections
+  const [joiningJourney, setJoiningJourney] = useState<SectionState<JoiningJourneyRecord[]>>({ state: 'idle', data: [], error: null });
+  const [disclosures, setDisclosures] = useState<SectionState<{ records: DisclosureRecord[]; summary: DisclosureSummary | null }>>({ state: 'idle', data: { records: [], summary: null }, error: null });
+  const [appointments, setAppointments] = useState<SectionState<AppointmentRecord[]>>({ state: 'idle', data: [], error: null });
+  const [suspensions, setSuspensions] = useState<SectionState<SuspensionRecord[]>>({ state: 'idle', data: [], error: null });
+  const [teamReviews, setTeamReviews] = useState<SectionState<TeamReviewRecord[]>>({ state: 'idle', data: [], error: null });
+  const [permits, setPermits] = useState<SectionState<PermitRecord[]>>({ state: 'idle', data: [], error: null });
+  const [awards, setAwards] = useState<SectionState<AwardRecord[]>>({ state: 'idle', data: [], error: null });
+
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchData = useCallback(async () => {
-    return tracer.startActiveSpan('dashboard.fetchData', async (span) => {
-    setIsLoading(true);
-    setLoadingStatus('Initializing...');
-    setError(null);
+  // Section refs for intersection observer
+  const joiningJourneyRef = useRef<HTMLElement>(null);
+  const disclosuresRef = useRef<HTMLElement>(null);
+  const appointmentsRef = useRef<HTMLElement>(null);
+  const suspensionsRef = useRef<HTMLElement>(null);
+  const teamReviewsRef = useRef<HTMLElement>(null);
+  const permitsRef = useRef<HTMLElement>(null);
+  const awardsRef = useRef<HTMLElement>(null);
 
-    console.log('[Dashboard] fetchData called with contactId:', contactId || '(empty)');
+  // Track which sections have been triggered
+  const triggeredSections = useRef<Set<string>>(new Set());
 
-    try {
-      const client = new ScoutsApiClient(token);
-
-      // Initialize to get contactId if not provided
-      if (!contactId) {
-        console.log('[Dashboard] No contactId provided, calling initialize()');
-        await client.initialize();
-      } else {
-        console.log('[Dashboard] Setting contactId on client:', contactId);
-        // Use the provided contactId
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (client as any).contactId = contactId;
-      }
-
-      // Expose client for testing table names in browser console
-      // Usage: window.testTable('DisclosureDashboardView')
+  // Memoize the API client
+  const client = useMemo(() => {
+    const c = new ScoutsApiClient(token);
+    if (contactId) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).apiClient = client;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).testTable = (tableName: string) => client.testTable(tableName);
-      // Check learning by membership numbers - uses GetLmsDetailsAsync for accurate expiry dates
-      // Usage: checkLearning(['0012162494', '0012345678'])
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).checkLearning = (membershipNumbers: string[]) =>
-        client.checkLearningByMembershipNumbers(membershipNumbers);
-      // Test joining journey view
-      // Usage: testJoiningJourney()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).testJoiningJourney = () => client.getJoiningJourney(50);
-      console.log('[Dashboard] Test functions: checkLearning([...]), testJoiningJourney()');
-
-      // First get member list from LearningComplianceDashboardView to get membership numbers
-      setLoadingStatus('Loading member list...');
-      console.log('[Dashboard] Fetching member list...');
-      const memberListResponse = await client.getAllLearningCompliance(1000);
-
-      if (memberListResponse.error) {
-        throw new Error(memberListResponse.error);
-      }
-
-      // Extract unique membership numbers
-      const uniqueMembershipNumbers = [...new Set(
-        (memberListResponse.data || []).map(r => r['Membership number'])
-      )];
-      console.log(`[Dashboard] Found ${uniqueMembershipNumbers.length} unique members`);
-
-      // Fetch accurate learning data via GetLmsDetailsAsync
-      setLoadingStatus(`Loading learning details for ${uniqueMembershipNumbers.length} members...`);
-      console.log('[Dashboard] Fetching learning details for each member...');
-      const learningResult = await client.checkLearningByMembershipNumbers(uniqueMembershipNumbers);
-
-      if (!learningResult.success || !learningResult.members) {
-        throw new Error(learningResult.error || 'Failed to fetch learning details');
-      }
-
-      // Transform to LearningRecord format, only including modules that actually expire
-      const data = transformLearningResults(learningResult.members);
-      console.log(`[Dashboard] Transformed to ${data.length} learning records (expiring modules only)`);
-
-      setRecords(data);
-
-      // Compute summary
-      const summaryData = client.computeComplianceSummary(data);
-      setSummary(summaryData);
-
-      // Fetch joining journey data
-      setLoadingStatus('Loading joining journey...');
-      console.log('[Dashboard] Fetching joining journey data...');
-      const joiningJourneyResponse = await client.getJoiningJourney(500);
-      if (!joiningJourneyResponse.error && joiningJourneyResponse.data) {
-        setJoiningJourneyRecords(joiningJourneyResponse.data);
-        console.log(`[Dashboard] Got ${joiningJourneyResponse.data.length} joining journey records`);
-      }
-
-      // Fetch disclosure compliance data
-      setLoadingStatus('Loading disclosures...');
-      console.log('[Dashboard] Fetching disclosure compliance data...');
-      const disclosureResponse = await client.getDisclosureCompliance(500);
-      if (!disclosureResponse.error && disclosureResponse.data) {
-        setDisclosureRecords(disclosureResponse.data);
-        setDisclosureSummary(client.computeDisclosureSummary(disclosureResponse.data));
-        console.log(`[Dashboard] Got ${disclosureResponse.data.length} disclosure records`);
-      }
-
-      // Fetch appointments data
-      setLoadingStatus('Loading appointments...');
-      console.log('[Dashboard] Fetching appointments data...');
-      const appointmentsResponse = await client.getAppointments(500);
-      if (!appointmentsResponse.error && appointmentsResponse.data) {
-        setAppointmentRecords(appointmentsResponse.data);
-        console.log(`[Dashboard] Got ${appointmentsResponse.data.length} appointment records`);
-      }
-
-      // Fetch suspensions data
-      setLoadingStatus('Loading suspensions...');
-      console.log('[Dashboard] Fetching suspensions data...');
-      const suspensionsResponse = await client.getSuspensions(500);
-      if (!suspensionsResponse.error && suspensionsResponse.data) {
-        setSuspensionRecords(suspensionsResponse.data);
-        console.log(`[Dashboard] Got ${suspensionsResponse.data.length} suspension records`);
-      }
-
-      // Fetch team reviews data
-      setLoadingStatus('Loading team reviews...');
-      console.log('[Dashboard] Fetching team reviews data...');
-      const teamReviewsResponse = await client.getTeamReviews(500);
-      if (!teamReviewsResponse.error && teamReviewsResponse.data) {
-        setTeamReviewRecords(teamReviewsResponse.data);
-        console.log(`[Dashboard] Got ${teamReviewsResponse.data.length} team review records`);
-      }
-
-      // Fetch permits data
-      setLoadingStatus('Loading permits...');
-      console.log('[Dashboard] Fetching permits data...');
-      const permitsResponse = await client.getPermits(500);
-      if (!permitsResponse.error && permitsResponse.data) {
-        setPermitRecords(permitsResponse.data);
-        console.log(`[Dashboard] Got ${permitsResponse.data.length} permit records`);
-      }
-
-      // Fetch awards data
-      setLoadingStatus('Loading awards...');
-      console.log('[Dashboard] Fetching awards data...');
-      const awardsResponse = await client.getAwards(500);
-      if (!awardsResponse.error && awardsResponse.data) {
-        setAwardRecords(awardsResponse.data);
-        console.log(`[Dashboard] Got ${awardsResponse.data.length} award records`);
-      }
-
-      setLoadingStatus('');
-      setLastUpdated(new Date());
-      span.setStatus({ code: SpanStatusCode.OK });
-    } catch (err) {
-      const message = (err as Error).message;
-      span.setStatus({ code: SpanStatusCode.ERROR, message });
-      span.recordException(err as Error);
-      if (message === 'TOKEN_EXPIRED') {
-        onTokenExpired();
-      } else {
-        setError(message);
-      }
-    } finally {
-      setIsLoading(false);
-      span.end();
+      (c as any).contactId = contactId;
     }
-    });
-  }, [token, contactId, onTokenExpired]);
+    return c;
+  }, [token, contactId]);
 
+  // Primary data fetch (learning records + summary)
+  const fetchPrimaryData = useCallback(async () => {
+    return tracer.startActiveSpan('dashboard.fetchPrimaryData', async (span) => {
+      setPrimaryLoading(true);
+      setPrimaryError(null);
+
+      try {
+        // Initialize client if no contactId
+        if (!contactId) {
+          await client.initialize();
+        }
+
+        // Expose debug helpers
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).apiClient = client;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).testTable = (tableName: string) => client.testTable(tableName);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).checkLearning = (membershipNumbers: string[]) =>
+          client.checkLearningByMembershipNumbers(membershipNumbers);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).testJoiningJourney = () => client.getJoiningJourney(50);
+
+        // Get member list
+        const memberListResponse = await client.getAllLearningCompliance(1000);
+        if (memberListResponse.error) {
+          throw new Error(memberListResponse.error);
+        }
+
+        // Extract unique membership numbers
+        const uniqueMembershipNumbers = [...new Set(
+          (memberListResponse.data || []).map(r => r['Membership number'])
+        )];
+
+        // Fetch learning details
+        const learningResult = await client.checkLearningByMembershipNumbers(uniqueMembershipNumbers);
+        if (!learningResult.success || !learningResult.members) {
+          throw new Error(learningResult.error || 'Failed to fetch learning details');
+        }
+
+        // Transform and set data
+        const data = transformLearningResults(learningResult.members);
+        setRecords(data);
+        setSummary(client.computeComplianceSummary(data));
+        setLastUpdated(new Date());
+        span.setStatus({ code: SpanStatusCode.OK });
+      } catch (err) {
+        const message = (err as Error).message;
+        span.setStatus({ code: SpanStatusCode.ERROR, message });
+        span.recordException(err as Error);
+        if (message === 'TOKEN_EXPIRED') {
+          onTokenExpired();
+        } else {
+          setPrimaryError(message);
+        }
+      } finally {
+        setPrimaryLoading(false);
+        span.end();
+      }
+    });
+  }, [client, contactId, onTokenExpired]);
+
+  // Section loaders
+  const loadJoiningJourney = useCallback(async () => {
+    setJoiningJourney(s => ({ ...s, state: 'loading', error: null }));
+    try {
+      const response = await client.getJoiningJourney(500);
+      if (response.error) throw new Error(response.error);
+      setJoiningJourney({ state: 'loaded', data: response.data || [], error: null });
+    } catch (err) {
+      setJoiningJourney(s => ({ ...s, state: 'error', error: (err as Error).message }));
+    }
+  }, [client]);
+
+  const loadDisclosures = useCallback(async () => {
+    setDisclosures(s => ({ ...s, state: 'loading', error: null }));
+    try {
+      const response = await client.getDisclosureCompliance(500);
+      if (response.error) throw new Error(response.error);
+      const records = response.data || [];
+      setDisclosures({
+        state: 'loaded',
+        data: { records, summary: client.computeDisclosureSummary(records) },
+        error: null
+      });
+    } catch (err) {
+      setDisclosures(s => ({ ...s, state: 'error', error: (err as Error).message }));
+    }
+  }, [client]);
+
+  const loadAppointments = useCallback(async () => {
+    setAppointments(s => ({ ...s, state: 'loading', error: null }));
+    try {
+      const response = await client.getAppointments(500);
+      if (response.error) throw new Error(response.error);
+      setAppointments({ state: 'loaded', data: response.data || [], error: null });
+    } catch (err) {
+      setAppointments(s => ({ ...s, state: 'error', error: (err as Error).message }));
+    }
+  }, [client]);
+
+  const loadSuspensions = useCallback(async () => {
+    setSuspensions(s => ({ ...s, state: 'loading', error: null }));
+    try {
+      const response = await client.getSuspensions(500);
+      if (response.error) throw new Error(response.error);
+      setSuspensions({ state: 'loaded', data: response.data || [], error: null });
+    } catch (err) {
+      setSuspensions(s => ({ ...s, state: 'error', error: (err as Error).message }));
+    }
+  }, [client]);
+
+  const loadTeamReviews = useCallback(async () => {
+    setTeamReviews(s => ({ ...s, state: 'loading', error: null }));
+    try {
+      const response = await client.getTeamReviews(500);
+      if (response.error) throw new Error(response.error);
+      setTeamReviews({ state: 'loaded', data: response.data || [], error: null });
+    } catch (err) {
+      setTeamReviews(s => ({ ...s, state: 'error', error: (err as Error).message }));
+    }
+  }, [client]);
+
+  const loadPermits = useCallback(async () => {
+    setPermits(s => ({ ...s, state: 'loading', error: null }));
+    try {
+      const response = await client.getPermits(500);
+      if (response.error) throw new Error(response.error);
+      setPermits({ state: 'loaded', data: response.data || [], error: null });
+    } catch (err) {
+      setPermits(s => ({ ...s, state: 'error', error: (err as Error).message }));
+    }
+  }, [client]);
+
+  const loadAwards = useCallback(async () => {
+    setAwards(s => ({ ...s, state: 'loading', error: null }));
+    try {
+      const response = await client.getAwards(500);
+      if (response.error) throw new Error(response.error);
+      setAwards({ state: 'loaded', data: response.data || [], error: null });
+    } catch (err) {
+      setAwards(s => ({ ...s, state: 'error', error: (err as Error).message }));
+    }
+  }, [client]);
+
+  // Refresh all data
+  const refreshAll = useCallback(async () => {
+    triggeredSections.current.clear();
+    setJoiningJourney({ state: 'idle', data: [], error: null });
+    setDisclosures({ state: 'idle', data: { records: [], summary: null }, error: null });
+    setAppointments({ state: 'idle', data: [], error: null });
+    setSuspensions({ state: 'idle', data: [], error: null });
+    setTeamReviews({ state: 'idle', data: [], error: null });
+    setPermits({ state: 'idle', data: [], error: null });
+    setAwards({ state: 'idle', data: [], error: null });
+    await fetchPrimaryData();
+  }, [fetchPrimaryData]);
+
+  // Load primary data on mount
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchPrimaryData();
+  }, [fetchPrimaryData]);
+
+  // Set up intersection observers for lazy sections
+  useEffect(() => {
+    const sections = [
+      { ref: joiningJourneyRef, key: 'joiningJourney', load: loadJoiningJourney },
+      { ref: disclosuresRef, key: 'disclosures', load: loadDisclosures },
+      { ref: appointmentsRef, key: 'appointments', load: loadAppointments },
+      { ref: suspensionsRef, key: 'suspensions', load: loadSuspensions },
+      { ref: teamReviewsRef, key: 'teamReviews', load: loadTeamReviews },
+      { ref: permitsRef, key: 'permits', load: loadPermits },
+      { ref: awardsRef, key: 'awards', load: loadAwards },
+    ];
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const section = sections.find(s => s.ref.current === entry.target);
+            if (section && !triggeredSections.current.has(section.key)) {
+              triggeredSections.current.add(section.key);
+              section.load();
+            }
+          }
+        });
+      },
+      { rootMargin: '100px' }
+    );
+
+    sections.forEach(({ ref }) => {
+      if (ref.current) observer.observe(ref.current);
+    });
+
+    return () => observer.disconnect();
+  }, [loadJoiningJourney, loadDisclosures, loadAppointments, loadSuspensions, loadTeamReviews, loadPermits, loadAwards]);
+
+  const isAnyLoading = primaryLoading ||
+    joiningJourney.state === 'loading' ||
+    disclosures.state === 'loading' ||
+    appointments.state === 'loading' ||
+    suspensions.state === 'loading' ||
+    teamReviews.state === 'loading' ||
+    permits.state === 'loading' ||
+    awards.state === 'loading';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -220,17 +300,12 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
               </span>
             )}
             <button
-              onClick={fetchData}
-              disabled={isLoading}
+              onClick={refreshAll}
+              disabled={isAnyLoading}
               className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50"
             >
-              {isLoading ? 'Loading...' : 'Refresh'}
+              {isAnyLoading ? 'Loading...' : 'Refresh'}
             </button>
-            {isLoading && loadingStatus && (
-              <span className="text-sm text-purple-600 animate-pulse">
-                {loadingStatus}
-              </span>
-            )}
             <button
               onClick={onLogout}
               className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
@@ -243,12 +318,12 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        {error && (
+        {primaryError && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
             <div className="font-medium">Error loading data</div>
-            <div className="text-sm mt-1">{error}</div>
+            <div className="text-sm mt-1">{primaryError}</div>
             <button
-              onClick={fetchData}
+              onClick={fetchPrimaryData}
               className="mt-2 text-sm text-red-800 underline hover:no-underline"
             >
               Try again
@@ -256,59 +331,120 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
           </div>
         )}
 
-        {/* Summary Tiles */}
+        {/* Summary Tiles - Always load immediately */}
         <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Compliance Summary</h2>
-          <SummaryTiles summary={summary} isLoading={isLoading} />
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Compliance Summary</h2>
+            {primaryLoading && (
+              <span className="text-sm text-purple-600 animate-pulse flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Loading...
+              </span>
+            )}
+          </div>
+          <SummaryTiles summary={summary} isLoading={primaryLoading} />
         </section>
 
-        {/* Learning Compliance Table */}
+        {/* Learning Compliance Table - Always load immediately */}
         <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Learning Records</h2>
-          <ComplianceTable records={records} isLoading={isLoading} />
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Learning Records</h2>
+            {primaryLoading && (
+              <span className="text-sm text-purple-600 animate-pulse flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Loading...
+              </span>
+            )}
+          </div>
+          <ComplianceTable records={records} isLoading={primaryLoading} />
         </section>
 
-        {/* Joining Journey Table */}
-        <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Joining Journey</h2>
-          <JoiningJourneyTable records={joiningJourneyRecords} isLoading={isLoading} />
-        </section>
+        {/* Joining Journey - Lazy loaded */}
+        <LazySection
+          ref={joiningJourneyRef}
+          title="Joining Journey"
+          state={joiningJourney.state}
+          error={joiningJourney.error}
+          onRetry={() => { triggeredSections.current.delete('joiningJourney'); loadJoiningJourney(); }}
+        >
+          <JoiningJourneyTable records={joiningJourney.data} isLoading={joiningJourney.state === 'loading'} />
+        </LazySection>
 
-        {/* Disclosure Compliance Table */}
-        <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Disclosure Compliance</h2>
-          <DisclosureTable records={disclosureRecords} summary={disclosureSummary} isLoading={isLoading} />
-        </section>
+        {/* Disclosure Compliance - Lazy loaded */}
+        <LazySection
+          ref={disclosuresRef}
+          title="Disclosure Compliance"
+          state={disclosures.state}
+          error={disclosures.error}
+          onRetry={() => { triggeredSections.current.delete('disclosures'); loadDisclosures(); }}
+        >
+          <DisclosureTable
+            records={disclosures.data.records}
+            summary={disclosures.data.summary}
+            isLoading={disclosures.state === 'loading'}
+          />
+        </LazySection>
 
-        {/* Suspensions Table */}
-        <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Suspensions</h2>
-          <SuspensionsTable records={suspensionRecords} isLoading={isLoading} />
-        </section>
+        {/* Suspensions - Lazy loaded */}
+        <LazySection
+          ref={suspensionsRef}
+          title="Suspensions"
+          state={suspensions.state}
+          error={suspensions.error}
+          onRetry={() => { triggeredSections.current.delete('suspensions'); loadSuspensions(); }}
+        >
+          <SuspensionsTable records={suspensions.data} isLoading={suspensions.state === 'loading'} />
+        </LazySection>
 
-        {/* Appointments Table */}
-        <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Appointments</h2>
-          <AppointmentsTable records={appointmentRecords} isLoading={isLoading} />
-        </section>
+        {/* Appointments - Lazy loaded */}
+        <LazySection
+          ref={appointmentsRef}
+          title="Appointments"
+          state={appointments.state}
+          error={appointments.error}
+          onRetry={() => { triggeredSections.current.delete('appointments'); loadAppointments(); }}
+        >
+          <AppointmentsTable records={appointments.data} isLoading={appointments.state === 'loading'} />
+        </LazySection>
 
-        {/* Team Reviews Table */}
-        <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Team Directory Reviews</h2>
-          <TeamReviewsTable records={teamReviewRecords} isLoading={isLoading} />
-        </section>
+        {/* Team Reviews - Lazy loaded */}
+        <LazySection
+          ref={teamReviewsRef}
+          title="Team Directory Reviews"
+          state={teamReviews.state}
+          error={teamReviews.error}
+          onRetry={() => { triggeredSections.current.delete('teamReviews'); loadTeamReviews(); }}
+        >
+          <TeamReviewsTable records={teamReviews.data} isLoading={teamReviews.state === 'loading'} />
+        </LazySection>
 
-        {/* Permits Table */}
-        <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Permits</h2>
-          <PermitsTable records={permitRecords} isLoading={isLoading} />
-        </section>
+        {/* Permits - Lazy loaded */}
+        <LazySection
+          ref={permitsRef}
+          title="Permits"
+          state={permits.state}
+          error={permits.error}
+          onRetry={() => { triggeredSections.current.delete('permits'); loadPermits(); }}
+        >
+          <PermitsTable records={permits.data} isLoading={permits.state === 'loading'} />
+        </LazySection>
 
-        {/* Awards Table */}
-        <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Awards & Recognitions</h2>
-          <AwardsTable records={awardRecords} isLoading={isLoading} />
-        </section>
+        {/* Awards - Lazy loaded */}
+        <LazySection
+          ref={awardsRef}
+          title="Awards & Recognitions"
+          state={awards.state}
+          error={awards.error}
+          onRetry={() => { triggeredSections.current.delete('awards'); loadAwards(); }}
+        >
+          <AwardsTable records={awards.data} isLoading={awards.state === 'loading'} />
+        </LazySection>
       </main>
 
       {/* Footer */}
