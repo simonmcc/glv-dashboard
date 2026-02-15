@@ -108,7 +108,11 @@ app.post('/api/proxy', async (req, res) => {
 
   // Log token length (or partial token if debug mode enabled)
   if (DEBUG_LOG_TOKENS) {
-    log(`[Proxy] Token length: ${token.length}, starts: ${token.substring(0, 20)}..., ends: ...${token.substring(token.length - 20)}`);
+    if (token.length >= 40) {
+      log(`[Proxy] Token length: ${token.length}, starts: ${token.substring(0, 20)}..., ends: ...${token.substring(token.length - 20)}`);
+    } else {
+      log(`[Proxy] Token length: ${token.length} (too short to show partial)`);
+    }
   } else {
     log(`[Proxy] Token length: ${token.length}`);
   }
