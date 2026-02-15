@@ -409,58 +409,6 @@ export async function authenticate(username: string, password: string): Promise<
 
       contactId = contactResponse.id;
       log('[Auth] Got contactId from browser context:', contactId);
-
-      // Test: Try simpler query first (ContactHierarchyUnitsView - used by scraper)
-      const unitsResponse = await fetch('https://tsa-memportal-prod-fun01.azurewebsites.net/api/DataExplorer/GetResultsAsync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${capturedToken}`,
-          'Accept': 'application/json, text/plain, */*',
-        },
-        body: JSON.stringify({
-          table: 'ContactHierarchyUnitsView',
-          query: '',
-          selectFields: ['Id', 'UnitName'],
-          pageNo: 1,
-          pageSize: 10,
-          orderBy: 'UnitName',
-          order: 'asc',
-          distinct: true,
-          isDashboardQuery: false,
-          contactId: contactId,
-          id: '',
-          name: '',
-        }),
-      });
-      const unitsQuery = await unitsResponse.json();
-      log('[Auth] Units query (Node.js):', JSON.stringify(unitsQuery).substring(0, 300));
-
-      // Test: Try LearningComplianceDashboardView with exact scraper parameters
-      const learningResponse = await fetch('https://tsa-memportal-prod-fun01.azurewebsites.net/api/DataExplorer/GetResultsAsync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${capturedToken}`,
-          'Accept': 'application/json, text/plain, */*',
-        },
-        body: JSON.stringify({
-          table: 'LearningComplianceDashboardView',
-          query: '',
-          selectFields: ['FirstName', 'LastName', 'MembershipNumber', 'Name', 'Status', 'ExpiryDate'],
-          pageNo: 1,
-          pageSize: 200,
-          orderBy: '',
-          order: null,
-          distinct: true,
-          isDashboardQuery: false,
-          contactId: contactId,
-          id: '',
-          name: '',
-        }),
-      });
-      const learningQuery = await learningResponse.json();
-      log('[Auth] Learning query (Node.js):', JSON.stringify(learningQuery).substring(0, 300));
     } catch (err) {
       logError('[Auth] Error in browser context:', err);
       // Contact ID fetch failed, but we have the token
