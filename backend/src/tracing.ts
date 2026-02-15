@@ -3,6 +3,7 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
+import { log } from './logger.js';
 
 const OTEL_ENABLED = process.env.OTEL_ENABLED === 'true' || process.env.OTEL_ENABLED === '1';
 
@@ -26,7 +27,7 @@ if (OTEL_ENABLED) {
   });
 
   sdk.start();
-  console.log('[Tracing] OpenTelemetry initialized - exporting to',
+  log('[Tracing] OpenTelemetry initialized - exporting to',
     process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces');
 
   const shutdown = async () => {
@@ -36,5 +37,5 @@ if (OTEL_ENABLED) {
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 } else {
-  console.log('[Tracing] OpenTelemetry disabled (set OTEL_ENABLED=true to enable)');
+  log('[Tracing] OpenTelemetry disabled (set OTEL_ENABLED=true to enable)');
 }
