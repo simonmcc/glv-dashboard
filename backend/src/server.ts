@@ -86,13 +86,17 @@ app.post('/api/proxy', async (req, res) => {
 
   // Log high-level metadata only (don't expose sensitive data like membership numbers)
   const bodyMetadata = body ? {
-    tableName: body.table || undefined,
-    pageSize: body.pageSize || undefined,
-    selectFields: body.selectFields?.length || undefined,
+    tableName: body.table,
+    pageSize: body.pageSize,
+    selectFields: body.selectFields?.length,
     keys: Object.keys(body)
   } : undefined;
   
-  log(`[Proxy] Request: ${method} ${endpoint}`, bodyMetadata ? `metadata: ${JSON.stringify(bodyMetadata)}` : '');
+  if (bodyMetadata) {
+    log(`[Proxy] Request: ${method} ${endpoint} metadata: ${JSON.stringify(bodyMetadata)}`);
+  } else {
+    log(`[Proxy] Request: ${method} ${endpoint}`);
+  }
   
   // Full body logging only in debug mode (may contain sensitive data)
   logDebug(`[Proxy] Full body:`, JSON.stringify(body));
