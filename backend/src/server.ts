@@ -14,7 +14,8 @@ import { getMockAuth, getMockProxyResponse, getMockLearningDetails } from './moc
 const app = express();
 const PORT = process.env.PORT || 3001;
 const MOCK_MODE = process.env.MOCK_MODE === 'true';
-const MOCK_DELAY_MS = parseInt(process.env.MOCK_DELAY_MS || '1000', 10);
+const rawMockDelay = parseInt(process.env.MOCK_DELAY_MS || '1000', 10);
+const MOCK_DELAY_MS = Number.isNaN(rawMockDelay) ? 1000 : rawMockDelay;
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
