@@ -11,6 +11,7 @@
  */
 
 import { authenticate } from './auth-service.js';
+import { log, logError } from './logger.js';
 
 const API_BASE = 'https://tsa-memportal-prod-fun01.azurewebsites.net/api';
 
@@ -63,28 +64,28 @@ async function queryDataExplorer(
 }
 
 async function main() {
-  console.log('═'.repeat(60));
-  console.log('  Backend API Test - All Dashboard Views');
-  console.log('═'.repeat(60));
+  log('═'.repeat(60));
+  log('  Backend API Test - All Dashboard Views');
+  log('═'.repeat(60));
 
   const username = process.env.SCOUT_USERNAME;
   const password = process.env.SCOUT_PASSWORD;
 
   if (!username || !password) {
-    console.error('❌ SCOUT_USERNAME and SCOUT_PASSWORD environment variables required');
+    logError('❌ SCOUT_USERNAME and SCOUT_PASSWORD environment variables required');
     process.exit(1);
   }
 
-  console.log('\n🔐 Authenticating...');
+  log('\n🔐 Authenticating...');
   const authResult = await authenticate(username, password);
 
   if (!authResult.success || !authResult.token) {
-    console.error('❌ Authentication failed:', authResult.error);
+    logError('❌ Authentication failed:', authResult.error);
     process.exit(1);
   }
 
-  console.log('✅ Authenticated');
-  console.log(`   Contact ID: ${authResult.contactId}`);
+  log('✅ Authenticated');
+  log(`   Contact ID: ${authResult.contactId}`);
 
   const token = authResult.token;
   const contactId = authResult.contactId || '';
@@ -105,20 +106,20 @@ async function main() {
     { name: 'PreloadedAwardsDashboardView', description: 'Awards and recognitions' },
   ];
 
-  console.log('\n' + '─'.repeat(60));
-  console.log('Testing All DataExplorer Views');
-  console.log('─'.repeat(60));
+  log('\n' + '─'.repeat(60));
+  log('Testing All DataExplorer Views');
+  log('─'.repeat(60));
 
   const results: ViewTestResult[] = [];
 
   for (const view of viewsToTest) {
-    console.log(`\n📊 ${view.name}`);
-    console.log(`   ${view.description}`);
+    log(`\n📊 ${view.name}`);
+    log(`   ${view.description}`);
 
     const result = await queryDataExplorer(token, contactId, view.name, 5);
 
     if (result.error) {
-      console.log(`   ❌ Error: ${result.error}`);
+      log(`   ❌ Error: ${result.error}`);
       results.push({
         view: view.name,
         success: false,
@@ -133,8 +134,8 @@ async function main() {
       ? Object.keys(result.data[0] as Record<string, unknown>)
       : [];
 
-    console.log(`   ✅ Count: ${result.count}, Sample: ${result.data.length} records`);
-    console.log(`   📋 Fields (${fields.length}): ${fields.slice(0, 8).join(', ')}${fields.length > 8 ? '...' : ''}`);
+    log(`   ✅ Count: ${result.count}, Sample: ${result.data.length} records`);
+    log(`   📋 Fields (${fields.length}): ${fields.slice(0, 8).join(', ')}${fields.length > 8 ? '...' : ''}`);
 
     results.push({
       view: view.name,
@@ -146,36 +147,36 @@ async function main() {
     // Show sample record for key views
     if (result.data.length > 0 && ['InProgressActionDashboardView', 'DisclosureComplianceDashboardView'].includes(view.name)) {
       const sample = result.data[0] as Record<string, unknown>;
-      console.log(`   📄 Sample record:`);
+      log(`   📄 Sample record:`);
       const sampleStr = JSON.stringify(sample, null, 2);
       const truncated = sampleStr.length > 1000 ? sampleStr.substring(0, 1000) + '\n      ...' : sampleStr;
-      console.log(truncated.split('\n').map(l => '      ' + l).join('\n'));
+      log(truncated.split('\n').map(l => '      ' + l).join('\n'));
     }
   }
 
   // Summary
-  console.log('\n' + '═'.repeat(60));
-  console.log('  Summary');
-  console.log('═'.repeat(60));
+  log('\n' + '═'.repeat(60));
+  log('  Summary');
+  log('═'.repeat(60));
 
   const working = results.filter(r => r.success);
   const failed = results.filter(r => !r.success);
 
-  console.log(`\n✅ Working views (${working.length}):`);
+  log(`\n✅ Working views (${working.length}):`);
   for (const r of working) {
-    console.log(`   - ${r.view}: ${r.count} records, ${r.fields.length} fields`);
+    log(`   - ${r.view}: ${r.count} records, ${r.fields.length} fields`);
   }
 
   if (failed.length > 0) {
-    console.log(`\n❌ Failed views (${failed.length}):`);
+    log(`\n❌ Failed views (${failed.length}):`);
     for (const r of failed) {
-      console.log(`   - ${r.view}: ${r.error}`);
+      log(`   - ${r.view}: ${r.error}`);
     }
   }
 
-  console.log('\n' + '═'.repeat(60));
-  console.log('  Test Complete');
-  console.log('═'.repeat(60));
+  log('\n' + '═'.repeat(60));
+  log('  Test Complete');
+  log('═'.repeat(60));
 }
 
-main().catch(console.error);
+main().catch(logError);
