@@ -465,42 +465,6 @@ export class ScoutsApiClient {
     return [];
   }
 
-  /**
-   * Scrape disclosures by navigating to member pages with Playwright
-   * Requires credentials and list of member contact IDs
-   */
-  async scrapeDisclosures(
-    username: string,
-    password: string,
-    memberContactIds: string[]
-  ): Promise<{ success: boolean; members?: unknown[]; error?: string }> {
-    console.log(`[API] Scraping disclosures for ${memberContactIds.length} members...`);
-
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/scrape-disclosures`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username,
-          password,
-          memberContactIds,
-        }),
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        return { success: false, error: `HTTP ${response.status}: ${text}` };
-      }
-
-      const result = await response.json();
-      console.log('[API] Scrape result:', result);
-      return result;
-    } catch (err) {
-      console.error('[API] Scrape error:', err);
-      return { success: false, error: String(err) };
-    }
-  }
-
 /**
    * Check learning by membership numbers
    * Uses MemberListingAsync to find contact IDs, then fetches learning via GetLmsDetailsAsync

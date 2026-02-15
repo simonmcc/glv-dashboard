@@ -7,7 +7,6 @@ import cors from 'cors';
 vi.mock('./auth-service.js', () => ({
   authenticate: vi.fn(),
   exploreDisclosures: vi.fn(),
-  scrapeDisclosures: vi.fn(),
   checkDisclosuresByMembershipNumbers: vi.fn(),
   checkLearningByMembershipNumbers: vi.fn(),
 }));
@@ -16,7 +15,6 @@ vi.mock('./auth-service.js', () => ({
 import {
   authenticate,
   exploreDisclosures,
-  scrapeDisclosures,
   checkDisclosuresByMembershipNumbers,
   checkLearningByMembershipNumbers,
 } from './auth-service.js';
@@ -82,27 +80,6 @@ function createTestApp() {
     return res.json({ data: [], count: 0 });
   });
 
-  // Scrape disclosures endpoint
-  app.post('/api/scrape-disclosures', async (req, res) => {
-    const { username, password, memberContactIds } = req.body;
-
-    if (!username || !password || !memberContactIds || !Array.isArray(memberContactIds)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Username, password, and memberContactIds array are required',
-      });
-    }
-
-    try {
-      const result = await scrapeDisclosures(username, password, memberContactIds);
-      return res.json(result);
-    } catch {
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to scrape disclosures',
-      });
-    }
-  });
 
   // Check learning endpoint
   app.post('/api/check-learning', async (req, res) => {
@@ -286,36 +263,6 @@ describe('Backend Server', () => {
         .send({ endpoint: '/test', token: 'test-token' });
 
       expect(response.status).toBe(200);
-    });
-  });
-
-  describe('POST /api/scrape-disclosures', () => {
-    it('should return 400 if required fields are missing', async () => {
-      const response = await request(app)
-        .post('/api/scrape-disclosures')
-        .send({ username: 'test' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Username, password, and memberContactIds array are required');
-    });
-
-    it('should return 400 if memberContactIds is not an array', async () => {
-      const response = await request(app)
-        .post('/api/scrape-disclosures')
-        .send({ username: 'test', password: 'pass', memberContactIds: 'not-an-array' });
-
-      expect(response.status).toBe(400);
-    });
-
-    it('should call scrapeDisclosures with valid parameters', async () => {
-      vi.mocked(scrapeDisclosures).mockResolvedValue({ success: true, members: [] });
-
-      const response = await request(app)
-        .post('/api/scrape-disclosures')
-        .send({ username: 'test', password: 'pass', memberContactIds: ['123'] });
-
-      expect(response.status).toBe(200);
-      expect(scrapeDisclosures).toHaveBeenCalledWith('test', 'pass', ['123']);
     });
   });
 

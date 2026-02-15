@@ -8,7 +8,7 @@
 import './tracing.js';
 import express from 'express';
 import cors from 'cors';
-import { authenticate, exploreDisclosures, scrapeDisclosures, checkDisclosuresByMembershipNumbers, checkLearningByMembershipNumbers } from './auth-service.js';
+import { authenticate, exploreDisclosures, checkDisclosuresByMembershipNumbers, checkLearningByMembershipNumbers } from './auth-service.js';
 import { getMockAuth, getMockProxyResponse, getMockLearningDetails } from './mock-data.js';
 
 const app = express();
@@ -148,37 +148,6 @@ app.post('/api/proxy', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to proxy request',
-    });
-  }
-});
-
-// Scrape disclosures endpoint - uses Playwright to navigate to member pages
-app.post('/api/scrape-disclosures', async (req, res) => {
-  const { username, password, memberContactIds } = req.body;
-
-  if (!username || !password || !memberContactIds || !Array.isArray(memberContactIds)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Username, password, and memberContactIds array are required',
-    });
-  }
-
-  // Mock mode - return empty scrape result
-  if (MOCK_MODE) {
-    console.log(`[Scrape] Mock mode - returning empty scrape result for ${memberContactIds.length} members`);
-    return res.json({ success: true, members: [] });
-  }
-
-  console.log(`[Scrape] Starting scrape for ${memberContactIds.length} members`);
-
-  try {
-    const result = await scrapeDisclosures(username, password, memberContactIds);
-    return res.json(result);
-  } catch (error) {
-    console.error('[Scrape] Error:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to scrape disclosures',
     });
   }
 });
