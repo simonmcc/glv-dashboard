@@ -8,6 +8,7 @@
 import { chromium, Page } from 'playwright';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { log, logError } from './logger.js';
+import { createHash } from 'node:crypto';
 
 const tracer = trace.getTracer('glv-backend-auth', '1.0.0');
 
@@ -358,7 +359,9 @@ export async function authenticate(username: string, password: string): Promise<
     if (authHeader && authHeader.startsWith('Bearer ') && request.url().includes('tsa-memportal-prod-fun01')) {
       capturedToken = authHeader.replace('Bearer ', '');
       log('[Auth] Captured token from:', request.url());
-      log(`[Auth] Token length: ${capturedToken.length}, starts: ${capturedToken.substring(0, 20)}..., ends: ...${capturedToken.substring(capturedToken.length - 20)}`);
+      // Use SHA-256 hash for non-sensitive token identification
+      const tokenHash = createHash('sha256').update(capturedToken).digest('hex').substring(0, 16);
+      log(`[Auth] Token length: ${capturedToken.length}, hash: ${tokenHash}`);
     }
   });
 
