@@ -8,7 +8,7 @@
 import './tracing.js';
 import express from 'express';
 import cors from 'cors';
-import { authenticate, exploreDisclosures, checkDisclosuresByMembershipNumbers, checkLearningByMembershipNumbers } from './auth-service.js';
+import { authenticate, checkDisclosuresByMembershipNumbers, checkLearningByMembershipNumbers } from './auth-service.js';
 import { getMockAuth, getMockProxyResponse, getMockLearningDetails } from './mock-data.js';
 
 const app = express();
@@ -210,37 +210,6 @@ app.post('/api/check-disclosures', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to check disclosures',
-    });
-  }
-});
-
-// Explore disclosures endpoint - discovers member contact IDs and fetches disclosure details
-app.post('/api/explore-disclosures', async (req, res) => {
-  const { token, contactId } = req.body;
-
-  if (!token || !contactId) {
-    return res.status(400).json({
-      success: false,
-      error: 'Token and contactId are required',
-    });
-  }
-
-  // Mock mode - return empty exploration result
-  if (MOCK_MODE) {
-    console.log('[Explore] Mock mode - returning empty exploration result');
-    return res.json({ success: true, members: [] });
-  }
-
-  console.log('[Explore] Starting disclosure exploration...');
-
-  try {
-    const result = await exploreDisclosures(token, contactId);
-    return res.json(result);
-  } catch (error) {
-    console.error('[Explore] Error:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to explore disclosures',
     });
   }
 });

@@ -106,5 +106,3 @@ Tracing is opt-in and has zero overhead when disabled. Manual spans instrument t
 - `POST /api/proxy` — Forward requests to Scouts API with token
 - `POST /api/check-disclosures` — Check disclosures by membership numbers
 - `POST /api/check-learning` — Check learning records by membership numbers
-- `POST /api/scrape-disclosures` — Playwright-based disclosure scraping (requires credentials)
-- `POST /api/explore-disclosures` — Discover member contact IDs and fetch disclosure details

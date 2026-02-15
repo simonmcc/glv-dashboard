@@ -6,7 +6,6 @@ import cors from 'cors';
 // Mock the auth-service module before importing the server
 vi.mock('./auth-service.js', () => ({
   authenticate: vi.fn(),
-  exploreDisclosures: vi.fn(),
   checkDisclosuresByMembershipNumbers: vi.fn(),
   checkLearningByMembershipNumbers: vi.fn(),
 }));
@@ -14,7 +13,6 @@ vi.mock('./auth-service.js', () => ({
 // Import mocked functions
 import {
   authenticate,
-  exploreDisclosures,
   checkDisclosuresByMembershipNumbers,
   checkLearningByMembershipNumbers,
 } from './auth-service.js';
@@ -121,28 +119,6 @@ function createTestApp() {
       return res.status(500).json({
         success: false,
         error: 'Failed to check disclosures',
-      });
-    }
-  });
-
-  // Explore disclosures endpoint
-  app.post('/api/explore-disclosures', async (req, res) => {
-    const { token, contactId } = req.body;
-
-    if (!token || !contactId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Token and contactId are required',
-      });
-    }
-
-    try {
-      const result = await exploreDisclosures(token, contactId);
-      return res.json(result);
-    } catch {
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to explore disclosures',
       });
     }
   });
@@ -316,34 +292,4 @@ describe('Backend Server', () => {
     });
   });
 
-  describe('POST /api/explore-disclosures', () => {
-    it('should return 400 if token is missing', async () => {
-      const response = await request(app)
-        .post('/api/explore-disclosures')
-        .send({ contactId: 'test-id' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Token and contactId are required');
-    });
-
-    it('should return 400 if contactId is missing', async () => {
-      const response = await request(app)
-        .post('/api/explore-disclosures')
-        .send({ token: 'test-token' });
-
-      expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Token and contactId are required');
-    });
-
-    it('should call exploreDisclosures with valid parameters', async () => {
-      vi.mocked(exploreDisclosures).mockResolvedValue({ success: true, members: [] });
-
-      const response = await request(app)
-        .post('/api/explore-disclosures')
-        .send({ token: 'test-token', contactId: 'test-contact-id' });
-
-      expect(response.status).toBe(200);
-      expect(exploreDisclosures).toHaveBeenCalledWith('test-token', 'test-contact-id');
-    });
-  });
 });

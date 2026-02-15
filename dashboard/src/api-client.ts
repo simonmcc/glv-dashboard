@@ -291,80 +291,6 @@ export class ScoutsApiClient {
     };
   }
 
-  async getAllDisclosures(pageSize: number = 500): Promise<ApiResponse<DisclosureRecord>> {
-    console.log('[API] Fetching disclosure compliance data');
-
-    // NOTE: Like learning, requesting specific fields causes API errors
-    // Use empty selectFields to get all data
-    const result = await this.query<Record<string, unknown>>({
-      table: 'DisclosureComplianceDashboardView',
-      selectFields: [],
-      query: '',
-      pageNo: 1,
-      pageSize,
-      distinct: true,
-    });
-
-    if (result.error) {
-      console.error('[API] Disclosure query error:', result.error);
-      return { data: [], nextPage: null, count: 0, error: result.error };
-    }
-
-    // Transform API response - disclosure view has these fields:
-    // "First name", "Surname", "Membership number", "Communication email", "Unit name",
-    // "Disclosure authority", "Disclosure status", "Disclosure issue date", "Disclosure expiry date",
-    // "Days since expiry", "Role", "Team", "Status"
-    const rawData = (result.data || []).map((record): DisclosureRecord => ({
-      'First name': String(record['First name'] || ''),
-      'Last name': String(record['Surname'] || record['Last name'] || ''),
-      'Membership number': String(record['Membership number'] || ''),
-      'Communication email': record['Communication email'] as string,
-      'Unit name': record['Unit name'] as string,
-      'Disclosure authority': String(record['Disclosure authority'] || ''),
-      'Disclosure status': String(record['Disclosure status'] || ''),
-      'Disclosure issue date': record['Disclosure issue date'] as string | null,
-      'Disclosure expiry date': record['Disclosure expiry date'] as string | null,
-      'Days since expiry': record['Days since expiry'] as number | null,
-      'Role name': record['Role'] as string,
-      'Team name': record['Team'] as string,
-    }));
-
-    // Deduplicate by membership number (keep earliest expiry)
-    const data = this.deduplicateDisclosures(rawData);
-
-    console.log(`[API] Transformed ${rawData.length} disclosure records, deduplicated to ${data.length}`);
-
-    return {
-      data,
-      nextPage: result.nextPage,
-      count: result.count,
-      error: result.error,
-    };
-  }
-
-  private deduplicateDisclosures(records: DisclosureRecord[]): DisclosureRecord[] {
-    const seen = new Map<string, DisclosureRecord>();
-
-    for (const record of records) {
-      const key = record['Membership number'];
-      const existing = seen.get(key);
-
-      if (!existing) {
-        seen.set(key, record);
-      } else {
-        // Keep the record with the earliest expiry date (most urgent)
-        const existingExpiry = existing['Disclosure expiry date'] ? new Date(existing['Disclosure expiry date']).getTime() : Infinity;
-        const currentExpiry = record['Disclosure expiry date'] ? new Date(record['Disclosure expiry date']).getTime() : Infinity;
-
-        if (currentExpiry < existingExpiry) {
-          seen.set(key, record);
-        }
-      }
-    }
-
-    return Array.from(seen.values());
-  }
-
   computeDisclosureSummary(records: DisclosureRecord[]): DisclosureSummary {
     const byStatus: Record<string, number> = {};
     let expired = 0;
@@ -404,68 +330,6 @@ export class ScoutsApiClient {
   }
 
   /**
-   * Generate a SAS token for Azure Table Storage access
-   * Parameters: table, partitionkey (contact ID), permissions
-   */
-  async generateSASToken(table: string, partitionKey: string): Promise<{ success: boolean; token?: string; error?: string }> {
-    console.log(`[API] Generating SAS token for table: ${table}, partitionKey: ${partitionKey}`);
-
-    try {
-      const result = await this.request<{ uri: string; token: string }>('/GenerateSASTokenAsync', {
-        table,
-        partitionkey: partitionKey,
-        permissions: 'R',
-      });
-      console.log('[API] SAS token response:', result);
-      return { success: true, token: result.token };
-    } catch (err) {
-      console.error('[API] SAS token error:', err);
-      return { success: false, error: String(err) };
-    }
-  }
-
-  /**
-   * Fetch disclosures from Azure Table Storage for a specific contact
-   */
-  async getDisclosureForContact(memberContactId: string): Promise<{ success: boolean; data?: unknown[]; error?: string }> {
-    console.log(`[API] Fetching disclosures from Table Storage for contact: ${memberContactId}`);
-
-    // Get a SAS token for this member's disclosures
-    const sasResult = await this.generateSASToken('Disclosures', memberContactId);
-    if (!sasResult.success || !sasResult.token) {
-      return { success: false, error: sasResult.error || 'Failed to get SAS token' };
-    }
-
-    console.log('[API] Got SAS URL:', sasResult.token);
-
-    // Fetch from the SAS URL (the token field contains the full URL)
-    try {
-      const response = await fetch(sasResult.token, {
-        headers: { 'Accept': 'application/json' },
-      });
-
-      if (!response.ok) {
-        return { success: false, error: `Table Storage error: ${response.status}` };
-      }
-
-      const result = await response.json();
-      console.log('[API] Table Storage result:', result);
-      return { success: true, data: result.value || [] };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
-  }
-
-  /**
-   * Get all member contact IDs from learning records
-   */
-  getMemberContactIds(): string[] {
-    // Note: Learning records don't have contact IDs, only membership numbers
-    // We'd need a different approach to get contact IDs for all members
-    return [];
-  }
-
-/**
    * Check learning by membership numbers
    * Uses MemberListingAsync to find contact IDs, then fetches learning via GetLmsDetailsAsync
    */
@@ -527,37 +391,6 @@ export class ScoutsApiClient {
       return result;
     } catch (err) {
       console.error('[API] Check disclosures error:', err);
-      return { success: false, error: String(err) };
-    }
-  }
-
-  /**
-   * Explore disclosures using the backend scraper
-   * This discovers member contact IDs and fetches detailed disclosure data
-   */
-  async exploreDisclosures(): Promise<{ success: boolean; members?: unknown[]; error?: string }> {
-    console.log('[API] Exploring disclosures via backend...');
-
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/explore-disclosures`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: this.token,
-          contactId: this.contactId,
-        }),
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        return { success: false, error: `HTTP ${response.status}: ${text}` };
-      }
-
-      const result = await response.json();
-      console.log('[API] Explore result:', result);
-      return result;
-    } catch (err) {
-      console.error('[API] Explore error:', err);
       return { success: false, error: String(err) };
     }
   }
