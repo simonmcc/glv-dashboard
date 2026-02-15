@@ -17,6 +17,7 @@ const PORT = process.env.PORT || 3001;
 const MOCK_MODE = process.env.MOCK_MODE === 'true';
 const rawMockDelay = parseInt(process.env.MOCK_DELAY_MS || '1000', 10);
 const MOCK_DELAY_MS = Number.isNaN(rawMockDelay) ? 1000 : rawMockDelay;
+const DEBUG_LOG_TOKENS = process.env.DEBUG_LOG_TOKENS === 'true';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -117,8 +118,16 @@ app.post('/api/proxy', async (req, res) => {
     return res.json(getMockProxyResponse(tableName));
   }
 
-  // Log token details for debugging
-  log(`[Proxy] Token length: ${token.length}, starts: ${token.substring(0, 20)}..., ends: ...${token.substring(token.length - 20)}`);
+  // Log token length (or partial token if debug mode enabled)
+  if (DEBUG_LOG_TOKENS) {
+    if (token.length >= 40) {
+      log(`[Proxy] Token length: ${token.length}, starts: ${token.substring(0, 20)}..., ends: ...${token.substring(token.length - 20)}`);
+    } else {
+      log(`[Proxy] Token length: ${token.length} (too short to show partial)`);
+    }
+  } else {
+    log(`[Proxy] Token length: ${token.length}`);
+  }
 
   const apiUrl = `https://tsa-memportal-prod-fun01.azurewebsites.net/api${endpoint}`;
 
