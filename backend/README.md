@@ -155,3 +155,61 @@ npx vitest run src/server.test.ts  # Single test file
 ```
 
 Tests use Vitest with supertest for HTTP assertions. Mocks are set up for `auth-service.ts` to avoid Playwright in tests.
+
+## Deployment (Google Cloud Run)
+
+The backend is designed to deploy to Cloud Run with Playwright/Chromium for browser automation.
+
+### Prerequisites
+
+- [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) installed and authenticated
+- A GCP project with Cloud Run and Cloud Build APIs enabled
+
+### Deploy via Cloud Build
+
+```bash
+cd backend
+gcloud builds submit --config cloudbuild.yaml
+```
+
+This will:
+
+1. Build a Docker image with Playwright and Chromium
+2. Push to Google Container Registry
+3. Deploy to Cloud Run (europe-west1, 1Gi memory, 0-3 instances)
+
+### Build and test locally
+
+```bash
+# Build the image
+docker build -t glv-backend .
+
+# Run locally
+docker run -p 8080:8080 \
+  -e CORS_ORIGIN=http://localhost:5173 \
+  -e MOCK_MODE=true \
+  glv-backend
+
+# Test health endpoint
+curl http://localhost:8080/health
+```
+
+### Production environment variables
+
+Set these in Cloud Run console or via `gcloud run deploy`:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CORS_ORIGIN` | Yes | Frontend URL (e.g., `https://glv-dashboard.web.app`) |
+
+User credentials are provided at login time via the dashboard, not stored in the backend.
+
+### Resource configuration
+
+The default Cloud Run config uses:
+
+- **Memory:** 1Gi (Chromium requires ~500MB)
+- **CPU:** 1 vCPU
+- **Timeout:** 300s (auth can take 30-60s)
+- **Concurrency:** 10 requests per instance
+- **Instances:** 0-3 (scale to zero when idle)

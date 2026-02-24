@@ -1,0 +1,74 @@
+# Cloud Build configuration for deploying backend to Cloud Run
+# Trigger with: gcloud builds submit --config cloudbuild.yaml
+#
+# Dashboard is deployed via GitHub Actions (firebase-hosting-pull-request.yml)
+
+steps:
+  # Build backend Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'backend-build'
+    dir: 'backend'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/glv-backend:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/glv-backend:latest'
+      - '.'
+
+  # Push backend image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'backend-push'
+    waitFor: ['backend-build']
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/glv-backend:$BUILD_ID'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'backend-push-latest'
+    waitFor: ['backend-build']
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/glv-backend:latest'
+
+  # Deploy backend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'backend-deploy'
+    waitFor: ['backend-push']
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'glv-backend'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/glv-backend:$BUILD_ID'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--timeout'
+      - '300'
+      - '--concurrency'
+      - '10'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '3'
+      - '--set-env-vars'
+      - 'CORS_ORIGIN=${_DASHBOARD_URL}'
+
+substitutions:
+  _REGION: europe-west1
+  _DASHBOARD_URL: https://glv-dashboard.web.app
+
+images:
+  - 'gcr.io/$PROJECT_ID/glv-backend:$BUILD_ID'
+  - 'gcr.io/$PROJECT_ID/glv-backend:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
