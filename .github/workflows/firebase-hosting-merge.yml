@@ -4,9 +4,10 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 env:
-  VITE_BACKEND_URL: https://glv-backend-europe-west1.run.app
+  VITE_BACKEND_URL: https://glv-backend-gxoc276j2a-ew.a.run.app
 
 jobs:
   build_and_deploy:
