@@ -8,6 +8,7 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
 
 env:
   PROJECT_ID: glv-dashboard

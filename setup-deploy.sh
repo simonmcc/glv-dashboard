@@ -26,7 +26,7 @@ fi
 
 # Grant permissions (these are idempotent by nature)
 echo "Granting IAM permissions..."
-for role in "roles/run.admin" "roles/storage.admin" "roles/iam.serviceAccountUser"; do
+for role in "roles/run.admin" "roles/storage.admin" "roles/iam.serviceAccountUser" "roles/artifactregistry.writer"; do
   gcloud projects add-iam-policy-binding ${PROJECT_ID} \
     --member="serviceAccount:${SA_EMAIL}" \
     --role="${role}" \
