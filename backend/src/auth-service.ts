@@ -404,8 +404,10 @@ export async function authenticate(username: string, password: string): Promise<
     }
   });
 
-  // Capture Bearer token from network requests to the API domain
+  // Capture Bearer token and contactId from network traffic — the portal makes
+  // these calls itself immediately after login, so we intercept rather than repeat them.
   let capturedToken: string | null = null;
+  let capturedContactId: string | null = null;
 
   page.on('request', (request) => {
     const authHeader = request.headers()['authorization'];
@@ -416,6 +418,20 @@ export async function authenticate(username: string, password: string): Promise<
       // Use SHA-256 hash for non-sensitive token identification
       const tokenHash = createHash('sha256').update(capturedToken).digest('hex').substring(0, 16);
       log(`[Auth] Token length: ${capturedToken.length}, hash: ${tokenHash}`);
+    }
+  });
+
+  page.on('response', async (response) => {
+    if (capturedContactId === null && response.url().includes('tsa-memportal-prod-fun01') && response.url().includes('GetContactDetailAsync')) {
+      try {
+        const data = await response.json();
+        if (data?.id) {
+          capturedContactId = data.id;
+          log('[Auth] Captured contactId from response:', capturedContactId);
+        }
+      } catch {
+        // Non-JSON or unexpected shape — ignore
+      }
     }
   });
 
@@ -435,18 +451,19 @@ export async function authenticate(username: string, password: string): Promise<
       loginSpan.end();
     });
 
-    // Wait for token to be captured from API requests (poll instead of fixed wait)
+    // Wait for both token and contactId — the portal fires GetContactDetailAsync
+    // immediately after login so both arrive within the same burst of requests.
     await tracer.startActiveSpan('playwright.wait-for-token', async (tokenSpan) => {
       const startTime = Date.now();
-      const tokenCaptured = await waitForCondition(
-        () => capturedToken !== null,
+      const captured = await waitForCondition(
+        () => capturedToken !== null && capturedContactId !== null,
         15000, // max 15s timeout
         200    // check every 200ms
       );
       const waitDuration = Date.now() - startTime;
-      tokenSpan.setAttribute('auth.token_captured', tokenCaptured);
+      tokenSpan.setAttribute('auth.token_captured', captured);
       tokenSpan.setAttribute('auth.wait_duration_ms', waitDuration);
-      log(`[Auth] Token wait completed in ${waitDuration}ms, captured: ${tokenCaptured}`);
+      log(`[Auth] Token+contactId wait completed in ${waitDuration}ms, captured: ${captured}`);
       tokenSpan.end();
     });
 
@@ -454,26 +471,11 @@ export async function authenticate(username: string, password: string): Promise<
       throw new Error('Failed to capture Bearer token');
     }
 
-    // Get contact ID by making a request
-    let contactId: string | undefined;
-    try {
-      const contactResponse = await page.evaluate(async (token) => {
-        const response = await fetch('https://tsa-memportal-prod-fun01.azurewebsites.net/api/GetContactDetailAsync', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({}),
-        });
-        return response.json();
-      }, capturedToken);
-
-      contactId = contactResponse.id;
-      log('[Auth] Got contactId from browser context:', contactId);
-    } catch (err) {
-      logError('[Auth] Error in browser context:', err);
-      // Contact ID fetch failed, but we have the token
+    const contactId = capturedContactId ?? undefined;
+    if (contactId) {
+      log('[Auth] Got contactId from intercepted response:', contactId);
+    } else {
+      log('[Auth] contactId not captured from page responses');
     }
 
     const token = capturedToken as string;
