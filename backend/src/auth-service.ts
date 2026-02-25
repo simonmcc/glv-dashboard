@@ -92,16 +92,16 @@ async function handleCookieConsent(page: Page): Promise<void> {
  * Poll for a condition with timeout
  */
 async function waitForCondition(
-  condition: () => boolean,
+  condition: () => boolean | Promise<boolean>,
   timeoutMs: number,
   pollIntervalMs = 100
 ): Promise<boolean> {
   const startTime = Date.now();
   while (Date.now() - startTime < timeoutMs) {
-    if (condition()) return true;
+    if (await condition()) return true;
     await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
   }
-  return condition();
+  return await condition();
 }
 
 async function performLogin(page: Page, username: string, password: string): Promise<void> {
