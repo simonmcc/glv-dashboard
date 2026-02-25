@@ -124,12 +124,17 @@ async function performLogin(page: Page, username: string, password: string): Pro
   if (!page.url().includes('b2clogin.com')) {
     log('[Auth] Not yet on B2C, waiting up to 30s for redirect...');
     try {
-      await page.waitForURL('**/b2clogin.com/**', { timeout: 30000 });
+      // Use a predicate to match the subdomain prodscoutsb2c.b2clogin.com
+      // (glob patterns like '**/b2clogin.com/**' only match path segments, not subdomains)
+      await page.waitForURL(url => url.href.includes('b2clogin.com'), { timeout: 30000 });
       log(`[Auth] Reached B2C login page: ${page.url()}`);
     } catch {
       log(`[Auth] waitForURL(b2clogin) timed out, current url=${page.url()}`);
-      // Check if we might already be logged in
-      if (page.url().includes('membership.scouts.org.uk')) {
+      // If we landed on B2C but the wait timed out (e.g. slow load), continue anyway
+      if (page.url().includes('b2clogin.com')) {
+        log('[Auth] Already on B2C despite timeout, continuing');
+      } else if (page.url().includes('membership.scouts.org.uk')) {
+        // Check if we might already be logged in
         log('[Auth] Still on membership portal, checking for existing token in sessionStorage...');
         const hasToken = await page.evaluate(() => {
           for (let i = 0; i < sessionStorage.length; i++) {
@@ -143,8 +148,10 @@ async function performLogin(page: Page, username: string, password: string): Pro
           return; // Already authenticated
         }
         log('[Auth] No token found in sessionStorage');
+        throw new Error('Failed to reach B2C login page');
+      } else {
+        throw new Error('Failed to reach B2C login page');
       }
-      throw new Error('Failed to reach B2C login page');
     }
   } else {
     log('[Auth] Already on B2C login page');
