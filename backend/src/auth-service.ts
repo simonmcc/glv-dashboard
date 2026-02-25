@@ -112,11 +112,6 @@ async function waitForCondition(
 }
 
 async function performLogin(page: Page, username: string, password: string): Promise<void> {
-  // Wait for network to settle instead of fixed timeout
-  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
-    // networkidle may not trigger if there's polling, continue anyway
-  });
-
   // Check if we're already on B2C or need to wait for redirect
   if (!page.url().includes('b2clogin.com')) {
     try {
