@@ -5,7 +5,7 @@
  * Fetches data from the Scouts membership portal using the user's session.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import type { AuthState } from './types';
 import { AuthFlow } from './components/AuthFlow';
 import { Dashboard } from './components/Dashboard';
@@ -14,14 +14,6 @@ const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
 
 function App() {
   const [authState, setAuthState] = useState<AuthState>({ status: 'unauthenticated' });
-
-  // Auto-authenticate in mock mode
-  useEffect(() => {
-    if (MOCK_MODE && authState.status === 'unauthenticated') {
-      console.log('[App] Mock mode enabled - auto-authenticating');
-      setAuthState({ status: 'authenticated', token: 'mock-token', contactId: 'mock-contact' });
-    }
-  }, [authState.status]);
 
   const handleAuthStart = useCallback(() => {
     setAuthState({ status: 'authenticating' });
@@ -51,6 +43,7 @@ function App() {
         onAuthStart={handleAuthStart}
         onAuthComplete={handleAuthComplete}
         onAuthError={handleAuthError}
+        mockMode={MOCK_MODE}
       />
     );
   }
