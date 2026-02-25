@@ -5,7 +5,7 @@
  * and capture the Bearer token.
  */
 
-import { chromium, Page } from 'playwright';
+import { chromium, Frame, Page } from 'playwright';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { log, logError } from './logger.js';
 import { createHash } from 'node:crypto';
@@ -73,31 +73,77 @@ async function handleCookieConsent(page: Page): Promise<void> {
     '#onetrust-accept-btn-handler',
   ];
 
+  log(`[Auth] Checking for cookie consent banner (url: ${page.url()})`);
+
   for (const selector of cookieSelectors) {
     try {
       const button = await page.$(selector);
       if (button) {
+        log(`[Auth] Clicking cookie consent button: ${selector}`);
         await button.click();
-        await page.waitForTimeout(1000);
+        // Wait for the banner container to disappear (more reliable than waiting for the button itself)
+        try {
+          await page.waitForSelector('#onetrust-banner-sdk', {
+            state: 'hidden',
+            timeout: 2000,
+          });
+          log('[Auth] Cookie consent banner dismissed');
+        } catch {
+          log('[Auth] Cookie consent banner did not disappear within 2s, continuing');
+        }
         return;
       }
     } catch {
       // Continue to next selector
     }
   }
+
+  log('[Auth] No cookie consent banner found');
+}
+
+/**
+ * Poll for a condition with timeout
+ */
+async function waitForCondition(
+  condition: () => boolean | Promise<boolean>,
+  timeoutMs: number,
+  pollIntervalMs = 100
+): Promise<boolean> {
+  const startTime = Date.now();
+  while (Date.now() - startTime < timeoutMs) {
+    if (await condition()) return true;
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+  }
+  return await condition();
 }
 
 async function performLogin(page: Page, username: string, password: string): Promise<void> {
-  // Wait for the page to settle
-  await page.waitForTimeout(3000);
+  log(`[Auth] performLogin: current url=${page.url()}`);
 
   // Check if we're already on B2C or need to wait for redirect
   if (!page.url().includes('b2clogin.com')) {
+    log('[Auth] Not yet on B2C, waiting up to 30s for redirect...');
     try {
-      await page.waitForURL('**/b2clogin.com/**', { timeout: 30000 });
+      // Use a predicate to match the B2C login host (including subdomains like prodscoutsb2c.b2clogin.com)
+      // by inspecting the parsed URL hostname instead of doing a substring match on the full href.
+      await page.waitForURL(url => {
+        try {
+          const hostname = new URL(url.href).hostname.toLowerCase();
+          return hostname === 'b2clogin.com' || hostname.endsWith('.b2clogin.com');
+        } catch (err) {
+          logError('[Auth] Error parsing URL in B2C waitForURL predicate', err instanceof Error ? err : new Error(String(err)));
+          return false;
+        }
+      }, { timeout: 30000 });
+      log(`[Auth] Reached B2C login page: ${page.url()}`);
     } catch {
-      // Check if we might already be logged in
-      if (page.url().includes('membership.scouts.org.uk')) {
+      log(`[Auth] waitForURL(b2clogin) timed out, current url=${page.url()}`);
+      // If we landed on B2C but the wait timed out (e.g. slow load), continue anyway
+      if (page.url().includes('b2clogin.com')) {
+        log('[Auth] Already on B2C despite timeout, continuing');
+      } else if (page.url().includes('membership.scouts.org.uk')) {
+        // Check if we might already be logged in
+        log('[Auth] Still on membership portal, checking for existing token in sessionStorage...');
         const hasToken = await page.evaluate(() => {
           for (let i = 0; i < sessionStorage.length; i++) {
             const key = sessionStorage.key(i);
@@ -106,41 +152,43 @@ async function performLogin(page: Page, username: string, password: string): Pro
           return false;
         });
         if (hasToken) {
+          log('[Auth] Found existing token in sessionStorage, skipping login form');
           return; // Already authenticated
         }
+        log('[Auth] No token found in sessionStorage');
+        throw new Error('Failed to reach B2C login page');
+      } else {
+        throw new Error('Failed to reach B2C login page');
       }
-      throw new Error('Failed to reach B2C login page');
     }
+  } else {
+    log('[Auth] Already on B2C login page');
   }
 
-  await page.waitForTimeout(2000);
-
-  // Fill in email
-  const emailSelectors = [
-    'input[type="email"]',
-    'input[name="logonIdentifier"]',
-    'input[id="signInName"]',
-  ];
-
-  let emailFilled = false;
-  for (const selector of emailSelectors) {
-    const input = await page.$(selector);
-    if (input) {
-      await input.fill(username);
-      emailFilled = true;
-      break;
-    }
-  }
-
-  if (!emailFilled) {
+  // Wait for the login form to render — B2C is a JS SPA, domcontentloaded fires
+  // while the page still shows "Loading...". Wait for the actual email input instead.
+  const emailInputSelector = 'input[type="email"], input[name="logonIdentifier"], input[id="signInName"]';
+  log('[Auth] Waiting for email input to appear in login form...');
+  let emailInput;
+  try {
+    emailInput = await page.waitForSelector(emailInputSelector, { timeout: 15000 });
+  } catch {
+    log(`[Auth] Email input did not appear within 15s, page title="${await page.title()}", url=${page.url()}`);
     throw new Error('Could not find email input field');
   }
+  log(`[Auth] Login form ready, url=${page.url()}`);
+
+  // Fill in email — use the handle returned by waitForSelector
+  log(`[Auth] Filling email`);
+  await emailInput.fill(username);
 
   // Fill in password
   const passwordInput = await page.$('input[type="password"]');
   if (!passwordInput) {
+    log(`[Auth] Could not find password input, page title="${await page.title()}", url=${page.url()}`);
     throw new Error('Could not find password input field');
   }
+  log('[Auth] Filling password');
   await passwordInput.fill(password);
 
   // Click sign in button
@@ -154,6 +202,7 @@ async function performLogin(page: Page, username: string, password: string): Pro
   for (const selector of submitSelectors) {
     const button = await page.$(selector);
     if (button) {
+      log(`[Auth] Clicking submit using selector: ${selector}`);
       await button.click();
       submitted = true;
       break;
@@ -161,11 +210,14 @@ async function performLogin(page: Page, username: string, password: string): Pro
   }
 
   if (!submitted) {
+    log(`[Auth] Could not find submit button, page title="${await page.title()}", url=${page.url()}`);
     throw new Error('Could not find sign in button');
   }
 
   // Wait for redirect back to membership portal
+  log('[Auth] Waiting up to 60s for redirect back to membership portal...');
   await page.waitForURL('**/membership.scouts.org.uk/**', { timeout: 60000 });
+  log(`[Auth] Returned to membership portal: ${page.url()}`);
 }
 
 const API_BASE = 'https://tsa-memportal-prod-fun01.azurewebsites.net/api';
@@ -350,8 +402,30 @@ export async function authenticate(username: string, password: string): Promise<
     Object.defineProperty(navigator, 'webdriver', { get: () => false });
   });
 
-  // Capture Bearer token from network requests to the API domain
+  // Log every top-level navigation so we can trace the auth redirect chain
+  const navigationHandler = (frame: Frame) => {
+    if (frame === page.mainFrame()) {
+      const rawUrl = frame.url();
+      let safeUrl = rawUrl;
+      try {
+        const parsed = new URL(rawUrl);
+        safeUrl = `${parsed.origin}${parsed.pathname}`;
+      } catch {
+        // If URL parsing fails, fall back to the raw URL (unlikely to contain sensitive query params in this case)
+      }
+      log(`[Auth] Navigation -> ${safeUrl}`);
+    }
+  };
+
+  page.on('framenavigated', navigationHandler);
+  page.once('close', () => {
+    page.off('framenavigated', navigationHandler);
+  });
+
+  // Capture Bearer token and contactId from network traffic — the portal makes
+  // these calls itself immediately after login, so we intercept rather than repeat them.
   let capturedToken: string | null = null;
+  let capturedContactId: string | null = null;
 
   page.on('request', (request) => {
     const authHeader = request.headers()['authorization'];
@@ -365,11 +439,34 @@ export async function authenticate(username: string, password: string): Promise<
     }
   });
 
+  page.on('response', async (response) => {
+    const url = response.url();
+    if (!url.includes('tsa-memportal-prod-fun01') || !url.includes('GetContactDetailAsync')) {
+      return;
+    }
+
+    if (capturedContactId !== null) {
+      log('[Auth] Skipping GetContactDetailAsync response because contactId is already captured');
+      return;
+    }
+
+    try {
+      const data = await response.json();
+      if (data?.id) {
+        capturedContactId = data.id;
+        log('[Auth] Captured contactId from response:', capturedContactId);
+      }
+    } catch {
+      // Non-JSON or unexpected shape — ignore
+    }
+  });
+
   try {
     // Navigate to the portal
     await tracer.startActiveSpan('playwright.navigate.scouts-portal', async (navSpan) => {
+      log(`[Auth] Navigating to ${SCOUTS_URL}`);
       await page.goto(SCOUTS_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-      await page.waitForTimeout(2000);
+      log(`[Auth] Initial navigation complete, url=${page.url()}`);
       await handleCookieConsent(page);
       navSpan.end();
     });
@@ -377,14 +474,22 @@ export async function authenticate(username: string, password: string): Promise<
     // Perform login
     await tracer.startActiveSpan('playwright.b2c-login', async (loginSpan) => {
       await performLogin(page, username, password);
-      await page.waitForTimeout(2000);
       loginSpan.end();
     });
 
-    // Wait for portal to fully load and make initial API calls
+    // Wait for token — the portal fires GetContactDetailAsync immediately after
+    // login so contactId typically arrives in the same burst, but it is optional.
     await tracer.startActiveSpan('playwright.wait-for-token', async (tokenSpan) => {
-      await page.waitForTimeout(5000);
-      tokenSpan.setAttribute('auth.token_captured', !!capturedToken);
+      const startTime = Date.now();
+      const captured = await waitForCondition(
+        () => capturedToken !== null,
+        15000, // max 15s timeout
+        200    // check every 200ms
+      );
+      const waitDuration = Date.now() - startTime;
+      tokenSpan.setAttribute('auth.token_captured', captured);
+      tokenSpan.setAttribute('auth.wait_duration_ms', waitDuration);
+      log(`[Auth] Token wait completed in ${waitDuration}ms, captured: ${captured}`);
       tokenSpan.end();
     });
 
@@ -392,26 +497,11 @@ export async function authenticate(username: string, password: string): Promise<
       throw new Error('Failed to capture Bearer token');
     }
 
-    // Get contact ID by making a request
-    let contactId: string | undefined;
-    try {
-      const contactResponse = await page.evaluate(async (token) => {
-        const response = await fetch('https://tsa-memportal-prod-fun01.azurewebsites.net/api/GetContactDetailAsync', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({}),
-        });
-        return response.json();
-      }, capturedToken);
-
-      contactId = contactResponse.id;
-      log('[Auth] Got contactId from browser context:', contactId);
-    } catch (err) {
-      logError('[Auth] Error in browser context:', err);
-      // Contact ID fetch failed, but we have the token
+    const contactId = capturedContactId ?? undefined;
+    if (contactId) {
+      log('[Auth] Got contactId from intercepted response:', contactId);
+    } else {
+      log('[Auth] contactId not captured from page responses');
     }
 
     const token = capturedToken as string;
