@@ -5,6 +5,9 @@
 
 import type { LearningRecord, MemberLearningResult } from './types';
 
+/** Name of the mandatory First Response module required within 1 year of joining */
+export const FIRST_RESPONSE_MODULE = 'First Response';
+
 /**
  * Parse expiry date from API format "MM/DD/YYYY HH:MM:SS" to Date
  */
@@ -47,27 +50,59 @@ export function computeModuleStatus(currentLevel: string, expiryDate: Date | nul
 
 /**
  * Transform MemberLearningResult[] from GetLmsDetailsAsync into LearningRecord[] format.
- * Only includes modules that have actual expiry dates (filters out one-time modules).
+ * Includes modules that have expiry dates, plus First Response (required within 1 year of joining).
+ * Synthesises a "Not Started" First Response record for any member missing it entirely.
+ *
+ * @param memberStartDates Optional map of membership number → earliest role start date,
+ *   used to populate the Start date field on First Response records so the 1-year deadline
+ *   can be displayed in the UI.
  */
-export function transformLearningResults(members: MemberLearningResult[], now: Date = new Date()): LearningRecord[] {
+export function transformLearningResults(
+  members: MemberLearningResult[],
+  now: Date = new Date(),
+  memberStartDates?: Map<string, string>,
+): LearningRecord[] {
   const records: LearningRecord[] = [];
 
   for (const member of members) {
-    // Only include modules that have an expiry date (i.e., need renewal)
-    const expiringModules = member.modules.filter(m => m.expiryDate !== null);
+    const hasFirstResponse = member.modules.some(m => m.title === FIRST_RESPONSE_MODULE);
 
-    for (const module of expiringModules) {
-      // Parse the expiry date (format: "MM/DD/YYYY HH:MM:SS")
+    // Include modules with expiry dates, plus First Response regardless of expiry date
+    const includedModules = member.modules.filter(
+      m => m.expiryDate !== null || m.title === FIRST_RESPONSE_MODULE,
+    );
+
+    for (const module of includedModules) {
       const expiryDate = parseExpiryDate(module.expiryDate);
       const status = computeModuleStatus(module.currentLevel, expiryDate, now);
 
-      records.push({
+      const record: LearningRecord = {
         'First name': member.firstName,
         'Last name': member.lastName,
         'Membership number': member.membershipNumber,
         'Learning': module.title,
         'Status': status,
         'Expiry date': expiryDate ? expiryDate.toISOString() : null,
+      };
+
+      // Attach start date to First Response so the 1-year deadline can be shown
+      if (module.title === FIRST_RESPONSE_MODULE && memberStartDates) {
+        record['Start date'] = memberStartDates.get(member.membershipNumber) ?? null;
+      }
+
+      records.push(record);
+    }
+
+    // Synthesise a "Not Started" record for members with no First Response module at all
+    if (!hasFirstResponse) {
+      records.push({
+        'First name': member.firstName,
+        'Last name': member.lastName,
+        'Membership number': member.membershipNumber,
+        'Learning': FIRST_RESPONSE_MODULE,
+        'Status': 'Not Started',
+        'Expiry date': null,
+        'Start date': memberStartDates?.get(member.membershipNumber) ?? null,
       });
     }
   }
