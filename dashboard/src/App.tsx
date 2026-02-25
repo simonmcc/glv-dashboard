@@ -9,54 +9,21 @@ import { useState, useCallback } from 'react';
 import type { AuthState } from './types';
 import { AuthFlow } from './components/AuthFlow';
 import { Dashboard } from './components/Dashboard';
+import { loadSession, saveSession, clearSession } from './session';
 
 const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
-const SESSION_KEY = 'glv-dashboard-session';
 
-/** Load session from sessionStorage (survives page refresh, clears on tab close) */
-function loadSession(): AuthState {
-  // In mock mode, check sessionStorage but don't auto-authenticate
-  // This ensures users see the login screen with the "Preview Mode" banner
-  if (MOCK_MODE) {
-    try {
-      const stored = sessionStorage.getItem(SESSION_KEY);
-      if (stored) {
-        const { token, contactId } = JSON.parse(stored);
-        if (token) {
-          return { status: 'authenticated', token, contactId };
-        }
-      }
-    } catch {
-      // Ignore parse errors
-    }
-    return { status: 'unauthenticated' };
-  }
-  try {
-    const stored = sessionStorage.getItem(SESSION_KEY);
-    if (stored) {
-      const { token, contactId } = JSON.parse(stored);
-      if (token) {
-        return { status: 'authenticated', token, contactId };
-      }
-    }
-  } catch {
-    // Ignore parse errors
+/** Load session from sessionStorage and convert to AuthState */
+function loadAuthState(): AuthState {
+  const session = loadSession();
+  if (session) {
+    return { status: 'authenticated', token: session.token, contactId: session.contactId };
   }
   return { status: 'unauthenticated' };
 }
 
-/** Save session to sessionStorage */
-function saveSession(token: string, contactId: string): void {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token, contactId }));
-}
-
-/** Clear session from sessionStorage */
-function clearSession(): void {
-  sessionStorage.removeItem(SESSION_KEY);
-}
-
 function App() {
-  const [authState, setAuthState] = useState<AuthState>(loadSession);
+  const [authState, setAuthState] = useState<AuthState>(loadAuthState);
 
   const handleAuthStart = useCallback(() => {
     setAuthState({ status: 'authenticating' });

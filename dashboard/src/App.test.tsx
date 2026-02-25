@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { SESSION_KEY } from './session';
 
 // Mock the Dashboard component to avoid API calls
 vi.mock('./components/Dashboard', () => ({
@@ -10,8 +11,6 @@ vi.mock('./components/Dashboard', () => ({
     </div>
   ),
 }));
-
-const SESSION_KEY = 'glv-dashboard-session';
 
 describe('App - session management', () => {
   beforeEach(() => {
