@@ -8,6 +8,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { ScoutsApiClient } from '../api-client';
+import { MockScoutsApiClient } from '../mock-api-client';
+
+const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
 
 const tracer = trace.getTracer('glv-dashboard', '1.0.0');
 import { transformLearningResults } from '../utils';
@@ -68,8 +71,12 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
   // Track which sections have been triggered
   const triggeredSections = useRef<Set<string>>(new Set());
 
-  // Memoize the API client
+  // Memoize the API client (use mock client in mock mode)
   const client = useMemo(() => {
+    if (MOCK_MODE) {
+      console.log('[Dashboard] Using mock API client');
+      return new MockScoutsApiClient();
+    }
     const c = new ScoutsApiClient(token);
     if (contactId) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

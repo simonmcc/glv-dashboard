@@ -8,7 +8,7 @@ permissions:
   pull-requests: write
 
 env:
-  VITE_BACKEND_URL: https://glv-backend-gxoc276j2a-ew.a.run.app
+  VITE_MOCK_MODE: 'true'
 
 jobs:
   build_and_preview:

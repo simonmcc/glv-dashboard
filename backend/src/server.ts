@@ -9,17 +9,11 @@ import './tracing.js';
 import express from 'express';
 import cors from 'cors';
 import { authenticate, checkLearningByMembershipNumbers } from './auth-service.js';
-import { getMockAuth, getMockProxyResponse, getMockLearningDetails } from './mock-data.js';
 import { log, logError, logDebug } from './logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const MOCK_MODE = process.env.MOCK_MODE === 'true';
-const rawMockDelay = parseInt(process.env.MOCK_DELAY_MS || '1000', 10);
-const MOCK_DELAY_MS = Number.isNaN(rawMockDelay) ? 1000 : rawMockDelay;
 const DEBUG_LOG_TOKENS = process.env.DEBUG_LOG_TOKENS === 'true';
-
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Middleware
 app.use(cors({
@@ -42,13 +36,6 @@ app.post('/auth/login', async (req, res) => {
       success: false,
       error: 'Username and password are required',
     });
-  }
-
-  // Mock mode - return mock auth with simulated delay
-  if (MOCK_MODE) {
-    log(`[Auth] Mock login for: ${username} (${MOCK_DELAY_MS}ms delay)`);
-    await delay(MOCK_DELAY_MS);
-    return res.json(getMockAuth());
   }
 
   log(`[Auth] Login attempt for: ${username}`);
@@ -108,14 +95,6 @@ app.post('/api/proxy', async (req, res) => {
       success: false,
       error: 'Endpoint and token are required',
     });
-  }
-
-  // Mock mode - return mock data based on table name
-  if (MOCK_MODE) {
-    const tableName = body?.table;
-    log(`[Proxy] Mock mode - returning mock data for table: ${tableName} (${MOCK_DELAY_MS}ms delay)`);
-    await delay(MOCK_DELAY_MS);
-    return res.json(getMockProxyResponse(tableName));
   }
 
   // Log token length (or partial token if debug mode enabled)
@@ -191,13 +170,6 @@ app.post('/api/check-learning', async (req, res) => {
     });
   }
 
-  // Mock mode - return mock learning details
-  if (MOCK_MODE) {
-    log(`[Learning] Mock mode - returning mock data for ${membershipNumbers.length} members (${MOCK_DELAY_MS}ms delay)`);
-    await delay(MOCK_DELAY_MS);
-    return res.json(getMockLearningDetails(membershipNumbers));
-  }
-
   log(`[Learning] Checking ${membershipNumbers.length} membership numbers`);
 
   try {
@@ -216,9 +188,6 @@ app.post('/api/check-learning', async (req, res) => {
 app.listen(PORT, () => {
   log(`[Server] GLV Dashboard backend running on http://localhost:${PORT}`);
   log(`[Server] CORS origin: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
-  if (MOCK_MODE) {
-    log(`[Server] MOCK MODE ENABLED - Using mock data with ${MOCK_DELAY_MS}ms delay`);
-  }
 });
 
 export default app;

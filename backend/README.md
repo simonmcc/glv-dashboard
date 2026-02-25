@@ -9,36 +9,6 @@ npm install
 npm run dev         # Start server on http://localhost:3001
 ```
 
-## Mock Mode
-
-Run the backend with mock data instead of connecting to the real Scouts API:
-
-```bash
-MOCK_MODE=true npm run dev
-```
-
-By default, mock responses include a 1 second delay to simulate real API latency. Customize this with `MOCK_DELAY_MS`:
-
-```bash
-MOCK_MODE=true MOCK_DELAY_MS=500 npm run dev   # 500ms delay
-MOCK_MODE=true MOCK_DELAY_MS=0 npm run dev     # No delay
-```
-
-Mock mode provides realistic sample data for all dashboard views:
-
-| Table | Mock Data |
-|-------|-----------|
-| Learning Compliance | 8 members x 4 learning types with various statuses |
-| Joining Journey | 4 members with outstanding onboarding actions |
-| Disclosure Compliance | 8 members with DBS/AccessNI/PVG records |
-| Appointments | 8 members with various roles |
-| Suspensions | 1 suspended member |
-| Team Reviews | 8 members with scheduled/overdue reviews |
-| Permits | 5 members with Nights Away/Water/Climbing permits |
-| Awards | 4 members with Wood Badge/Merit awards |
-
-Mock data uses a seeded random number generator for consistent, reproducible results across restarts.
-
 ## Scripts
 
 | Command | Description |
@@ -57,8 +27,6 @@ Mock data uses a seeded random number generator for consistent, reproducible res
 |----------|---------|-------------|
 | `PORT` | `3001` | Server port |
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
-| `MOCK_MODE` | `false` | Use mock data instead of real API |
-| `MOCK_DELAY_MS` | `1000` | Simulated response delay in mock mode (ms) |
 | `OTEL_ENABLED` | `false` | Enable OpenTelemetry tracing |
 | `HEADLESS` | `true` | Set to `false` for visible Playwright browser |
 
@@ -187,7 +155,6 @@ docker build -t glv-backend .
 # Run locally
 docker run -p 8080:8080 \
   -e CORS_ORIGIN=http://localhost:5173 \
-  -e MOCK_MODE=true \
   glv-backend
 
 # Test health endpoint
