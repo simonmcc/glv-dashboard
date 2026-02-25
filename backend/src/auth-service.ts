@@ -78,8 +78,15 @@ async function handleCookieConsent(page: Page): Promise<void> {
       const button = await page.$(selector);
       if (button) {
         await button.click();
-        // Wait for cookie banner to disappear rather than fixed timeout
-        await page.waitForTimeout(300);
+        // Wait for the clicked cookie control to disappear instead of a fixed timeout
+        try {
+          await page.waitForSelector(selector, {
+            state: 'hidden',
+            timeout: 5000,
+          });
+        } catch {
+          // If the element does not disappear in time, continue without failing
+        }
         return;
       }
     } catch {
