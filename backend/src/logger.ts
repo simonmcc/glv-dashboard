@@ -26,7 +26,7 @@ function gcpEntry(severity: string, message: string, ...args: unknown[]): string
 
   const entry: Record<string, unknown> = {
     severity,
-    message: args.length ? `${message} ${args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ')}` : message,
+    message: args.length ? `${message} ${args.map(a => (a instanceof Error ? (a.stack || a.message) : typeof a === 'string' ? a : JSON.stringify(a))).join(' ')}` : message,
     time: new Date().toISOString(),
   };
 
