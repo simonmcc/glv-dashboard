@@ -15,8 +15,21 @@ const SESSION_KEY = 'glv-dashboard-session';
 
 /** Load session from sessionStorage (survives page refresh, clears on tab close) */
 function loadSession(): AuthState {
+  // In mock mode, check sessionStorage but don't auto-authenticate
+  // This ensures users see the login screen with the "Preview Mode" banner
   if (MOCK_MODE) {
-    return { status: 'authenticated', token: 'mock-token', contactId: 'mock-contact' };
+    try {
+      const stored = sessionStorage.getItem(SESSION_KEY);
+      if (stored) {
+        const { token, contactId } = JSON.parse(stored);
+        if (token) {
+          return { status: 'authenticated', token, contactId };
+        }
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return { status: 'unauthenticated' };
   }
   try {
     const stored = sessionStorage.getItem(SESSION_KEY);
