@@ -312,8 +312,8 @@ async function getLearningForContact(
 }
 
 // Maximum number of member lookups to run in parallel.
-// Keeps API load reasonable while still cutting wall-clock time significantly.
-const LEARNING_CONCURRENCY = 5;
+// Configurable via LEARNING_CONCURRENCY env var; defaults to 10.
+const LEARNING_CONCURRENCY = parseInt(process.env.LEARNING_CONCURRENCY ?? '10', 10);
 
 /**
  * Fetch search + learning for a single membership number.

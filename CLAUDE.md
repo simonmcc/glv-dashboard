@@ -78,6 +78,7 @@ cd dashboard && npx vitest run src/utils.test.ts
 - `PORT` — Backend port (default: `3001`)
 - `CORS_ORIGIN` — Backend CORS origin (default: `http://localhost:5173`)
 - `HEADLESS` — Set to `false` for visible browser in scraper/auth
+- `LEARNING_CONCURRENCY` — Number of parallel member lookups in `check-learning` (default: `10`)
 - `OTEL_ENABLED` — Set to `true` to enable backend OpenTelemetry tracing (or use `npm run dev:traced`)
 - `VITE_OTEL_ENABLED` — Set to `true` to enable frontend browser tracing
 
