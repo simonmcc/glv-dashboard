@@ -23,29 +23,34 @@ describe('AuthFlow - mock mode', () => {
 
   it('authenticates with mock token on form submit in mock mode', async () => {
     vi.useFakeTimers();
-    const onAuthComplete = vi.fn();
-    const { act } = await import('@testing-library/react');
-    render(
-      <AuthFlow
-        {...defaultProps}
-        onAuthComplete={onAuthComplete}
-        mockMode={true}
-      />
-    );
+    try {
+      const onAuthComplete = vi.fn();
+      const { act } = await import('@testing-library/react');
+      render(
+        <AuthFlow
+          {...defaultProps}
+          onAuthComplete={onAuthComplete}
+          mockMode={true}
+        />
+      );
 
-    fireEvent.change(screen.getByLabelText('Email Address'), {
-      target: { value: 'anyone@example.com' },
-    });
-    fireEvent.change(screen.getByLabelText('Password'), {
-      target: { value: 'anypassword' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in with Scouts' }));
+      fireEvent.change(screen.getByLabelText('Email Address'), {
+        target: { value: 'anyone@example.com' },
+      });
+      fireEvent.change(screen.getByLabelText('Password'), {
+        target: { value: 'anypassword' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in with Scouts' }));
 
-    await act(async () => {
-      vi.runAllTimers();
-    });
+      await act(async () => {
+        vi.runAllTimers();
+      });
 
-    expect(onAuthComplete).toHaveBeenCalledWith('mock-token', 'mock-contact');
-    vi.useRealTimers();
+      expect(onAuthComplete).toHaveBeenCalledWith('mock-token', 'mock-contact');
+    } finally {
+      vi.runOnlyPendingTimers();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 });
