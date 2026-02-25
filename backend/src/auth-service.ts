@@ -157,33 +157,25 @@ async function performLogin(page: Page, username: string, password: string): Pro
     log('[Auth] Already on B2C login page');
   }
 
-  // Wait for login form to be ready
-  log('[Auth] Waiting for login form (domcontentloaded)...');
-  await page.waitForLoadState('domcontentloaded');
-  log(`[Auth] Login form ready, url=${page.url()}`);
-
-  // Fill in email
-  const emailSelectors = [
-    'input[type="email"]',
-    'input[name="logonIdentifier"]',
-    'input[id="signInName"]',
-  ];
-
-  let emailFilled = false;
-  for (const selector of emailSelectors) {
-    const input = await page.$(selector);
-    if (input) {
-      log(`[Auth] Filling email using selector: ${selector}`);
-      await input.fill(username);
-      emailFilled = true;
-      break;
-    }
-  }
-
-  if (!emailFilled) {
-    log(`[Auth] Could not find email input, page title="${await page.title()}", url=${page.url()}`);
+  // Wait for the login form to render — B2C is a JS SPA, domcontentloaded fires
+  // while the page still shows "Loading...". Wait for the actual email input instead.
+  const emailInputSelector = 'input[type="email"], input[name="logonIdentifier"], input[id="signInName"]';
+  log('[Auth] Waiting for email input to appear in login form...');
+  try {
+    await page.waitForSelector(emailInputSelector, { timeout: 15000 });
+  } catch {
+    log(`[Auth] Email input did not appear within 15s, page title="${await page.title()}", url=${page.url()}`);
     throw new Error('Could not find email input field');
   }
+  log(`[Auth] Login form ready, url=${page.url()}`);
+
+  // Fill in email — use the first visible match
+  const emailInput = await page.$(emailInputSelector);
+  if (!emailInput) {
+    throw new Error('Could not find email input field');
+  }
+  log(`[Auth] Filling email`);
+  await emailInput.fill(username);
 
   // Fill in password
   const passwordInput = await page.$('input[type="password"]');
