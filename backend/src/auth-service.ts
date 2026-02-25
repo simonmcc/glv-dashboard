@@ -73,10 +73,13 @@ async function handleCookieConsent(page: Page): Promise<void> {
     '#onetrust-accept-btn-handler',
   ];
 
+  log(`[Auth] Checking for cookie consent banner (url: ${page.url()})`);
+
   for (const selector of cookieSelectors) {
     try {
       const button = await page.$(selector);
       if (button) {
+        log(`[Auth] Clicking cookie consent button: ${selector}`);
         await button.click();
         // Wait for the clicked cookie control to disappear instead of a fixed timeout
         try {
@@ -84,8 +87,9 @@ async function handleCookieConsent(page: Page): Promise<void> {
             state: 'hidden',
             timeout: 5000,
           });
+          log('[Auth] Cookie consent banner dismissed');
         } catch {
-          // If the element does not disappear in time, continue without failing
+          log('[Auth] Cookie consent banner did not disappear within 5s, continuing');
         }
         return;
       }
@@ -93,6 +97,8 @@ async function handleCookieConsent(page: Page): Promise<void> {
       // Continue to next selector
     }
   }
+
+  log('[Auth] No cookie consent banner found');
 }
 
 /**
@@ -112,13 +118,19 @@ async function waitForCondition(
 }
 
 async function performLogin(page: Page, username: string, password: string): Promise<void> {
+  log(`[Auth] performLogin: current url=${page.url()}`);
+
   // Check if we're already on B2C or need to wait for redirect
   if (!page.url().includes('b2clogin.com')) {
+    log('[Auth] Not yet on B2C, waiting up to 30s for redirect...');
     try {
       await page.waitForURL('**/b2clogin.com/**', { timeout: 30000 });
+      log(`[Auth] Reached B2C login page: ${page.url()}`);
     } catch {
+      log(`[Auth] waitForURL(b2clogin) timed out, current url=${page.url()}`);
       // Check if we might already be logged in
       if (page.url().includes('membership.scouts.org.uk')) {
+        log('[Auth] Still on membership portal, checking for existing token in sessionStorage...');
         const hasToken = await page.evaluate(() => {
           for (let i = 0; i < sessionStorage.length; i++) {
             const key = sessionStorage.key(i);
@@ -127,15 +139,21 @@ async function performLogin(page: Page, username: string, password: string): Pro
           return false;
         });
         if (hasToken) {
+          log('[Auth] Found existing token in sessionStorage, skipping login form');
           return; // Already authenticated
         }
+        log('[Auth] No token found in sessionStorage');
       }
       throw new Error('Failed to reach B2C login page');
     }
+  } else {
+    log('[Auth] Already on B2C login page');
   }
 
   // Wait for login form to be ready
+  log('[Auth] Waiting for login form (domcontentloaded)...');
   await page.waitForLoadState('domcontentloaded');
+  log(`[Auth] Login form ready, url=${page.url()}`);
 
   // Fill in email
   const emailSelectors = [
@@ -148,6 +166,7 @@ async function performLogin(page: Page, username: string, password: string): Pro
   for (const selector of emailSelectors) {
     const input = await page.$(selector);
     if (input) {
+      log(`[Auth] Filling email using selector: ${selector}`);
       await input.fill(username);
       emailFilled = true;
       break;
@@ -155,14 +174,17 @@ async function performLogin(page: Page, username: string, password: string): Pro
   }
 
   if (!emailFilled) {
+    log(`[Auth] Could not find email input, page title="${await page.title()}", url=${page.url()}`);
     throw new Error('Could not find email input field');
   }
 
   // Fill in password
   const passwordInput = await page.$('input[type="password"]');
   if (!passwordInput) {
+    log(`[Auth] Could not find password input, page title="${await page.title()}", url=${page.url()}`);
     throw new Error('Could not find password input field');
   }
+  log('[Auth] Filling password');
   await passwordInput.fill(password);
 
   // Click sign in button
@@ -176,6 +198,7 @@ async function performLogin(page: Page, username: string, password: string): Pro
   for (const selector of submitSelectors) {
     const button = await page.$(selector);
     if (button) {
+      log(`[Auth] Clicking submit using selector: ${selector}`);
       await button.click();
       submitted = true;
       break;
@@ -183,11 +206,14 @@ async function performLogin(page: Page, username: string, password: string): Pro
   }
 
   if (!submitted) {
+    log(`[Auth] Could not find submit button, page title="${await page.title()}", url=${page.url()}`);
     throw new Error('Could not find sign in button');
   }
 
   // Wait for redirect back to membership portal
+  log('[Auth] Waiting up to 60s for redirect back to membership portal...');
   await page.waitForURL('**/membership.scouts.org.uk/**', { timeout: 60000 });
+  log(`[Auth] Returned to membership portal: ${page.url()}`);
 }
 
 const API_BASE = 'https://tsa-memportal-prod-fun01.azurewebsites.net/api';
@@ -372,6 +398,13 @@ export async function authenticate(username: string, password: string): Promise<
     Object.defineProperty(navigator, 'webdriver', { get: () => false });
   });
 
+  // Log every top-level navigation so we can trace the auth redirect chain
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame()) {
+      log(`[Auth] Navigation -> ${frame.url()}`);
+    }
+  });
+
   // Capture Bearer token from network requests to the API domain
   let capturedToken: string | null = null;
 
@@ -390,7 +423,9 @@ export async function authenticate(username: string, password: string): Promise<
   try {
     // Navigate to the portal
     await tracer.startActiveSpan('playwright.navigate.scouts-portal', async (navSpan) => {
+      log(`[Auth] Navigating to ${SCOUTS_URL}`);
       await page.goto(SCOUTS_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      log(`[Auth] Initial navigation complete, url=${page.url()}`);
       await handleCookieConsent(page);
       navSpan.end();
     });
