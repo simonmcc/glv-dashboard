@@ -78,7 +78,8 @@ async function handleCookieConsent(page: Page): Promise<void> {
       const button = await page.$(selector);
       if (button) {
         await button.click();
-        await page.waitForTimeout(1000);
+        // Wait for cookie banner to disappear rather than fixed timeout
+        await page.waitForTimeout(300);
         return;
       }
     } catch {
@@ -87,9 +88,27 @@ async function handleCookieConsent(page: Page): Promise<void> {
   }
 }
 
+/**
+ * Poll for a condition with timeout
+ */
+async function waitForCondition(
+  condition: () => boolean,
+  timeoutMs: number,
+  pollIntervalMs = 100
+): Promise<boolean> {
+  const startTime = Date.now();
+  while (Date.now() - startTime < timeoutMs) {
+    if (condition()) return true;
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+  }
+  return condition();
+}
+
 async function performLogin(page: Page, username: string, password: string): Promise<void> {
-  // Wait for the page to settle
-  await page.waitForTimeout(3000);
+  // Wait for network to settle instead of fixed timeout
+  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+    // networkidle may not trigger if there's polling, continue anyway
+  });
 
   // Check if we're already on B2C or need to wait for redirect
   if (!page.url().includes('b2clogin.com')) {
@@ -113,7 +132,8 @@ async function performLogin(page: Page, username: string, password: string): Pro
     }
   }
 
-  await page.waitForTimeout(2000);
+  // Wait for login form to be ready
+  await page.waitForLoadState('domcontentloaded');
 
   // Fill in email
   const emailSelectors = [
@@ -369,7 +389,6 @@ export async function authenticate(username: string, password: string): Promise<
     // Navigate to the portal
     await tracer.startActiveSpan('playwright.navigate.scouts-portal', async (navSpan) => {
       await page.goto(SCOUTS_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-      await page.waitForTimeout(2000);
       await handleCookieConsent(page);
       navSpan.end();
     });
@@ -377,14 +396,21 @@ export async function authenticate(username: string, password: string): Promise<
     // Perform login
     await tracer.startActiveSpan('playwright.b2c-login', async (loginSpan) => {
       await performLogin(page, username, password);
-      await page.waitForTimeout(2000);
       loginSpan.end();
     });
 
-    // Wait for portal to fully load and make initial API calls
+    // Wait for token to be captured from API requests (poll instead of fixed wait)
     await tracer.startActiveSpan('playwright.wait-for-token', async (tokenSpan) => {
-      await page.waitForTimeout(5000);
-      tokenSpan.setAttribute('auth.token_captured', !!capturedToken);
+      const startTime = Date.now();
+      const tokenCaptured = await waitForCondition(
+        () => capturedToken !== null,
+        15000, // max 15s timeout
+        200    // check every 200ms
+      );
+      const waitDuration = Date.now() - startTime;
+      tokenSpan.setAttribute('auth.token_captured', tokenCaptured);
+      tokenSpan.setAttribute('auth.wait_duration_ms', waitDuration);
+      log(`[Auth] Token wait completed in ${waitDuration}ms, captured: ${tokenCaptured}`);
       tokenSpan.end();
     });
 
