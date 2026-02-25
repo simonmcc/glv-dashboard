@@ -15,11 +15,12 @@ interface AuthFlowProps {
   onAuthStart: () => void;
   onAuthComplete: (token: string, contactId: string) => void;
   onAuthError: (message: string) => void;
+  mockMode?: boolean;
 }
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
-export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError }: AuthFlowProps) {
+export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, mockMode = false }: AuthFlowProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -34,6 +35,15 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError }
 
     setIsLoading(true);
     onAuthStart();
+
+    // In mock mode, authenticate immediately without calling the backend
+    if (mockMode) {
+      setTimeout(() => {
+        setIsLoading(false);
+        onAuthComplete('mock-token', 'mock-contact');
+      }, 500);
+      return;
+    }
 
     await tracer.startActiveSpan('auth.login', async (span) => {
       try {
@@ -78,6 +88,13 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError }
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
+          {mockMode && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded text-amber-800 text-sm">
+              <p className="font-semibold">🔍 Preview Mode (Mock Data)</p>
+              <p className="mt-1">This is a PR preview using mock data. Sign in with any email and password.</p>
+            </div>
+          )}
+
           {authState.status === 'error' && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
               {authState.message}

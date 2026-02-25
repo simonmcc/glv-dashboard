@@ -47,6 +47,7 @@ function App() {
         onAuthStart={handleAuthStart}
         onAuthComplete={handleAuthComplete}
         onAuthError={handleAuthError}
+        mockMode={MOCK_MODE}
       />
     );
   }
