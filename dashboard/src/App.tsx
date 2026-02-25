@@ -9,21 +9,28 @@ import { useState, useCallback } from 'react';
 import type { AuthState } from './types';
 import { AuthFlow } from './components/AuthFlow';
 import { Dashboard } from './components/Dashboard';
+import { loadSession, saveSession, clearSession } from './session';
 
 const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
 
+/** Load session from sessionStorage and convert to AuthState */
+function loadAuthState(): AuthState {
+  const session = loadSession();
+  if (session) {
+    return { status: 'authenticated', token: session.token, contactId: session.contactId };
+  }
+  return { status: 'unauthenticated' };
+}
+
 function App() {
-  const [authState, setAuthState] = useState<AuthState>(() =>
-    MOCK_MODE
-      ? { status: 'authenticated', token: 'mock-token', contactId: 'mock-contact' }
-      : { status: 'unauthenticated' }
-  );
+  const [authState, setAuthState] = useState<AuthState>(loadAuthState);
 
   const handleAuthStart = useCallback(() => {
     setAuthState({ status: 'authenticating' });
   }, []);
 
   const handleAuthComplete = useCallback((token: string, contactId: string) => {
+    saveSession(token, contactId);
     setAuthState({ status: 'authenticated', token, contactId });
   }, []);
 
@@ -32,10 +39,12 @@ function App() {
   }, []);
 
   const handleLogout = useCallback(() => {
+    clearSession();
     setAuthState({ status: 'unauthenticated' });
   }, []);
 
   const handleTokenExpired = useCallback(() => {
+    clearSession();
     setAuthState({ status: 'error', message: 'Your session has expired. Please sign in again.' });
   }, []);
 
