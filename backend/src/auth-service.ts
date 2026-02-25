@@ -81,15 +81,15 @@ async function handleCookieConsent(page: Page): Promise<void> {
       if (button) {
         log(`[Auth] Clicking cookie consent button: ${selector}`);
         await button.click();
-        // Wait for the clicked cookie control to disappear instead of a fixed timeout
+        // Wait for the banner container to disappear (more reliable than waiting for the button itself)
         try {
-          await page.waitForSelector(selector, {
+          await page.waitForSelector('#onetrust-banner-sdk', {
             state: 'hidden',
-            timeout: 5000,
+            timeout: 2000,
           });
           log('[Auth] Cookie consent banner dismissed');
         } catch {
-          log('[Auth] Cookie consent banner did not disappear within 5s, continuing');
+          log('[Auth] Cookie consent banner did not disappear within 2s, continuing');
         }
         return;
       }
