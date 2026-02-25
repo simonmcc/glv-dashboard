@@ -164,32 +164,7 @@ async function performLogin(page: Page, username: string, password: string): Pro
   try {
     await page.waitForSelector(emailInputSelector, { timeout: 15000 });
   } catch {
-    const title = await page.title();
-    log(`[Auth] Email input did not appear within 15s, page title="${title}", url=${page.url()}`);
-
-    // Capture a screenshot and dump all input elements to help diagnose the form structure
-    try {
-      const screenshotPath = `/tmp/auth-debug-${Date.now()}.png`;
-      await page.screenshot({ path: screenshotPath, fullPage: true });
-      log(`[Auth] Screenshot saved to ${screenshotPath}`);
-    } catch (ssErr) {
-      log(`[Auth] Screenshot failed: ${(ssErr as Error).message}`);
-    }
-    try {
-      const inputs = await page.evaluate(() =>
-        Array.from(document.querySelectorAll('input')).map(el => ({
-          type: el.type,
-          name: el.name,
-          id: el.id,
-          placeholder: el.placeholder,
-          className: el.className,
-        }))
-      );
-      log(`[Auth] Inputs found on page: ${JSON.stringify(inputs)}`);
-    } catch (evalErr) {
-      log(`[Auth] Could not enumerate inputs: ${(evalErr as Error).message}`);
-    }
-
+    log(`[Auth] Email input did not appear within 15s, page title="${await page.title()}", url=${page.url()}`);
     throw new Error('Could not find email input field');
   }
   log(`[Auth] Login form ready, url=${page.url()}`);
