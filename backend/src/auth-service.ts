@@ -124,9 +124,16 @@ async function performLogin(page: Page, username: string, password: string): Pro
   if (!page.url().includes('b2clogin.com')) {
     log('[Auth] Not yet on B2C, waiting up to 30s for redirect...');
     try {
-      // Use a predicate to match the subdomain prodscoutsb2c.b2clogin.com
-      // (glob patterns like '**/b2clogin.com/**' only match path segments, not subdomains)
-      await page.waitForURL(url => url.href.includes('b2clogin.com'), { timeout: 30000 });
+      // Use a predicate to match the B2C login host (including subdomains like prodscoutsb2c.b2clogin.com)
+      // by inspecting the parsed URL hostname instead of doing a substring match on the full href.
+      await page.waitForURL(url => {
+        try {
+          const hostname = new URL(url.href).hostname.toLowerCase();
+          return hostname === 'b2clogin.com' || hostname.endsWith('.b2clogin.com');
+        } catch {
+          return false;
+        }
+      }, { timeout: 30000 });
       log(`[Auth] Reached B2C login page: ${page.url()}`);
     } catch {
       log(`[Auth] waitForURL(b2clogin) timed out, current url=${page.url()}`);
