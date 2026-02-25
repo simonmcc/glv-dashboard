@@ -81,12 +81,6 @@ cd dashboard && npx vitest run src/utils.test.ts
 - `OTEL_ENABLED` — Set to `true` to enable backend OpenTelemetry tracing (or use `npm run dev:traced`)
 - `VITE_OTEL_ENABLED` — Set to `true` to enable frontend browser tracing
 
-## Git Workflow
-
-- Never commit or push directly to main
-- Create a feature branch for all changes
-- Use `gh pr create` to open a pull request
-- All changes must be reviewed and merged via GitHub PR
 
 ## Tracing
 
@@ -105,3 +99,15 @@ Tracing is opt-in and has zero overhead when disabled. Manual spans instrument t
 - `POST /auth/login` — Authenticate via Playwright, returns Bearer token + contactId
 - `POST /api/proxy` — Forward requests to Scouts API with token
 - `POST /api/check-learning` — Check learning records by membership numbers
+
+## Project Rules
+
+- Create a feature branch for all changes
+- Use `gh pr create` to open a pull request
+- All changes must be reviewed and merged via GitHub PR
+
+### Critical Rules
+
+1. **NEVER commit or push directly to main** - ALL changes go through a PR, no exceptions. This includes code, documentation, config files, and any other modifications. Always create a feature branch first, commit there, and open a PR.
+
+2. **Always use worktrees** - Never work directly in the main repo directory. Each ticket gets its own worktree.
