@@ -130,7 +130,8 @@ async function performLogin(page: Page, username: string, password: string): Pro
         try {
           const hostname = new URL(url.href).hostname.toLowerCase();
           return hostname === 'b2clogin.com' || hostname.endsWith('.b2clogin.com');
-        } catch {
+        } catch (err) {
+          logError('[Auth] Error parsing URL in B2C waitForURL predicate', err instanceof Error ? err : new Error(String(err)));
           return false;
         }
       }, { timeout: 30000 });
@@ -404,7 +405,15 @@ export async function authenticate(username: string, password: string): Promise<
   // Log every top-level navigation so we can trace the auth redirect chain
   const navigationHandler = (frame: Frame) => {
     if (frame === page.mainFrame()) {
-      log(`[Auth] Navigation -> ${frame.url()}`);
+      const rawUrl = frame.url();
+      let safeUrl = rawUrl;
+      try {
+        const parsed = new URL(rawUrl);
+        safeUrl = `${parsed.origin}${parsed.pathname}`;
+      } catch {
+        // If URL parsing fails, fall back to the raw URL (unlikely to contain sensitive query params in this case)
+      }
+      log(`[Auth] Navigation -> ${safeUrl}`);
     }
   };
 
@@ -431,16 +440,24 @@ export async function authenticate(username: string, password: string): Promise<
   });
 
   page.on('response', async (response) => {
-    if (capturedContactId === null && response.url().includes('tsa-memportal-prod-fun01') && response.url().includes('GetContactDetailAsync')) {
-      try {
-        const data = await response.json();
-        if (data?.id) {
-          capturedContactId = data.id;
-          log('[Auth] Captured contactId from response:', capturedContactId);
-        }
-      } catch {
-        // Non-JSON or unexpected shape — ignore
+    const url = response.url();
+    if (!url.includes('tsa-memportal-prod-fun01') || !url.includes('GetContactDetailAsync')) {
+      return;
+    }
+
+    if (capturedContactId !== null) {
+      log('[Auth] Skipping GetContactDetailAsync response because contactId is already captured');
+      return;
+    }
+
+    try {
+      const data = await response.json();
+      if (data?.id) {
+        capturedContactId = data.id;
+        log('[Auth] Captured contactId from response:', capturedContactId);
       }
+    } catch {
+      // Non-JSON or unexpected shape — ignore
     }
   });
 
