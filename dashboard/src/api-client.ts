@@ -48,7 +48,7 @@ export class ScoutsApiClient {
     this.token = token;
   }
 
-  private async request<T>(endpoint: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  private async request<T>(endpoint: string, body?: unknown): Promise<T> {
     console.log(`[API] Calling ${endpoint}`, body ? { bodyKeys: Object.keys(body as object) } : '');
 
     const response = await fetch(`${BACKEND_URL}/api/proxy`, {
@@ -62,7 +62,6 @@ export class ScoutsApiClient {
         body,
         token: this.token,
       }),
-      signal,
     });
 
     if (response.status === 401) {
@@ -96,7 +95,7 @@ export class ScoutsApiClient {
     return this.contactId;
   }
 
-  private async query<T>(request: DataExplorerRequest, signal?: AbortSignal): Promise<DataExplorerResponse<T>> {
+  private async query<T>(request: DataExplorerRequest): Promise<DataExplorerResponse<T>> {
     // NOTE: orderBy and order must be empty/null - non-empty values cause API errors
     const body = {
       table: request.table,
@@ -114,10 +113,10 @@ export class ScoutsApiClient {
     };
 
     console.log('[API] Query:', { table: body.table, contactId: body.contactId || '(empty)', thisContactId: this.contactId || '(empty)', pageSize: body.pageSize });
-    return this.request<DataExplorerResponse<T>>('/DataExplorer/GetResultsAsync', body, signal);
+    return this.request<DataExplorerResponse<T>>('/DataExplorer/GetResultsAsync', body);
   }
 
-  async getAllLearningCompliance(pageSize: number = 500, signal?: AbortSignal): Promise<ApiResponse<LearningRecord>> {
+  async getAllLearningCompliance(pageSize: number = 500): Promise<ApiResponse<LearningRecord>> {
     console.log('[API] Fetching learning compliance data');
 
     const result = await this.query<Record<string, unknown>>({
@@ -127,7 +126,7 @@ export class ScoutsApiClient {
       pageNo: 1,
       pageSize,
       distinct: true,
-    }, signal);
+    });
 
     if (result.error) {
       console.error('[API] Query error:', result.error);
@@ -335,8 +334,7 @@ export class ScoutsApiClient {
    * Uses MemberListingAsync to find contact IDs, then fetches learning via GetLmsDetailsAsync
    */
   async checkLearningByMembershipNumbers(
-    membershipNumbers: string[],
-    signal?: AbortSignal
+    membershipNumbers: string[]
   ): Promise<{ success: boolean; members?: MemberLearningResult[]; error?: string }> {
     console.log(`[API] Checking learning for ${membershipNumbers.length} members...`);
 
@@ -348,7 +346,6 @@ export class ScoutsApiClient {
           token: this.token,
           membershipNumbers,
         }),
-        signal,
       });
 
       if (!response.ok) {
