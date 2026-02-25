@@ -5,7 +5,7 @@
  * and capture the Bearer token.
  */
 
-import { chromium, Page } from 'playwright';
+import { chromium, Frame, Page } from 'playwright';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { log, logError } from './logger.js';
 import { createHash } from 'node:crypto';
@@ -81,15 +81,15 @@ async function handleCookieConsent(page: Page): Promise<void> {
       if (button) {
         log(`[Auth] Clicking cookie consent button: ${selector}`);
         await button.click();
-        // Wait for the clicked cookie control to disappear instead of a fixed timeout
+        // Wait for the banner container to disappear (more reliable than waiting for the button itself)
         try {
-          await page.waitForSelector(selector, {
+          await page.waitForSelector('#onetrust-banner-sdk', {
             state: 'hidden',
-            timeout: 5000,
+            timeout: 2000,
           });
           log('[Auth] Cookie consent banner dismissed');
         } catch {
-          log('[Auth] Cookie consent banner did not disappear within 5s, continuing');
+          log('[Auth] Cookie consent banner did not disappear within 2s, continuing');
         }
         return;
       }
@@ -124,9 +124,17 @@ async function performLogin(page: Page, username: string, password: string): Pro
   if (!page.url().includes('b2clogin.com')) {
     log('[Auth] Not yet on B2C, waiting up to 30s for redirect...');
     try {
-      // Use a predicate to match the subdomain prodscoutsb2c.b2clogin.com
-      // (glob patterns like '**/b2clogin.com/**' only match path segments, not subdomains)
-      await page.waitForURL(url => url.href.includes('b2clogin.com'), { timeout: 30000 });
+      // Use a predicate to match the B2C login host (including subdomains like prodscoutsb2c.b2clogin.com)
+      // by inspecting the parsed URL hostname instead of doing a substring match on the full href.
+      await page.waitForURL(url => {
+        try {
+          const hostname = new URL(url.href).hostname.toLowerCase();
+          return hostname === 'b2clogin.com' || hostname.endsWith('.b2clogin.com');
+        } catch (err) {
+          logError('[Auth] Error parsing URL in B2C waitForURL predicate', err instanceof Error ? err : new Error(String(err)));
+          return false;
+        }
+      }, { timeout: 30000 });
       log(`[Auth] Reached B2C login page: ${page.url()}`);
     } catch {
       log(`[Auth] waitForURL(b2clogin) timed out, current url=${page.url()}`);
@@ -398,10 +406,23 @@ export async function authenticate(username: string, password: string): Promise<
   });
 
   // Log every top-level navigation so we can trace the auth redirect chain
-  page.on('framenavigated', (frame) => {
+  const navigationHandler = (frame: Frame) => {
     if (frame === page.mainFrame()) {
-      log(`[Auth] Navigation -> ${frame.url()}`);
+      const rawUrl = frame.url();
+      let safeUrl = rawUrl;
+      try {
+        const parsed = new URL(rawUrl);
+        safeUrl = `${parsed.origin}${parsed.pathname}`;
+      } catch {
+        // If URL parsing fails, fall back to the raw URL (unlikely to contain sensitive query params in this case)
+      }
+      log(`[Auth] Navigation -> ${safeUrl}`);
     }
+  };
+
+  page.on('framenavigated', navigationHandler);
+  page.once('close', () => {
+    page.off('framenavigated', navigationHandler);
   });
 
   // Capture Bearer token and contactId from network traffic — the portal makes
@@ -422,16 +443,24 @@ export async function authenticate(username: string, password: string): Promise<
   });
 
   page.on('response', async (response) => {
-    if (capturedContactId === null && response.url().includes('tsa-memportal-prod-fun01') && response.url().includes('GetContactDetailAsync')) {
-      try {
-        const data = await response.json();
-        if (data?.id) {
-          capturedContactId = data.id;
-          log('[Auth] Captured contactId from response:', capturedContactId);
-        }
-      } catch {
-        // Non-JSON or unexpected shape — ignore
+    const url = response.url();
+    if (!url.includes('tsa-memportal-prod-fun01') || !url.includes('GetContactDetailAsync')) {
+      return;
+    }
+
+    if (capturedContactId !== null) {
+      log('[Auth] Skipping GetContactDetailAsync response because contactId is already captured');
+      return;
+    }
+
+    try {
+      const data = await response.json();
+      if (data?.id) {
+        capturedContactId = data.id;
+        log('[Auth] Captured contactId from response:', capturedContactId);
       }
+    } catch {
+      // Non-JSON or unexpected shape — ignore
     }
   });
 
@@ -451,19 +480,19 @@ export async function authenticate(username: string, password: string): Promise<
       loginSpan.end();
     });
 
-    // Wait for both token and contactId — the portal fires GetContactDetailAsync
-    // immediately after login so both arrive within the same burst of requests.
+    // Wait for token — the portal fires GetContactDetailAsync immediately after
+    // login so contactId typically arrives in the same burst, but it is optional.
     await tracer.startActiveSpan('playwright.wait-for-token', async (tokenSpan) => {
       const startTime = Date.now();
       const captured = await waitForCondition(
-        () => capturedToken !== null && capturedContactId !== null,
+        () => capturedToken !== null,
         15000, // max 15s timeout
         200    // check every 200ms
       );
       const waitDuration = Date.now() - startTime;
       tokenSpan.setAttribute('auth.token_captured', captured);
       tokenSpan.setAttribute('auth.wait_duration_ms', waitDuration);
-      log(`[Auth] Token+contactId wait completed in ${waitDuration}ms, captured: ${captured}`);
+      log(`[Auth] Token wait completed in ${waitDuration}ms, captured: ${captured}`);
       tokenSpan.end();
     });
 
