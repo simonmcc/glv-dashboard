@@ -110,4 +110,24 @@ Tracing is opt-in and has zero overhead when disabled. Manual spans instrument t
 
 1. **NEVER commit or push directly to main** - ALL changes go through a PR, no exceptions. This includes code, documentation, config files, and any other modifications. Always create a feature branch first, commit there, and open a PR.
 
-2. **Always use worktrees** - Never work directly in the main repo directory. Each ticket gets its own worktree.
+2. **Always use Git worktrees for development** - The original clone directory (the **default worktree**, e.g. `glv-dashboard/`) is for Git coordination only (`git fetch`, `git worktree list`, etc.). **Do not edit files, run builds, or commit from the default worktree.** Each ticket gets its own separate worktree directory based on a feature branch.
+
+   **Terminology clarification**
+   - **main branch** — the `main` Git branch (covered by Rule #1: never commit or push directly to it).
+   - **default worktree** — the directory you initially cloned into (holds the `.git` directory). This must remain clean and unused for day-to-day coding.
+
+   **Recommended worktree workflow**
+   ```bash
+   # 1. Clone the repo (default worktree, coordination only)
+   git clone git@github.com:YOUR-ORG/glv-dashboard.git
+   cd glv-dashboard
+
+   # 2. Create a feature branch for your ticket
+   git switch -c feature/TICKET-123
+
+   # 3. Create a dedicated worktree directory for that branch
+   git worktree add ../glv-TICKET-123 feature/TICKET-123
+
+   # 4. Do all coding, npm installs, and dev server runs from the worktree
+   cd ../glv-TICKET-123
+   # edit files, run: cd backend && npm run dev, etc.
