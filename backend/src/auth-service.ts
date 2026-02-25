@@ -317,19 +317,19 @@ const LEARNING_CONCURRENCY = parseInt(process.env.LEARNING_CONCURRENCY ?? '10', 
 
 /**
  * Fetch search + learning for a single membership number.
- * Returns a MemberLearning entry (with empty modules if the member is not found).
+ * Returns null if the member cannot be found in the portal (invalid/stale membership number).
  */
-async function fetchMemberLearning(token: string, membershipNumber: string): Promise<MemberLearning> {
+async function fetchMemberLearning(token: string, membershipNumber: string): Promise<MemberLearning | null> {
   return tracer.startActiveSpan('checkLearning.member', async (memberSpan) => {
     memberSpan.setAttribute('member.membership_number', membershipNumber);
     log(`[Learning] Looking up ${membershipNumber}...`);
 
     const member = await searchMemberByNumber(token, membershipNumber);
     if (!member) {
-      log(`[Learning] Member not found: ${membershipNumber}`);
+      log(`[Learning] Member not found: ${membershipNumber} — skipping`);
       memberSpan.setAttribute('member.found', false);
       memberSpan.end();
-      return { membershipNumber, contactId: '', firstName: '', lastName: '', modules: [] };
+      return null;
     }
 
     log(`[Learning] Found ${member.preferredName} ${member.lastname} (${member.id})`);
@@ -367,7 +367,7 @@ export async function checkLearningByMembershipNumbers(
 
     // Process members concurrently using a worker-pool pattern that preserves
     // insertion order while keeping at most LEARNING_CONCURRENCY requests in flight.
-    const results: MemberLearning[] = new Array(membershipNumbers.length);
+    const results: Array<MemberLearning | null> = new Array(membershipNumbers.length);
     let next = 0;
 
     async function worker() {
@@ -383,9 +383,14 @@ export async function checkLearningByMembershipNumbers(
     );
     await Promise.all(workers);
 
+    // Drop members that couldn't be resolved — they have no usable data
+    const members = results.filter((m): m is MemberLearning => m !== null);
+    log(`[Learning] Resolved ${members.length}/${membershipNumbers.length} members`);
+
+    span.setAttribute('members.resolved', members.length);
     span.setStatus({ code: SpanStatusCode.OK });
     span.end();
-    return { success: true, members: results };
+    return { success: true, members };
   });
 }
 
