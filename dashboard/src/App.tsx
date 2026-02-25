@@ -13,7 +13,11 @@ import { Dashboard } from './components/Dashboard';
 const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
 
 function App() {
-  const [authState, setAuthState] = useState<AuthState>({ status: 'unauthenticated' });
+  const [authState, setAuthState] = useState<AuthState>(() =>
+    MOCK_MODE
+      ? { status: 'authenticated', token: 'mock-token', contactId: 'mock-contact' }
+      : { status: 'unauthenticated' }
+  );
 
   const handleAuthStart = useCallback(() => {
     setAuthState({ status: 'authenticating' });
