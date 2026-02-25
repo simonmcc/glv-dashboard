@@ -405,10 +405,15 @@ export async function authenticate(username: string, password: string): Promise<
   });
 
   // Log every top-level navigation so we can trace the auth redirect chain
-  page.on('framenavigated', (frame) => {
+  const navigationHandler = (frame: Page['mainFrame']) => {
     if (frame === page.mainFrame()) {
       log(`[Auth] Navigation -> ${frame.url()}`);
     }
+  };
+
+  page.on('framenavigated', navigationHandler);
+  page.once('close', () => {
+    page.off('framenavigated', navigationHandler);
   });
 
   // Capture Bearer token and contactId from network traffic — the portal makes
