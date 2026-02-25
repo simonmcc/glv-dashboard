@@ -5,7 +5,7 @@
  * and capture the Bearer token.
  */
 
-import { chromium, Page } from 'playwright';
+import { chromium, Frame, Page } from 'playwright';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { log, logError } from './logger.js';
 import { createHash } from 'node:crypto';
@@ -168,19 +168,16 @@ async function performLogin(page: Page, username: string, password: string): Pro
   // while the page still shows "Loading...". Wait for the actual email input instead.
   const emailInputSelector = 'input[type="email"], input[name="logonIdentifier"], input[id="signInName"]';
   log('[Auth] Waiting for email input to appear in login form...');
+  let emailInput;
   try {
-    await page.waitForSelector(emailInputSelector, { timeout: 15000 });
+    emailInput = await page.waitForSelector(emailInputSelector, { timeout: 15000 });
   } catch {
     log(`[Auth] Email input did not appear within 15s, page title="${await page.title()}", url=${page.url()}`);
     throw new Error('Could not find email input field');
   }
   log(`[Auth] Login form ready, url=${page.url()}`);
 
-  // Fill in email — use the first visible match
-  const emailInput = await page.$(emailInputSelector);
-  if (!emailInput) {
-    throw new Error('Could not find email input field');
-  }
+  // Fill in email — use the handle returned by waitForSelector
   log(`[Auth] Filling email`);
   await emailInput.fill(username);
 
@@ -405,7 +402,7 @@ export async function authenticate(username: string, password: string): Promise<
   });
 
   // Log every top-level navigation so we can trace the auth redirect chain
-  const navigationHandler = (frame: Page['mainFrame']) => {
+  const navigationHandler = (frame: Frame) => {
     if (frame === page.mainFrame()) {
       log(`[Auth] Navigation -> ${frame.url()}`);
     }
@@ -463,19 +460,19 @@ export async function authenticate(username: string, password: string): Promise<
       loginSpan.end();
     });
 
-    // Wait for both token and contactId — the portal fires GetContactDetailAsync
-    // immediately after login so both arrive within the same burst of requests.
+    // Wait for token — the portal fires GetContactDetailAsync immediately after
+    // login so contactId typically arrives in the same burst, but it is optional.
     await tracer.startActiveSpan('playwright.wait-for-token', async (tokenSpan) => {
       const startTime = Date.now();
       const captured = await waitForCondition(
-        () => capturedToken !== null && capturedContactId !== null,
+        () => capturedToken !== null,
         15000, // max 15s timeout
         200    // check every 200ms
       );
       const waitDuration = Date.now() - startTime;
       tokenSpan.setAttribute('auth.token_captured', captured);
       tokenSpan.setAttribute('auth.wait_duration_ms', waitDuration);
-      log(`[Auth] Token+contactId wait completed in ${waitDuration}ms, captured: ${captured}`);
+      log(`[Auth] Token wait completed in ${waitDuration}ms, captured: ${captured}`);
       tokenSpan.end();
     });
 
