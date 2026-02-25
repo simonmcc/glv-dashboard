@@ -86,7 +86,9 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
   }, [token, contactId]);
 
   // Primary data fetch (learning records + summary)
-  const fetchPrimaryData = useCallback(async () => {
+  // Accepts an AbortSignal so the useEffect cleanup can cancel the in-flight request
+  // when React StrictMode double-mounts the component in development.
+  const fetchPrimaryData = useCallback(async (signal?: AbortSignal) => {
     return tracer.startActiveSpan('dashboard.fetchPrimaryData', async (span) => {
       setPrimaryLoading(true);
       setPrimaryError(null);
@@ -109,7 +111,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
         (window as any).testJoiningJourney = () => client.getJoiningJourney(50);
 
         // Get member list
-        const memberListResponse = await client.getAllLearningCompliance(1000);
+        const memberListResponse = await client.getAllLearningCompliance(1000, signal);
         if (memberListResponse.error) {
           throw new Error(memberListResponse.error);
         }
@@ -120,7 +122,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
         )];
 
         // Fetch learning details
-        const learningResult = await client.checkLearningByMembershipNumbers(uniqueMembershipNumbers);
+        const learningResult = await client.checkLearningByMembershipNumbers(uniqueMembershipNumbers, signal);
         if (!learningResult.success || !learningResult.members) {
           throw new Error(learningResult.error || 'Failed to fetch learning details');
         }
@@ -145,6 +147,9 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
         setLastUpdated(new Date());
         span.setStatus({ code: SpanStatusCode.OK });
       } catch (err) {
+        // Ignore aborted fetches — a new fetch will have already been started.
+        // Don't call span.end() here; finally handles it.
+        if ((err as Error).name === 'AbortError') return;
         const message = (err as Error).message;
         span.setStatus({ code: SpanStatusCode.ERROR, message });
         span.recordException(err as Error);
@@ -256,9 +261,13 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
     await fetchPrimaryData();
   }, [fetchPrimaryData]);
 
-  // Load primary data on mount
+  // Load primary data on mount.
+  // Return an AbortController cleanup so React StrictMode's synthetic
+  // unmount/remount in development cancels the first in-flight fetch.
   useEffect(() => {
-    fetchPrimaryData();
+    const controller = new AbortController();
+    fetchPrimaryData(controller.signal);
+    return () => controller.abort();
   }, [fetchPrimaryData]);
 
   // Set up intersection observers for lazy sections
@@ -343,7 +352,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
             <div className="font-medium">Error loading data</div>
             <div className="text-sm mt-1">{primaryError}</div>
             <button
-              onClick={fetchPrimaryData}
+              onClick={() => fetchPrimaryData()}
               className="mt-2 text-sm text-red-800 underline hover:no-underline"
             >
               Try again
