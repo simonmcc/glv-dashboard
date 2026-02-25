@@ -311,64 +311,81 @@ async function getLearningForContact(
   }
 }
 
+// Maximum number of member lookups to run in parallel.
+// Configurable via LEARNING_CONCURRENCY env var; defaults to 10.
+const LEARNING_CONCURRENCY = parseInt(process.env.LEARNING_CONCURRENCY ?? '10', 10);
+
 /**
- * Check learning for a list of membership numbers
- * Uses MemberListingAsync to find contact IDs, then fetches learning via GetLmsDetailsAsync
+ * Fetch search + learning for a single membership number.
+ * Returns a MemberLearning entry (with empty modules if the member is not found).
  */
-export async function checkLearningByMembershipNumbers(
-  token: string,
-  membershipNumbers: string[]
-): Promise<LearningResult> {
-  return tracer.startActiveSpan('checkLearningByMembershipNumbers', async (span) => {
-  span.setAttribute('members.count', membershipNumbers.length);
-  log(`[Learning] Checking ${membershipNumbers.length} membership numbers`);
-
-  const members: MemberLearning[] = [];
-
-  for (const membershipNumber of membershipNumbers) {
-    await tracer.startActiveSpan('checkLearning.member', async (memberSpan) => {
+async function fetchMemberLearning(token: string, membershipNumber: string): Promise<MemberLearning> {
+  return tracer.startActiveSpan('checkLearning.member', async (memberSpan) => {
     memberSpan.setAttribute('member.membership_number', membershipNumber);
     log(`[Learning] Looking up ${membershipNumber}...`);
 
-    // Search for member
     const member = await searchMemberByNumber(token, membershipNumber);
     if (!member) {
       log(`[Learning] Member not found: ${membershipNumber}`);
       memberSpan.setAttribute('member.found', false);
-      members.push({
-        membershipNumber,
-        contactId: '',
-        firstName: '',
-        lastName: '',
-        modules: [],
-      });
       memberSpan.end();
-      return;
+      return { membershipNumber, contactId: '', firstName: '', lastName: '', modules: [] };
     }
 
     log(`[Learning] Found ${member.preferredName} ${member.lastname} (${member.id})`);
     memberSpan.setAttribute('member.found', true);
     memberSpan.setAttribute('member.contact_id', member.id);
 
-    // Get learning details
     const modules = await getLearningForContact(token, member.id);
-    log(`[Learning] Got ${modules.length} learning modules`);
+    log(`[Learning] Got ${modules.length} learning modules for ${membershipNumber}`);
     memberSpan.setAttribute('member.module_count', modules.length);
+    memberSpan.end();
 
-    members.push({
+    return {
       membershipNumber,
       contactId: member.id,
       firstName: member.preferredName,
       lastName: member.lastname,
       modules,
-    });
-    memberSpan.end();
-    });
-  }
+    };
+  });
+}
 
-  span.setStatus({ code: SpanStatusCode.OK });
-  span.end();
-  return { success: true, members };
+/**
+ * Check learning for a list of membership numbers.
+ * Uses MemberListingAsync to find contact IDs, then fetches learning via GetLmsDetailsAsync.
+ * Members are processed with up to LEARNING_CONCURRENCY parallel requests to reduce wall-clock time.
+ */
+export async function checkLearningByMembershipNumbers(
+  token: string,
+  membershipNumbers: string[]
+): Promise<LearningResult> {
+  return tracer.startActiveSpan('checkLearningByMembershipNumbers', async (span) => {
+    span.setAttribute('members.count', membershipNumbers.length);
+    span.setAttribute('members.concurrency', LEARNING_CONCURRENCY);
+    log(`[Learning] Checking ${membershipNumbers.length} membership numbers (concurrency: ${LEARNING_CONCURRENCY})`);
+
+    // Process members concurrently using a worker-pool pattern that preserves
+    // insertion order while keeping at most LEARNING_CONCURRENCY requests in flight.
+    const results: MemberLearning[] = new Array(membershipNumbers.length);
+    let next = 0;
+
+    async function worker() {
+      while (next < membershipNumbers.length) {
+        const i = next++;
+        results[i] = await fetchMemberLearning(token, membershipNumbers[i]);
+      }
+    }
+
+    const workers = Array.from(
+      { length: Math.min(LEARNING_CONCURRENCY, membershipNumbers.length) },
+      worker
+    );
+    await Promise.all(workers);
+
+    span.setStatus({ code: SpanStatusCode.OK });
+    span.end();
+    return { success: true, members: results };
   });
 }
 
