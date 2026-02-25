@@ -29,6 +29,7 @@ import {
   mockTeamReviewRecords,
   mockPermitRecords,
   mockAwardRecords,
+  mockMemberLearningResults,
 } from './mock-data';
 
 // Simulate network delay for realistic feel
@@ -145,7 +146,10 @@ export class MockScoutsApiClient {
   ): Promise<{ success: boolean; members?: MemberLearningResult[]; error?: string }> {
     console.log(`[MockAPI] checkLearningByMembershipNumbers called for ${membershipNumbers.length} members`);
     await delay(200);
-    return { success: true, members: [] };
+    const members = mockMemberLearningResults.filter(m =>
+      membershipNumbers.includes(m.membershipNumber)
+    );
+    return { success: true, members };
   }
 
   computeComplianceSummary(records: LearningRecord[]): ComplianceSummary {

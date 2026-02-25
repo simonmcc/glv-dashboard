@@ -125,8 +125,21 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
           throw new Error(learningResult.error || 'Failed to fetch learning details');
         }
 
+        // Build map of membership number → earliest start date (for First Response deadline)
+        const memberStartDates = new Map<string, string>();
+        for (const r of memberListResponse.data || []) {
+          const num = r['Membership number'];
+          const start = r['Start date'];
+          if (start) {
+            const existing = memberStartDates.get(num);
+            if (!existing || new Date(start) < new Date(existing)) {
+              memberStartDates.set(num, start);
+            }
+          }
+        }
+
         // Transform and set data
-        const data = transformLearningResults(learningResult.members);
+        const data = transformLearningResults(learningResult.members, undefined, memberStartDates);
         setRecords(data);
         setSummary(client.computeComplianceSummary(data));
         setLastUpdated(new Date());

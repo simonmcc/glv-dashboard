@@ -51,8 +51,8 @@ export function ComplianceTable({ records, isLoading }: ComplianceTableProps) {
       if (r.Status === 'Expired') return true;
       // Days since expiry > 0
       if (r['Days since expiry'] && r['Days since expiry'] > 0) return true;
-      // New member past 12-month deadline
-      if (r.Status === 'In-Progress' && !r['Expiry date']) {
+      // New member past 12-month deadline (In-Progress or Not Started with no expiry)
+      if ((r.Status === 'In-Progress' || r.Status === 'Not Started') && !r['Expiry date'] && r['Start date']) {
         const { isOverdue } = getNewMemberDeadline(r['Start date']);
         return isOverdue;
       }
@@ -74,7 +74,7 @@ export function ComplianceTable({ records, isLoading }: ComplianceTableProps) {
       result = result.filter(r => {
         if (r.Status === 'Expired') return true;
         if (r['Days since expiry'] && r['Days since expiry'] > 0) return true;
-        if (r.Status === 'In-Progress' && !r['Expiry date']) {
+        if ((r.Status === 'In-Progress' || r.Status === 'Not Started') && !r['Expiry date'] && r['Start date']) {
           const { isOverdue } = getNewMemberDeadline(r['Start date']);
           return isOverdue;
         }
@@ -372,8 +372,8 @@ function getNewMemberDeadline(startDateStr: string | null | undefined): {
  * Format deadline info for display
  */
 function formatDeadlineInfo(record: LearningRecord): { text: string; colorClass: string } | null {
-  // Only show for In-Progress with no expiry date (new members)
-  if (record.Status !== 'In-Progress' || record['Expiry date']) {
+  // Show for In-Progress or Not Started records with a start date but no expiry date
+  if ((record.Status !== 'In-Progress' && record.Status !== 'Not Started') || record['Expiry date'] || !record['Start date']) {
     return null;
   }
 

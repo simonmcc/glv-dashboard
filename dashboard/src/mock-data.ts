@@ -14,6 +14,7 @@ import type {
   TeamReviewRecord,
   PermitRecord,
   AwardRecord,
+  MemberLearningResult,
 } from './types';
 
 // Helper to generate dates relative to today
@@ -24,6 +25,16 @@ const daysFromNow = (days: number) => {
   return date.toISOString().split('T')[0];
 };
 const daysAgo = (days: number) => daysFromNow(-days);
+
+// Format a date as the Scouts API expiry date string "MM/DD/YYYY 00:00:00"
+const apiDate = (date: Date): string => {
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const y = date.getFullYear();
+  return `${m}/${d}/${y} 00:00:00`;
+};
+const apiDaysFromNow = (days: number) => apiDate(new Date(today.getTime() + days * 24 * 60 * 60 * 1000));
+const apiDaysAgo = (days: number) => apiDaysFromNow(-days);
 
 export const mockLearningRecords: LearningRecord[] = [
   // Safety training - various statuses
@@ -342,5 +353,95 @@ export const mockAwardRecords: AwardRecord[] = [
     'Membership number': '23456789',
     'Accreditation': 'Award for Merit',
     'Role': 'Section Leader',
+  },
+];
+
+/**
+ * Mock MemberLearningResult data for checkLearningByMembershipNumbers.
+ * Covers the main First Response scenarios:
+ *   Alice   – First Response valid (with expiry)
+ *   Bob     – First Response expiring soon
+ *   Carol   – First Response MISSING (joined 400 days ago → overdue)
+ *   David   – First Response MISSING (joined 30 days ago → within 1 year)
+ *   Emma    – First Response achieved with no expiry (permanent one-time module)
+ *   Frank   – First Response MISSING (joined 500 days ago → overdue)
+ *   Grace   – First Response MISSING (joined 14 days ago → within 1 year)
+ */
+export const mockMemberLearningResults: MemberLearningResult[] = [
+  {
+    membershipNumber: '12345678',
+    contactId: 'contact-alice',
+    firstName: 'Alice',
+    lastName: 'Johnson',
+    modules: [
+      { title: 'First Response', expiryDate: apiDaysFromNow(365), currentLevel: 'Achieved skill' },
+      { title: 'Safety', expiryDate: apiDaysFromNow(180), currentLevel: 'Achieved skill' },
+      { title: 'Safeguarding', expiryDate: apiDaysFromNow(200), currentLevel: 'Achieved skill' },
+      { title: 'GDPR', expiryDate: apiDaysFromNow(300), currentLevel: 'Achieved skill' },
+    ],
+  },
+  {
+    membershipNumber: '23456789',
+    contactId: 'contact-bob',
+    firstName: 'Bob',
+    lastName: 'Smith',
+    modules: [
+      { title: 'First Response', expiryDate: apiDaysFromNow(25), currentLevel: 'Achieved skill' }, // Expiring
+      { title: 'Safety', expiryDate: apiDaysFromNow(30), currentLevel: 'Achieved skill' },
+      { title: 'Safeguarding', expiryDate: apiDaysFromNow(150), currentLevel: 'Achieved skill' },
+    ],
+  },
+  {
+    membershipNumber: '34567890',
+    contactId: 'contact-carol',
+    firstName: 'Carol',
+    lastName: 'Williams',
+    modules: [
+      // No First Response – joined 400 days ago, overdue!
+      { title: 'Safety', expiryDate: apiDaysAgo(15), currentLevel: 'Achieved skill' }, // Expired
+      { title: 'Safeguarding', expiryDate: apiDaysFromNow(45), currentLevel: 'Achieved skill' },
+    ],
+  },
+  {
+    membershipNumber: '45678901',
+    contactId: 'contact-david',
+    firstName: 'David',
+    lastName: 'Brown',
+    modules: [
+      // No First Response – joined 30 days ago, within 1 year
+      { title: 'Safety', expiryDate: null, currentLevel: 'Not started' },
+      { title: 'Safeguarding', expiryDate: null, currentLevel: 'Not started' },
+    ],
+  },
+  {
+    membershipNumber: '56789012',
+    contactId: 'contact-emma',
+    firstName: 'Emma',
+    lastName: 'Davis',
+    modules: [
+      // First Response achieved as a permanent (no-expiry) module
+      { title: 'First Response', expiryDate: null, currentLevel: 'Achieved skill' },
+      { title: 'First Aid', expiryDate: apiDaysFromNow(365), currentLevel: 'Achieved skill' },
+    ],
+  },
+  {
+    membershipNumber: '67890123',
+    contactId: 'contact-frank',
+    firstName: 'Frank',
+    lastName: 'Miller',
+    modules: [
+      // No First Response – joined 500 days ago, overdue!
+      { title: 'First Aid', expiryDate: apiDaysAgo(60), currentLevel: 'Achieved skill' }, // Expired
+    ],
+  },
+  {
+    membershipNumber: '78901234',
+    contactId: 'contact-grace',
+    firstName: 'Grace',
+    lastName: 'Wilson',
+    modules: [
+      // No First Response – joined 14 days ago, within 1 year
+      { title: 'GDPR', expiryDate: null, currentLevel: 'Not started' },
+    ],
   },
 ];
