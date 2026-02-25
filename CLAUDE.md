@@ -81,12 +81,6 @@ cd dashboard && npx vitest run src/utils.test.ts
 - `OTEL_ENABLED` — Set to `true` to enable backend OpenTelemetry tracing (or use `npm run dev:traced`)
 - `VITE_OTEL_ENABLED` — Set to `true` to enable frontend browser tracing
 
-## Git Workflow
-
-- Never commit or push directly to main
-- Create a feature branch for all changes
-- Use `gh pr create` to open a pull request
-- All changes must be reviewed and merged via GitHub PR
 
 ## Tracing
 
@@ -105,3 +99,35 @@ Tracing is opt-in and has zero overhead when disabled. Manual spans instrument t
 - `POST /auth/login` — Authenticate via Playwright, returns Bearer token + contactId
 - `POST /api/proxy` — Forward requests to Scouts API with token
 - `POST /api/check-learning` — Check learning records by membership numbers
+
+## Project Rules
+
+- Create a feature branch for all changes
+- Use `gh pr create` to open a pull request
+- All changes must be reviewed and merged via GitHub PR
+
+### Critical Rules
+
+1. **NEVER commit or push directly to main** - ALL changes go through a PR, no exceptions. This includes code, documentation, config files, and any other modifications. Always create a feature branch first, commit there, and open a PR.
+
+2. **Always use Git worktrees for development** - The original clone directory (the **default worktree**, e.g. `glv-dashboard/`) is for Git coordination only (`git fetch`, `git worktree list`, etc.). **Do not edit files, run builds, or commit from the default worktree.** Each ticket gets its own separate worktree directory based on a feature branch.
+
+   **Terminology clarification**
+   - **main branch** — the `main` Git branch (covered by Rule #1: never commit or push directly to it).
+   - **default worktree** — the directory you initially cloned into (holds the `.git` directory). This must remain clean and unused for day-to-day coding.
+
+   **Recommended worktree workflow**
+   ```bash
+   # 1. Clone the repo (default worktree, coordination only)
+   git clone git@github.com:YOUR-ORG/glv-dashboard.git
+   cd glv-dashboard
+
+   # 2. Create a feature branch for your ticket
+   git switch -c feature/TICKET-123
+
+   # 3. Create a dedicated worktree directory for that branch
+   git worktree add ../glv-TICKET-123 feature/TICKET-123
+
+   # 4. Do all coding, npm installs, and dev server runs from the worktree
+   cd ../glv-TICKET-123
+   # edit files, run: cd backend && npm run dev, etc.
