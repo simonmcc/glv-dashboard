@@ -60,7 +60,7 @@ steps:
       - '--max-instances'
       - '3'
       - '--set-env-vars'
-      - 'CORS_ORIGIN=${_DASHBOARD_URL}'
+      - 'CORS_ORIGIN=${_DASHBOARD_URL},OTEL_ENABLED=true,GOOGLE_CLOUD_PROJECT=$PROJECT_ID'
 
 substitutions:
   _REGION: europe-west1
