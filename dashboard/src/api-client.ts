@@ -4,7 +4,7 @@
  * Routes all API calls through the backend proxy to avoid CORS issues.
  */
 
-import type { LearningRecord, ApiResponse, ComplianceSummary, DisclosureRecord, DisclosureSummary, MemberLearningResult, JoiningJourneyRecord, AppointmentRecord, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from './types';
+import type { LearningRecord, ApiResponse, ComplianceSummary, DisclosureRecord, DisclosureSummary, MemberLearningResult, JoiningJourneyRecord, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from './types';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
@@ -467,50 +467,6 @@ export class ScoutsApiClient {
     }));
 
     console.log(`[API] Transformed ${data.length} disclosure compliance records`);
-
-    return {
-      data,
-      nextPage: result.nextPage,
-      count: result.count,
-      error: result.error,
-    };
-  }
-
-  /**
-   * Fetch appointments data from AppointmentsDashboardView
-   */
-  async getAppointments(pageSize: number = 500): Promise<ApiResponse<AppointmentRecord>> {
-    console.log('[API] Fetching appointments data');
-
-    const result = await this.query<Record<string, unknown>>({
-      table: 'AppointmentsDashboardView',
-      selectFields: [],
-      query: '',
-      pageNo: 1,
-      pageSize,
-      distinct: true,
-    });
-
-    if (result.error) {
-      console.error('[API] Appointments query error:', result.error);
-      return { data: [], nextPage: null, count: 0, error: result.error };
-    }
-
-    const data = (result.data || []).map((record): AppointmentRecord => ({
-      'First name': String(record['First name'] || ''),
-      'Last name': String(record['Last name'] || ''),
-      'Membership number': String(record['Membership number'] || ''),
-      'Role/Accreditation': String(record['Role/Accreditation'] || ''),
-      'Start date': record['Start date'] as string | null,
-      'End date': record['End date'] as string | null,
-      'Days since role Started': record['Days since role Started'] as number | null,
-      'Communication email': record['Communication email'] as string,
-      'Group': record['Group'] as string,
-      'District': record['District'] as string,
-      'EDI': record['EDI'] as string,
-    }));
-
-    console.log(`[API] Transformed ${data.length} appointment records`);
 
     return {
       data,

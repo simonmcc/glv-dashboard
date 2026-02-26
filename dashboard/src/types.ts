@@ -109,23 +109,6 @@ export interface MemberLearningResult {
 }
 
 /**
- * Appointment record from AppointmentsDashboardView
- */
-export interface AppointmentRecord {
-  'First name': string;
-  'Last name': string;
-  'Membership number': string;
-  'Role/Accreditation': string;
-  'Start date': string | null;
-  'End date': string | null;
-  'Days since role Started': number | null;
-  'Communication email'?: string;
-  'Group'?: string;
-  'District'?: string;
-  'EDI'?: string;
-}
-
-/**
  * Suspension record from SuspensionDashboardView
  */
 export interface SuspensionRecord {
