@@ -9,7 +9,6 @@ import type {
   LearningRecord,
   DisclosureRecord,
   JoiningJourneyRecord,
-  AppointmentRecord,
   SuspensionRecord,
   TeamReviewRecord,
   PermitRecord,
@@ -239,39 +238,6 @@ export const mockJoiningJourneyRecords: JoiningJourneyRecord[] = [
     'Item': 'Criminal Record Check',
     'Status': 'Incomplete',
     'Due date': daysAgo(5),
-  },
-];
-
-export const mockAppointmentRecords: AppointmentRecord[] = [
-  {
-    'First name': 'Alice',
-    'Last name': 'Johnson',
-    'Membership number': '12345678',
-    'Role/Accreditation': 'Assistant Section Leader',
-    'Start date': daysAgo(365),
-    'End date': null,
-    'Days since role Started': 365,
-    'Group': '1st Demo Group',
-  },
-  {
-    'First name': 'Bob',
-    'Last name': 'Smith',
-    'Membership number': '23456789',
-    'Role/Accreditation': 'Section Leader',
-    'Start date': daysAgo(730),
-    'End date': null,
-    'Days since role Started': 730,
-    'Group': '1st Demo Group',
-  },
-  {
-    'First name': 'Emma',
-    'Last name': 'Davis',
-    'Membership number': '56789012',
-    'Role/Accreditation': 'Group Scout Leader',
-    'Start date': daysAgo(1095),
-    'End date': null,
-    'Days since role Started': 1095,
-    'Group': '1st Demo Group',
   },
 ];
 

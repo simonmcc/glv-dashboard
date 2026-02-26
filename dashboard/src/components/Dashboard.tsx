@@ -14,12 +14,11 @@ const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
 
 const tracer = trace.getTracer('glv-dashboard', '1.0.0');
 import { transformLearningResults } from '../utils';
-import type { LearningRecord, ComplianceSummary, JoiningJourneyRecord, DisclosureRecord, DisclosureSummary, AppointmentRecord, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from '../types';
+import type { LearningRecord, ComplianceSummary, JoiningJourneyRecord, DisclosureRecord, DisclosureSummary, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from '../types';
 import { SummaryTiles } from './SummaryTiles';
 import { ComplianceTable } from './ComplianceTable';
 import { JoiningJourneyTable } from './JoiningJourneyTable';
 import { DisclosureTable } from './DisclosureTable';
-import { AppointmentsTable } from './AppointmentsTable';
 import { SuspensionsTable } from './SuspensionsTable';
 import { TeamReviewsTable } from './TeamReviewsTable';
 import { PermitsTable } from './PermitsTable';
@@ -51,7 +50,6 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
   // Lazy-loaded sections
   const [joiningJourney, setJoiningJourney] = useState<SectionState<JoiningJourneyRecord[]>>({ state: 'idle', data: [], error: null });
   const [disclosures, setDisclosures] = useState<SectionState<{ records: DisclosureRecord[]; summary: DisclosureSummary | null }>>({ state: 'idle', data: { records: [], summary: null }, error: null });
-  const [appointments, setAppointments] = useState<SectionState<AppointmentRecord[]>>({ state: 'idle', data: [], error: null });
   const [suspensions, setSuspensions] = useState<SectionState<SuspensionRecord[]>>({ state: 'idle', data: [], error: null });
   const [teamReviews, setTeamReviews] = useState<SectionState<TeamReviewRecord[]>>({ state: 'idle', data: [], error: null });
   const [permits, setPermits] = useState<SectionState<PermitRecord[]>>({ state: 'idle', data: [], error: null });
@@ -62,7 +60,6 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
   // Section refs for intersection observer
   const joiningJourneyRef = useRef<HTMLElement>(null);
   const disclosuresRef = useRef<HTMLElement>(null);
-  const appointmentsRef = useRef<HTMLElement>(null);
   const suspensionsRef = useRef<HTMLElement>(null);
   const teamReviewsRef = useRef<HTMLElement>(null);
   const permitsRef = useRef<HTMLElement>(null);
@@ -193,17 +190,6 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
     }
   }, [client]);
 
-  const loadAppointments = useCallback(async () => {
-    setAppointments(s => ({ ...s, state: 'loading', error: null }));
-    try {
-      const response = await client.getAppointments(500);
-      if (response.error) throw new Error(response.error);
-      setAppointments({ state: 'loaded', data: response.data || [], error: null });
-    } catch (err) {
-      setAppointments(s => ({ ...s, state: 'error', error: (err as Error).message }));
-    }
-  }, [client]);
-
   const loadSuspensions = useCallback(async () => {
     setSuspensions(s => ({ ...s, state: 'loading', error: null }));
     try {
@@ -253,7 +239,6 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
     triggeredSections.current.clear();
     setJoiningJourney({ state: 'idle', data: [], error: null });
     setDisclosures({ state: 'idle', data: { records: [], summary: null }, error: null });
-    setAppointments({ state: 'idle', data: [], error: null });
     setSuspensions({ state: 'idle', data: [], error: null });
     setTeamReviews({ state: 'idle', data: [], error: null });
     setPermits({ state: 'idle', data: [], error: null });
@@ -275,7 +260,6 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
     const sections = [
       { ref: joiningJourneyRef, key: 'joiningJourney', load: loadJoiningJourney },
       { ref: disclosuresRef, key: 'disclosures', load: loadDisclosures },
-      { ref: appointmentsRef, key: 'appointments', load: loadAppointments },
       { ref: suspensionsRef, key: 'suspensions', load: loadSuspensions },
       { ref: teamReviewsRef, key: 'teamReviews', load: loadTeamReviews },
       { ref: permitsRef, key: 'permits', load: loadPermits },
@@ -302,12 +286,11 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
     });
 
     return () => observer.disconnect();
-  }, [loadJoiningJourney, loadDisclosures, loadAppointments, loadSuspensions, loadTeamReviews, loadPermits, loadAwards]);
+  }, [loadJoiningJourney, loadDisclosures, loadSuspensions, loadTeamReviews, loadPermits, loadAwards]);
 
   const isAnyLoading = primaryLoading ||
     joiningJourney.state === 'loading' ||
     disclosures.state === 'loading' ||
-    appointments.state === 'loading' ||
     suspensions.state === 'loading' ||
     teamReviews.state === 'loading' ||
     permits.state === 'loading' ||
@@ -429,17 +412,6 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
           onRetry={() => { triggeredSections.current.delete('suspensions'); loadSuspensions(); }}
         >
           <SuspensionsTable records={suspensions.data} isLoading={suspensions.state === 'loading'} />
-        </LazySection>
-
-        {/* Appointments - Lazy loaded */}
-        <LazySection
-          ref={appointmentsRef}
-          title="Appointments"
-          state={appointments.state}
-          error={appointments.error}
-          onRetry={() => { triggeredSections.current.delete('appointments'); loadAppointments(); }}
-        >
-          <AppointmentsTable records={appointments.data} isLoading={appointments.state === 'loading'} />
         </LazySection>
 
         {/* Team Reviews - Lazy loaded */}

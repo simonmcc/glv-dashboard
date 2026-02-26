@@ -9,7 +9,6 @@ import type {
   LearningRecord,
   DisclosureRecord,
   JoiningJourneyRecord,
-  AppointmentRecord,
   SuspensionRecord,
   TeamReviewRecord,
   PermitRecord,
@@ -24,7 +23,6 @@ import {
   mockLearningRecords,
   mockDisclosureRecords,
   mockJoiningJourneyRecords,
-  mockAppointmentRecords,
   mockSuspensionRecords,
   mockTeamReviewRecords,
   mockPermitRecords,
@@ -76,17 +74,6 @@ export class MockScoutsApiClient {
       data: mockJoiningJourneyRecords,
       nextPage: null,
       count: mockJoiningJourneyRecords.length,
-      error: null,
-    };
-  }
-
-  async getAppointments(): Promise<ApiResponse<AppointmentRecord>> {
-    console.log('[MockAPI] Returning mock appointments data');
-    await delay(200);
-    return {
-      data: mockAppointmentRecords,
-      nextPage: null,
-      count: mockAppointmentRecords.length,
       error: null,
     };
   }
