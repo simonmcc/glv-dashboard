@@ -250,13 +250,15 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
     await fetchPrimaryData();
   }, [fetchPrimaryData]);
 
-  // Handle member selection - load joining journey if not yet loaded
+  // Handle member selection - load all lazy sections that are still idle
   const handleMemberSelect = useCallback((membershipNumber: string, name: string) => {
     setSelectedMember({ membershipNumber, name });
-    if (joiningJourney.state === 'idle') {
-      loadJoiningJourney();
-    }
-  }, [joiningJourney.state, loadJoiningJourney]);
+    if (joiningJourney.state === 'idle') loadJoiningJourney();
+    if (disclosures.state === 'idle') loadDisclosures();
+    if (teamReviews.state === 'idle') loadTeamReviews();
+    if (permits.state === 'idle') loadPermits();
+    if (awards.state === 'idle') loadAwards();
+  }, [joiningJourney.state, loadJoiningJourney, disclosures.state, loadDisclosures, teamReviews.state, loadTeamReviews, permits.state, loadPermits, awards.state, loadAwards]);
 
   // Load primary data on mount.
   // Return an AbortController cleanup so React StrictMode's synthetic
@@ -316,6 +318,14 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
         learningRecords={records}
         joiningJourneyRecords={joiningJourney.data}
         joiningJourneyState={joiningJourney.state}
+        disclosureRecords={disclosures.data.records}
+        disclosuresState={disclosures.state}
+        teamReviewRecords={teamReviews.data}
+        teamReviewsState={teamReviews.state}
+        permitRecords={permits.data}
+        permitsState={permits.state}
+        awardRecords={awards.data}
+        awardsState={awards.state}
         onBack={() => setSelectedMember(null)}
       />
     );
