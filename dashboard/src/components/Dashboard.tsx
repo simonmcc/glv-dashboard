@@ -29,6 +29,7 @@ import type { LoadState } from './LazySection';
 interface DashboardProps {
   token: string;
   contactId: string;
+  username?: string;
   onLogout: () => void;
   onTokenExpired: () => void;
 }
@@ -40,7 +41,7 @@ interface SectionState<T> {
   error: string | null;
 }
 
-export function Dashboard({ token, contactId, onLogout, onTokenExpired }: DashboardProps) {
+export function Dashboard({ token, contactId, username, onLogout, onTokenExpired }: DashboardProps) {
   // Primary data (loaded immediately - always visible at top)
   const [records, setRecords] = useState<LearningRecord[]>([]);
   const [summary, setSummary] = useState<ComplianceSummary | null>(null);
@@ -309,6 +310,11 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
             {lastUpdated && (
               <span className="text-sm text-gray-500">
                 Updated: {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
+            {username && (
+              <span className="text-sm text-gray-600">
+                Signed in as <span className="font-medium">{username}</span>
               </span>
             )}
             <button

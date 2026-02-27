@@ -13,7 +13,7 @@ const tracer = trace.getTracer('glv-dashboard', '1.0.0');
 interface AuthFlowProps {
   authState: AuthState;
   onAuthStart: () => void;
-  onAuthComplete: (token: string, contactId: string) => void;
+  onAuthComplete: (token: string, contactId: string, username?: string) => void;
   onAuthError: (message: string) => void;
   mockMode?: boolean;
 }
@@ -40,7 +40,7 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
     if (mockMode) {
       setTimeout(() => {
         setIsLoading(false);
-        onAuthComplete('mock-token', 'mock-contact');
+        onAuthComplete('mock-token', 'mock-contact', username);
       }, 500);
       return;
     }
@@ -59,7 +59,7 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
 
         if (result.success && result.token) {
           span.setStatus({ code: SpanStatusCode.OK });
-          onAuthComplete(result.token, result.contactId || '');
+          onAuthComplete(result.token, result.contactId || '', username);
         } else {
           span.setStatus({ code: SpanStatusCode.ERROR, message: result.error || 'Authentication failed' });
           onAuthError(result.error || 'Authentication failed');

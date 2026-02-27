@@ -59,7 +59,7 @@ export interface DisclosureSummary {
 export type AuthState =
   | { status: 'unauthenticated' }
   | { status: 'authenticating' }
-  | { status: 'authenticated'; token: string; contactId: string }
+  | { status: 'authenticated'; token: string; contactId: string; username?: string }
   | { status: 'error'; message: string };
 
 /**
