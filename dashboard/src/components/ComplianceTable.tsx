@@ -10,6 +10,7 @@ import type { LearningRecord } from '../types';
 interface ComplianceTableProps {
   records: LearningRecord[];
   isLoading: boolean;
+  onMemberSelect?: (membershipNumber: string, name: string) => void;
 }
 
 type SortField = 'name' | 'learning' | 'status' | 'expiry';
@@ -24,7 +25,7 @@ const statusColors: Record<string, string> = {
   'Not Started': 'bg-gray-100 text-gray-800',
 };
 
-export function ComplianceTable({ records, isLoading }: ComplianceTableProps) {
+export function ComplianceTable({ records, isLoading, onMemberSelect }: ComplianceTableProps) {
   const [sortField, setSortField] = useState<SortField>('expiry');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -275,7 +276,16 @@ export function ComplianceTable({ records, isLoading }: ComplianceTableProps) {
                 <tr key={`${record['Membership number']}-${record.Learning}-${index}`} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
-                      {record['First name']} {record['Last name']}
+                      {onMemberSelect ? (
+                        <button
+                          onClick={() => onMemberSelect(record['Membership number'], `${record['First name']} ${record['Last name']}`)}
+                          className="text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
+                        >
+                          {record['First name']} {record['Last name']}
+                        </button>
+                      ) : (
+                        `${record['First name']} ${record['Last name']}`
+                      )}
                     </div>
                     {record['Email address'] && (
                       <div className="text-sm text-gray-500">{record['Email address']}</div>

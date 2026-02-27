@@ -10,12 +10,13 @@ import type { SuspensionRecord } from '../types';
 interface SuspensionsTableProps {
   records: SuspensionRecord[];
   isLoading: boolean;
+  onMemberSelect?: (membershipNumber: string, name: string) => void;
 }
 
 type SortField = 'name' | 'date' | 'role';
 type SortOrder = 'asc' | 'desc';
 
-export function SuspensionsTable({ records, isLoading }: SuspensionsTableProps) {
+export function SuspensionsTable({ records, isLoading, onMemberSelect }: SuspensionsTableProps) {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [searchTerm, setSearchTerm] = useState('');
@@ -161,7 +162,16 @@ export function SuspensionsTable({ records, isLoading }: SuspensionsTableProps) 
                 <tr key={`${record['Membership number']}-${index}`} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
-                      {record['First name']} {record['Last name']}
+                      {onMemberSelect ? (
+                        <button
+                          onClick={() => onMemberSelect(record['Membership number'], `${record['First name']} ${record['Last name']}`)}
+                          className="text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
+                        >
+                          {record['First name']} {record['Last name']}
+                        </button>
+                      ) : (
+                        `${record['First name']} ${record['Last name']}`
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600 font-mono">

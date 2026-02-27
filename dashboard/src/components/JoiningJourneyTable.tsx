@@ -10,6 +10,7 @@ import type { JoiningJourneyRecord } from '../types';
 interface JoiningJourneyTableProps {
   records: JoiningJourneyRecord[];
   isLoading: boolean;
+  onMemberSelect?: (membershipNumber: string, name: string) => void;
 }
 
 type SortField = 'name' | 'item' | 'status';
@@ -26,7 +27,7 @@ const statusColors: Record<string, string> = {
   'Overdue': 'bg-red-100 text-red-800',
 };
 
-export function JoiningJourneyTable({ records, isLoading }: JoiningJourneyTableProps) {
+export function JoiningJourneyTable({ records, isLoading, onMemberSelect }: JoiningJourneyTableProps) {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [filterItem, setFilterItem] = useState<string>('all');
@@ -236,7 +237,16 @@ export function JoiningJourneyTable({ records, isLoading }: JoiningJourneyTableP
                 <tr key={`${record['Membership number']}-${record.Item}-${index}`} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
-                      {record['First name']} {record['Last name']}
+                      {onMemberSelect ? (
+                        <button
+                          onClick={() => onMemberSelect(record['Membership number'], `${record['First name']} ${record['Last name']}`)}
+                          className="text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
+                        >
+                          {record['First name']} {record['Last name']}
+                        </button>
+                      ) : (
+                        `${record['First name']} ${record['Last name']}`
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600 font-mono">

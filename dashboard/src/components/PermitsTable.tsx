@@ -10,6 +10,7 @@ import type { PermitRecord } from '../types';
 interface PermitsTableProps {
   records: PermitRecord[];
   isLoading: boolean;
+  onMemberSelect?: (membershipNumber: string, name: string) => void;
 }
 
 type SortField = 'name' | 'category' | 'status' | 'expiry';
@@ -23,7 +24,7 @@ const statusColors: Record<string, string> = {
   'Suspended': 'bg-red-100 text-red-800',
 };
 
-export function PermitsTable({ records, isLoading }: PermitsTableProps) {
+export function PermitsTable({ records, isLoading, onMemberSelect }: PermitsTableProps) {
   const [sortField, setSortField] = useState<SortField>('expiry');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [searchTerm, setSearchTerm] = useState('');
@@ -196,7 +197,16 @@ export function PermitsTable({ records, isLoading }: PermitsTableProps) {
                 <tr key={`${record['Membership number']}-${record['Permit category']}-${index}`} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
-                      {record['First name']} {record['Last name']}
+                      {onMemberSelect ? (
+                        <button
+                          onClick={() => onMemberSelect(record['Membership number'], `${record['First name']} ${record['Last name']}`)}
+                          className="text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
+                        >
+                          {record['First name']} {record['Last name']}
+                        </button>
+                      ) : (
+                        `${record['First name']} ${record['Last name']}`
+                      )}
                     </div>
                     {record['Unit name'] && (
                       <div className="text-sm text-gray-500">{record['Unit name']}</div>

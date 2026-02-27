@@ -11,6 +11,7 @@ interface DisclosureTableProps {
   records: DisclosureRecord[];
   summary: DisclosureSummary | null;
   isLoading: boolean;
+  onMemberSelect?: (membershipNumber: string, name: string) => void;
 }
 
 type SortField = 'name' | 'status' | 'expiry' | 'authority';
@@ -26,7 +27,7 @@ const statusColors: Record<string, string> = {
   'In Progress': 'bg-blue-100 text-blue-800',
 };
 
-export function DisclosureTable({ records, summary, isLoading }: DisclosureTableProps) {
+export function DisclosureTable({ records, summary, isLoading, onMemberSelect }: DisclosureTableProps) {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -269,7 +270,16 @@ export function DisclosureTable({ records, summary, isLoading }: DisclosureTable
                 <tr key={`${record['Membership number']}-${index}`} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
-                      {record['First name']} {record['Last name']}
+                      {onMemberSelect ? (
+                        <button
+                          onClick={() => onMemberSelect(record['Membership number'], `${record['First name']} ${record['Last name']}`)}
+                          className="text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
+                        >
+                          {record['First name']} {record['Last name']}
+                        </button>
+                      ) : (
+                        `${record['First name']} ${record['Last name']}`
+                      )}
                     </div>
                     {record['Communication email'] && (
                       <div className="text-sm text-gray-500">{record['Communication email']}</div>
