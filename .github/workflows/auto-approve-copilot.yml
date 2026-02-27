@@ -1,0 +1,37 @@
+# Auto-approve GitHub Actions workflow runs created by the Copilot coding agent.
+#
+# When Copilot pushes commits to a PR, GitHub requires manual approval for each
+# workflow run triggered by the push. This workflow detects those pending runs and
+# approves them automatically so that PR preview deployments and test runs proceed
+# without a human having to click "Approve and run" for every commit.
+#
+# This workflow runs in the context of the base branch (main) and therefore does
+# not itself need approval to execute.
+name: Auto-approve Copilot workflow runs
+
+on:
+  workflow_run:
+    workflows:
+      - "Deploy to Firebase Hosting on PR"
+      - "Tests"
+    types:
+      - requested
+
+permissions:
+  actions: write
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.actor.login == 'Copilot' ||
+      github.event.workflow_run.actor.login == 'copilot-swe-agent[bot]' ||
+      github.event.workflow_run.actor.login == 'github-copilot[bot]'
+    steps:
+      - name: Approve workflow run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api \
+            --method POST \
+            repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}/approve
