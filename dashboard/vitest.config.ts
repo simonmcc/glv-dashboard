@@ -1,11 +1,12 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
-import { getGitVersion } from './build-utils';
+import { getGitVersion, getGitUrl } from './build-utils';
 
 export default defineConfig({
   plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(getGitVersion()),
+    __APP_URL__: JSON.stringify(getGitUrl()),
   },
   test: {
     globals: true,

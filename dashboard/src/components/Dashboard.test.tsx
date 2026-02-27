@@ -73,7 +73,7 @@ describe('Dashboard footer', () => {
 
     const link = screen.getByRole('link', { name: /simonmcc\/glv-dashboard/ });
     expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute('href', 'https://github.com/simonmcc/glv-dashboard');
+    expect(link).toHaveAttribute('href', expect.stringContaining('https://github.com/simonmcc/glv-dashboard'));
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   });

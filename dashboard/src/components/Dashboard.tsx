@@ -452,7 +452,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
       <footer className="max-w-7xl mx-auto px-4 py-6 text-center text-sm text-gray-500">
         Data fetched directly from the Scouts membership portal. No data is stored.{' '}
         <a
-          href="https://github.com/simonmcc/glv-dashboard"
+          href={__APP_URL__}
           target="_blank"
           rel="noopener noreferrer"
           className="underline hover:text-gray-700"
