@@ -456,7 +456,15 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
 
       {/* Footer */}
       <footer className="max-w-7xl mx-auto px-4 py-6 text-center text-sm text-gray-500">
-        Data fetched directly from the Scouts membership portal. No data is stored.
+        Data fetched directly from the Scouts membership portal. No data is stored.{' '}
+        <a
+          href={__APP_URL__}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-gray-700"
+        >
+          simonmcc/glv-dashboard@{__APP_VERSION__}
+        </a>
       </footer>
     </div>
   );
