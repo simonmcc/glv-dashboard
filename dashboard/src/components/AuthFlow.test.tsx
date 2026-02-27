@@ -46,7 +46,7 @@ describe('AuthFlow - mock mode', () => {
         vi.runAllTimers();
       });
 
-      expect(onAuthComplete).toHaveBeenCalledWith('mock-token', 'mock-contact');
+      expect(onAuthComplete).toHaveBeenCalledWith('mock-token', 'mock-contact', 'anyone@example.com');
     } finally {
       vi.runOnlyPendingTimers();
       vi.clearAllTimers();

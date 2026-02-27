@@ -17,7 +17,7 @@ const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
 function loadAuthState(): AuthState {
   const session = loadSession();
   if (session) {
-    return { status: 'authenticated', token: session.token, contactId: session.contactId };
+    return { status: 'authenticated', token: session.token, contactId: session.contactId, username: session.username };
   }
   return { status: 'unauthenticated' };
 }
@@ -29,9 +29,9 @@ function App() {
     setAuthState({ status: 'authenticating' });
   }, []);
 
-  const handleAuthComplete = useCallback((token: string, contactId: string) => {
-    saveSession(token, contactId);
-    setAuthState({ status: 'authenticated', token, contactId });
+  const handleAuthComplete = useCallback((token: string, contactId: string, username?: string) => {
+    saveSession(token, contactId, username);
+    setAuthState({ status: 'authenticated', token, contactId, username });
   }, []);
 
   const handleAuthError = useCallback((message: string) => {
@@ -66,6 +66,7 @@ function App() {
     <Dashboard
       token={authState.token}
       contactId={authState.contactId}
+      username={authState.username}
       onLogout={handleLogout}
       onTokenExpired={handleTokenExpired}
     />
