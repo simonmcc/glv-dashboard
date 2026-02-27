@@ -25,6 +25,7 @@ import { PermitsTable } from './PermitsTable';
 import { AwardsTable } from './AwardsTable';
 import { LazySection } from './LazySection';
 import type { LoadState } from './LazySection';
+import { MemberDashboard } from './MemberDashboard';
 
 interface DashboardProps {
   token: string;
@@ -46,6 +47,9 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
   const [summary, setSummary] = useState<ComplianceSummary | null>(null);
   const [primaryLoading, setPrimaryLoading] = useState(true);
   const [primaryError, setPrimaryError] = useState<string | null>(null);
+
+  // Per-member view
+  const [selectedMember, setSelectedMember] = useState<{ membershipNumber: string; name: string } | null>(null);
 
   // Lazy-loaded sections
   const [joiningJourney, setJoiningJourney] = useState<SectionState<JoiningJourneyRecord[]>>({ state: 'idle', data: [], error: null });
@@ -246,6 +250,14 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
     await fetchPrimaryData();
   }, [fetchPrimaryData]);
 
+  // Handle member selection - load joining journey if not yet loaded
+  const handleMemberSelect = useCallback((membershipNumber: string, name: string) => {
+    setSelectedMember({ membershipNumber, name });
+    if (joiningJourney.state === 'idle') {
+      loadJoiningJourney();
+    }
+  }, [joiningJourney.state, loadJoiningJourney]);
+
   // Load primary data on mount.
   // Return an AbortController cleanup so React StrictMode's synthetic
   // unmount/remount in development cancels the first in-flight fetch.
@@ -295,6 +307,19 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
     teamReviews.state === 'loading' ||
     permits.state === 'loading' ||
     awards.state === 'loading';
+
+  if (selectedMember) {
+    return (
+      <MemberDashboard
+        membershipNumber={selectedMember.membershipNumber}
+        name={selectedMember.name}
+        learningRecords={records}
+        joiningJourneyRecords={joiningJourney.data}
+        joiningJourneyState={joiningJourney.state}
+        onBack={() => setSelectedMember(null)}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -374,7 +399,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
               </span>
             )}
           </div>
-          <ComplianceTable records={records} isLoading={primaryLoading} />
+          <ComplianceTable records={records} isLoading={primaryLoading} onMemberSelect={handleMemberSelect} />
         </section>
 
         {/* Joining Journey - Lazy loaded */}
@@ -385,7 +410,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
           error={joiningJourney.error}
           onRetry={() => { triggeredSections.current.delete('joiningJourney'); loadJoiningJourney(); }}
         >
-          <JoiningJourneyTable records={joiningJourney.data} isLoading={joiningJourney.state === 'loading'} />
+          <JoiningJourneyTable records={joiningJourney.data} isLoading={joiningJourney.state === 'loading'} onMemberSelect={handleMemberSelect} />
         </LazySection>
 
         {/* Disclosure Compliance - Lazy loaded */}
@@ -400,6 +425,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
             records={disclosures.data.records}
             summary={disclosures.data.summary}
             isLoading={disclosures.state === 'loading'}
+            onMemberSelect={handleMemberSelect}
           />
         </LazySection>
 
@@ -411,7 +437,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
           error={suspensions.error}
           onRetry={() => { triggeredSections.current.delete('suspensions'); loadSuspensions(); }}
         >
-          <SuspensionsTable records={suspensions.data} isLoading={suspensions.state === 'loading'} />
+          <SuspensionsTable records={suspensions.data} isLoading={suspensions.state === 'loading'} onMemberSelect={handleMemberSelect} />
         </LazySection>
 
         {/* Team Reviews - Lazy loaded */}
@@ -433,7 +459,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
           error={permits.error}
           onRetry={() => { triggeredSections.current.delete('permits'); loadPermits(); }}
         >
-          <PermitsTable records={permits.data} isLoading={permits.state === 'loading'} />
+          <PermitsTable records={permits.data} isLoading={permits.state === 'loading'} onMemberSelect={handleMemberSelect} />
         </LazySection>
 
         {/* Awards - Lazy loaded */}
@@ -444,7 +470,7 @@ export function Dashboard({ token, contactId, onLogout, onTokenExpired }: Dashbo
           error={awards.error}
           onRetry={() => { triggeredSections.current.delete('awards'); loadAwards(); }}
         >
-          <AwardsTable records={awards.data} isLoading={awards.state === 'loading'} />
+          <AwardsTable records={awards.data} isLoading={awards.state === 'loading'} onMemberSelect={handleMemberSelect} />
         </LazySection>
       </main>
 

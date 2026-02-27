@@ -10,12 +10,13 @@ import type { AwardRecord } from '../types';
 interface AwardsTableProps {
   records: AwardRecord[];
   isLoading: boolean;
+  onMemberSelect?: (membershipNumber: string, name: string) => void;
 }
 
 type SortField = 'name' | 'accreditation' | 'role';
 type SortOrder = 'asc' | 'desc';
 
-export function AwardsTable({ records, isLoading }: AwardsTableProps) {
+export function AwardsTable({ records, isLoading, onMemberSelect }: AwardsTableProps) {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [searchTerm, setSearchTerm] = useState('');
@@ -167,7 +168,16 @@ export function AwardsTable({ records, isLoading }: AwardsTableProps) {
                 <tr key={`${record['Membership number']}-${record['Accreditation']}-${index}`} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
-                      {record['First name']} {record['Last name']}
+                      {onMemberSelect ? (
+                        <button
+                          onClick={() => onMemberSelect(record['Membership number'], `${record['First name']} ${record['Last name']}`)}
+                          className="text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
+                        >
+                          {record['First name']} {record['Last name']}
+                        </button>
+                      ) : (
+                        `${record['First name']} ${record['Last name']}`
+                      )}
                     </div>
                     {record['Communication email'] && (
                       <div className="text-sm text-gray-500">{record['Communication email']}</div>
