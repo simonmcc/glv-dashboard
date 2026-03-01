@@ -149,8 +149,8 @@ describe('MemberDashboard', () => {
     render(<MemberDashboard {...defaultProps} />);
 
     expect(screen.getByRole('heading', { name: 'Alice Johnson' })).toBeInTheDocument();
-    // membership number appears in the header (and possibly in the tables)
-    expect(screen.getAllByText('12345678').length).toBeGreaterThan(0);
+    // membership number appears in the header
+    expect(screen.getByText('12345678')).toBeInTheDocument();
   });
 
   it('calls onBack when the back button is clicked', () => {
@@ -164,21 +164,20 @@ describe('MemberDashboard', () => {
   it('only shows learning records for the selected member', () => {
     render(<MemberDashboard {...defaultProps} />);
 
-    // There should be 2 data rows (Alice's Safety + Safeguarding)
-    // and no rows for Bob
-    const tbody = document.querySelector('table tbody') as HTMLElement;
-    const dataRows = tbody.querySelectorAll('tr');
-    expect(dataRows).toHaveLength(2);
+    const section = screen.getByTestId('learning-section');
+    // Alice's learning items should be visible
+    expect(section.textContent).toContain('Safety');
+    expect(section.textContent).toContain('Safeguarding');
+    // Bob's records should not appear in the learning section
+    expect(section.textContent).not.toContain('Expired');
   });
 
   it('only shows joining journey records for the selected member', () => {
     render(<MemberDashboard {...defaultProps} />);
 
-    const cells = screen.getAllByRole('cell');
-    const cellTexts = cells.map(c => c.textContent);
-
-    expect(cellTexts.some(t => t?.includes('Criminal Records Declaration'))).toBe(true);
-    expect(cellTexts.some(t => t?.includes('References'))).toBe(false);
+    const section = screen.getByTestId('joining-journey-section');
+    expect(section.textContent).toContain('Criminal Records Declaration');
+    expect(section.textContent).not.toContain('References');
   });
 
   it('shows a loading message when joining journey is loading', () => {
@@ -196,11 +195,9 @@ describe('MemberDashboard', () => {
   it('only shows disclosure records for the selected member', () => {
     render(<MemberDashboard {...defaultProps} />);
 
-    const cells = screen.getAllByRole('cell');
-    const cellTexts = cells.map(c => c.textContent);
-
-    expect(cellTexts.some(t => t?.includes('Disclosure Scotland'))).toBe(true);
-    expect(cellTexts.some(t => t?.includes('DBS'))).toBe(false);
+    const section = screen.getByTestId('disclosure-section');
+    expect(section.textContent).toContain('Disclosure Scotland');
+    expect(section.textContent).not.toContain('DBS');
   });
 
   it('shows a loading message when disclosures are loading', () => {
@@ -212,11 +209,9 @@ describe('MemberDashboard', () => {
   it('only shows team review records for the selected member', () => {
     render(<MemberDashboard {...defaultProps} />);
 
-    const cells = screen.getAllByRole('cell');
-    const cellTexts = cells.map(c => c.textContent);
-
-    expect(cellTexts.some(t => t?.includes('Scout Leader'))).toBe(true);
-    expect(cellTexts.some(t => t?.includes('Assistant Leader'))).toBe(false);
+    const section = screen.getByTestId('team-reviews-section');
+    expect(section.textContent).toContain('Scout Leader');
+    expect(section.textContent).not.toContain('Assistant Leader');
   });
 
   it('shows a loading message when team reviews are loading', () => {
@@ -228,11 +223,9 @@ describe('MemberDashboard', () => {
   it('only shows permit records for the selected member', () => {
     render(<MemberDashboard {...defaultProps} />);
 
-    const cells = screen.getAllByRole('cell');
-    const cellTexts = cells.map(c => c.textContent);
-
-    expect(cellTexts.some(t => t?.includes('Nights Away'))).toBe(true);
-    expect(cellTexts.some(t => t?.includes('Water Activities'))).toBe(false);
+    const section = screen.getByTestId('permits-section');
+    expect(section.textContent).toContain('Nights Away');
+    expect(section.textContent).not.toContain('Water Activities');
   });
 
   it('shows a loading message when permits are loading', () => {
@@ -244,16 +237,30 @@ describe('MemberDashboard', () => {
   it('only shows award records for the selected member', () => {
     render(<MemberDashboard {...defaultProps} />);
 
-    const cells = screen.getAllByRole('cell');
-    const cellTexts = cells.map(c => c.textContent);
-
-    expect(cellTexts.some(t => t?.includes('Wood Badge'))).toBe(true);
-    expect(cellTexts.some(t => t?.includes('Silver Award'))).toBe(false);
+    const section = screen.getByTestId('awards-section');
+    expect(section.textContent).toContain('Wood Badge');
+    expect(section.textContent).not.toContain('Silver Award');
   });
 
   it('shows a loading message when awards are loading', () => {
     render(<MemberDashboard {...defaultProps} awardsState="loading" awardRecords={[]} />);
 
     expect(screen.getByText(/Loading awards data/)).toBeInTheDocument();
+  });
+
+  it('displays expiry dates for learning records', () => {
+    render(<MemberDashboard {...defaultProps} />);
+
+    // Alice's Safety expiry date should be formatted
+    expect(screen.getByText('1 Dec 2025')).toBeInTheDocument();
+    expect(screen.getByText('15 Mar 2025')).toBeInTheDocument();
+  });
+
+  it('displays status badges with correct text', () => {
+    render(<MemberDashboard {...defaultProps} />);
+
+    const section = screen.getByTestId('learning-section');
+    expect(section.textContent).toContain('Valid');
+    expect(section.textContent).toContain('Expiring');
   });
 });
