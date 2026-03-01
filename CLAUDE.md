@@ -132,3 +132,9 @@ Tracing is opt-in and has zero overhead when disabled. Manual spans instrument t
    # 4. Do all coding, npm installs, and dev server runs from the worktree
    cd ../glv-TICKET-123
    # edit files, run: cd backend && npm run dev, etc.
+
+   # 5. ALWAYS push with an explicit refspec — never a bare `git push origin feature/TICKET-123`
+   #    `git worktree add` inherits the branch's upstream tracking from the current branch
+   #    (usually origin/main), so a bare push silently pushes to origin/main instead of
+   #    creating origin/feature/TICKET-123.
+   git push origin feature/TICKET-123:feature/TICKET-123
