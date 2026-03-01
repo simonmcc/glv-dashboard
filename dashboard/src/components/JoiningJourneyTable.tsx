@@ -11,6 +11,7 @@ interface JoiningJourneyTableProps {
   records: JoiningJourneyRecord[];
   isLoading: boolean;
   onMemberSelect?: (membershipNumber: string, name: string) => void;
+  searchTerm?: string;
 }
 
 type SortField = 'name' | 'item' | 'status';
@@ -27,12 +28,11 @@ const statusColors: Record<string, string> = {
   'Overdue': 'bg-red-100 text-red-800',
 };
 
-export function JoiningJourneyTable({ records, isLoading, onMemberSelect }: JoiningJourneyTableProps) {
+export function JoiningJourneyTable({ records, isLoading, onMemberSelect, searchTerm = '' }: JoiningJourneyTableProps) {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [filterItem, setFilterItem] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState('');
   const [filterIncomplete, setFilterIncomplete] = useState(false);
 
   // Get unique values for filters
@@ -146,14 +146,6 @@ export function JoiningJourneyTable({ records, isLoading, onMemberSelect }: Join
       {/* Filters */}
       <div className="p-4 border-b space-y-3">
         <div className="flex flex-wrap gap-3 items-center">
-          <input
-            type="text"
-            placeholder="Search by name or membership number..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-
           <select
             value={filterItem}
             onChange={(e) => setFilterItem(e.target.value)}

@@ -11,15 +11,15 @@ interface AwardsTableProps {
   records: AwardRecord[];
   isLoading: boolean;
   onMemberSelect?: (membershipNumber: string, name: string) => void;
+  searchTerm?: string;
 }
 
 type SortField = 'name' | 'accreditation' | 'role';
 type SortOrder = 'asc' | 'desc';
 
-export function AwardsTable({ records, isLoading, onMemberSelect }: AwardsTableProps) {
+export function AwardsTable({ records, isLoading, onMemberSelect, searchTerm = '' }: AwardsTableProps) {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
-  const [searchTerm, setSearchTerm] = useState('');
   const [filterAccreditation, setFilterAccreditation] = useState<string>('all');
 
   const accreditations = useMemo(() => {
@@ -102,13 +102,6 @@ export function AwardsTable({ records, isLoading, onMemberSelect }: AwardsTableP
     <div className="bg-white rounded-lg shadow-sm border">
       <div className="p-4 border-b space-y-3">
         <div className="flex flex-wrap gap-3 items-center">
-          <input
-            type="text"
-            placeholder="Search by name, membership # or accreditation..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
           <select
             value={filterAccreditation}
             onChange={(e) => setFilterAccreditation(e.target.value)}

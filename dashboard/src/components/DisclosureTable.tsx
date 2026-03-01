@@ -12,6 +12,7 @@ interface DisclosureTableProps {
   summary: DisclosureSummary | null;
   isLoading: boolean;
   onMemberSelect?: (membershipNumber: string, name: string) => void;
+  searchTerm?: string;
 }
 
 type SortField = 'name' | 'status' | 'expiry' | 'authority';
@@ -27,11 +28,10 @@ const statusColors: Record<string, string> = {
   'In Progress': 'bg-blue-100 text-blue-800',
 };
 
-export function DisclosureTable({ records, summary, isLoading, onMemberSelect }: DisclosureTableProps) {
+export function DisclosureTable({ records, summary, isLoading, onMemberSelect, searchTerm = '' }: DisclosureTableProps) {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState('');
   const [filterExpired, setFilterExpired] = useState(false);
   const [filterExpiringSoon, setFilterExpiringSoon] = useState(false);
 
@@ -169,14 +169,6 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect }:
       {/* Filters */}
       <div className="p-4 border-b space-y-3">
         <div className="flex flex-wrap gap-3 items-center">
-          <input
-            type="text"
-            placeholder="Search by name or membership number..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}

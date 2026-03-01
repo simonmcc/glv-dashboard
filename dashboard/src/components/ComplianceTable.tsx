@@ -11,6 +11,7 @@ interface ComplianceTableProps {
   records: LearningRecord[];
   isLoading: boolean;
   onMemberSelect?: (membershipNumber: string, name: string) => void;
+  searchTerm?: string;
 }
 
 type SortField = 'name' | 'learning' | 'status' | 'expiry';
@@ -25,12 +26,11 @@ const statusColors: Record<string, string> = {
   'Not Started': 'bg-gray-100 text-gray-800',
 };
 
-export function ComplianceTable({ records, isLoading, onMemberSelect }: ComplianceTableProps) {
+export function ComplianceTable({ records, isLoading, onMemberSelect, searchTerm = '' }: ComplianceTableProps) {
   const [sortField, setSortField] = useState<SortField>('expiry');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterLearning, setFilterLearning] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState('');
   const [filterOverdue, setFilterOverdue] = useState(false);
   const [filterNoExpiry, setFilterNoExpiry] = useState(false);
 
@@ -166,14 +166,6 @@ export function ComplianceTable({ records, isLoading, onMemberSelect }: Complian
       {/* Filters */}
       <div className="p-4 border-b space-y-3">
         <div className="flex flex-wrap gap-3 items-center">
-          <input
-            type="text"
-            placeholder="Search by name or membership number..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-
           <select
             value={filterLearning}
             onChange={(e) => setFilterLearning(e.target.value)}

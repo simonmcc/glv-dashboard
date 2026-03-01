@@ -49,6 +49,9 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
   const [primaryLoading, setPrimaryLoading] = useState(true);
   const [primaryError, setPrimaryError] = useState<string | null>(null);
 
+  // Global search term shared across all sections
+  const [searchTerm, setSearchTerm] = useState('');
+
   // Per-member view
   const [selectedMember, setSelectedMember] = useState<{ membershipNumber: string; name: string } | null>(null);
 
@@ -384,6 +387,29 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
           </div>
         )}
 
+        {/* Global Search */}
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search by name or membership number across all sections..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="Clear search"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
         {/* Summary Tiles - Always load immediately */}
         <section>
           <div className="flex items-center gap-3 mb-4">
@@ -415,7 +441,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
               </span>
             )}
           </div>
-          <ComplianceTable records={records} isLoading={primaryLoading} onMemberSelect={handleMemberSelect} />
+          <ComplianceTable records={records} isLoading={primaryLoading} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
         </section>
 
         {/* Joining Journey - Lazy loaded */}
@@ -426,7 +452,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
           error={joiningJourney.error}
           onRetry={() => { triggeredSections.current.delete('joiningJourney'); loadJoiningJourney(); }}
         >
-          <JoiningJourneyTable records={joiningJourney.data} isLoading={joiningJourney.state === 'loading'} onMemberSelect={handleMemberSelect} />
+          <JoiningJourneyTable records={joiningJourney.data} isLoading={joiningJourney.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
         </LazySection>
 
         {/* Disclosure Compliance - Lazy loaded */}
@@ -442,6 +468,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
             summary={disclosures.data.summary}
             isLoading={disclosures.state === 'loading'}
             onMemberSelect={handleMemberSelect}
+            searchTerm={searchTerm}
           />
         </LazySection>
 
@@ -453,7 +480,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
           error={suspensions.error}
           onRetry={() => { triggeredSections.current.delete('suspensions'); loadSuspensions(); }}
         >
-          <SuspensionsTable records={suspensions.data} isLoading={suspensions.state === 'loading'} onMemberSelect={handleMemberSelect} />
+          <SuspensionsTable records={suspensions.data} isLoading={suspensions.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
         </LazySection>
 
         {/* Team Reviews - Lazy loaded */}
@@ -464,7 +491,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
           error={teamReviews.error}
           onRetry={() => { triggeredSections.current.delete('teamReviews'); loadTeamReviews(); }}
         >
-          <TeamReviewsTable records={teamReviews.data} isLoading={teamReviews.state === 'loading'} />
+          <TeamReviewsTable records={teamReviews.data} isLoading={teamReviews.state === 'loading'} searchTerm={searchTerm} />
         </LazySection>
 
         {/* Permits - Lazy loaded */}
@@ -475,7 +502,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
           error={permits.error}
           onRetry={() => { triggeredSections.current.delete('permits'); loadPermits(); }}
         >
-          <PermitsTable records={permits.data} isLoading={permits.state === 'loading'} onMemberSelect={handleMemberSelect} />
+          <PermitsTable records={permits.data} isLoading={permits.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
         </LazySection>
 
         {/* Awards - Lazy loaded */}
@@ -486,7 +513,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
           error={awards.error}
           onRetry={() => { triggeredSections.current.delete('awards'); loadAwards(); }}
         >
-          <AwardsTable records={awards.data} isLoading={awards.state === 'loading'} onMemberSelect={handleMemberSelect} />
+          <AwardsTable records={awards.data} isLoading={awards.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
         </LazySection>
       </main>
 

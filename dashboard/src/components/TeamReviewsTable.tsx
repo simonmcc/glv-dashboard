@@ -10,15 +10,15 @@ import type { TeamReviewRecord } from '../types';
 interface TeamReviewsTableProps {
   records: TeamReviewRecord[];
   isLoading: boolean;
+  searchTerm?: string;
 }
 
 type SortField = 'leader' | 'date' | 'overdue';
 type SortOrder = 'asc' | 'desc';
 
-export function TeamReviewsTable({ records, isLoading }: TeamReviewsTableProps) {
+export function TeamReviewsTable({ records, isLoading, searchTerm = '' }: TeamReviewsTableProps) {
   const [sortField, setSortField] = useState<SortField>('overdue');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [searchTerm, setSearchTerm] = useState('');
   const [filterOverdue, setFilterOverdue] = useState(false);
 
   const overdueCount = useMemo(() => {
@@ -112,13 +112,6 @@ export function TeamReviewsTable({ records, isLoading }: TeamReviewsTableProps) 
     <div className="bg-white rounded-lg shadow-sm border">
       <div className="p-4 border-b space-y-3">
         <div className="flex flex-wrap gap-3 items-center">
-          <input
-            type="text"
-            placeholder="Search by team leader, role or membership #..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
           {overdueCount > 0 && (
             <button
               onClick={() => setFilterOverdue(!filterOverdue)}

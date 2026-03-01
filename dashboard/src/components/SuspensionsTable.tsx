@@ -11,15 +11,15 @@ interface SuspensionsTableProps {
   records: SuspensionRecord[];
   isLoading: boolean;
   onMemberSelect?: (membershipNumber: string, name: string) => void;
+  searchTerm?: string;
 }
 
 type SortField = 'name' | 'date' | 'role';
 type SortOrder = 'asc' | 'desc';
 
-export function SuspensionsTable({ records, isLoading, onMemberSelect }: SuspensionsTableProps) {
+export function SuspensionsTable({ records, isLoading, onMemberSelect, searchTerm = '' }: SuspensionsTableProps) {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [searchTerm, setSearchTerm] = useState('');
 
   const filteredRecords = useMemo(() => {
     let result = [...records];
@@ -102,16 +102,7 @@ export function SuspensionsTable({ records, isLoading, onMemberSelect }: Suspens
 
   return (
     <div className="bg-white rounded-lg shadow-sm border">
-      <div className="p-4 border-b space-y-3">
-        <div className="flex flex-wrap gap-3 items-center">
-          <input
-            type="text"
-            placeholder="Search by name or membership number..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-        </div>
+      <div className="p-4 border-b">
         <div className="text-sm text-gray-500">
           Showing {filteredRecords.length} of {records.length} records
         </div>
