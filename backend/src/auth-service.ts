@@ -14,6 +14,8 @@ const tracer = trace.getTracer('glv-backend-auth', '1.0.0');
 
 const SCOUTS_URL = 'https://membership.scouts.org.uk/';
 
+export type ProgressCallback = (step: string, message: string) => void;
+
 export interface AuthResult {
   success: boolean;
   token?: string;
@@ -117,11 +119,12 @@ async function waitForCondition(
   return await condition();
 }
 
-async function performLogin(page: Page, username: string, password: string): Promise<void> {
+async function performLogin(page: Page, username: string, password: string, onProgress?: ProgressCallback): Promise<void> {
   log(`[Auth] performLogin: current url=${page.url()}`);
 
   // Check if we're already on B2C or need to wait for redirect
   if (!page.url().includes('b2clogin.com')) {
+    onProgress?.('waiting_b2c', 'Loading login page...');
     log('[Auth] Not yet on B2C, waiting up to 30s for redirect...');
     try {
       // Use a predicate to match the B2C login host (including subdomains like prodscoutsb2c.b2clogin.com)
@@ -177,6 +180,7 @@ async function performLogin(page: Page, username: string, password: string): Pro
     throw new Error('Could not find email input field');
   }
   log(`[Auth] Login form ready, url=${page.url()}`);
+  onProgress?.('login_form_ready', 'Entering credentials...');
 
   // Fill in email — use the handle returned by waitForSelector
   log(`[Auth] Filling email`);
@@ -198,6 +202,7 @@ async function performLogin(page: Page, username: string, password: string): Pro
     '#next',
   ];
 
+  onProgress?.('submitting', 'Submitting login...');
   let submitted = false;
   for (const selector of submitSelectors) {
     const button = await page.$(selector);
@@ -213,6 +218,7 @@ async function performLogin(page: Page, username: string, password: string): Pro
     log(`[Auth] Could not find submit button, page title="${await page.title()}", url=${page.url()}`);
     throw new Error('Could not find sign in button');
   }
+  onProgress?.('waiting_redirect', 'Waiting for authentication to complete...');
 
   // Wait for redirect back to membership portal
   log('[Auth] Waiting up to 60s for redirect back to membership portal...');
@@ -394,10 +400,11 @@ export async function checkLearningByMembershipNumbers(
   });
 }
 
-export async function authenticate(username: string, password: string): Promise<AuthResult> {
+export async function authenticate(username: string, password: string, onProgress?: ProgressCallback): Promise<AuthResult> {
   return tracer.startActiveSpan('authenticate', async (span) => {
   span.setAttribute('auth.username', username);
 
+  onProgress?.('launching', 'Launching secure browser...');
   const browser = await tracer.startActiveSpan('playwright.browser.launch', async (launchSpan) => {
     const b = await chromium.launch({
       headless: true,
@@ -486,21 +493,24 @@ export async function authenticate(username: string, password: string): Promise<
   try {
     // Navigate to the portal
     await tracer.startActiveSpan('playwright.navigate.scouts-portal', async (navSpan) => {
+      onProgress?.('navigating', 'Connecting to Scouts portal...');
       log(`[Auth] Navigating to ${SCOUTS_URL}`);
       await page.goto(SCOUTS_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
       log(`[Auth] Initial navigation complete, url=${page.url()}`);
+      onProgress?.('cookie_consent', 'Handling page setup...');
       await handleCookieConsent(page);
       navSpan.end();
     });
 
     // Perform login
     await tracer.startActiveSpan('playwright.b2c-login', async (loginSpan) => {
-      await performLogin(page, username, password);
+      await performLogin(page, username, password, onProgress);
       loginSpan.end();
     });
 
     // Wait for token — the portal fires GetContactDetailAsync immediately after
     // login so contactId typically arrives in the same burst, but it is optional.
+    onProgress?.('capturing_token', 'Capturing session token...');
     await tracer.startActiveSpan('playwright.wait-for-token', async (tokenSpan) => {
       const startTime = Date.now();
       const captured = await waitForCondition(

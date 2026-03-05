@@ -8,7 +8,7 @@
 import './tracing.js';
 import express from 'express';
 import cors from 'cors';
-import { authenticate, checkLearningByMembershipNumbers } from './auth-service.js';
+import { authenticate, checkLearningByMembershipNumbers, type ProgressCallback } from './auth-service.js';
 import { log, logError, logDebug } from './logger.js';
 
 const app = express();
@@ -66,6 +66,45 @@ app.post('/auth/login', async (req, res) => {
       error: 'Internal server error',
     });
   }
+});
+
+// SSE streaming authentication endpoint
+app.post('/auth/login-stream', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({
+      success: false,
+      error: 'Username and password are required',
+    });
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const sendEvent = (type: string, data: unknown) => {
+    res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  const onProgress: ProgressCallback = (step, message) => {
+    sendEvent('progress', { step, message });
+  };
+
+  log(`[Auth] Login-stream attempt for: ${username}`);
+  try {
+    const result = await authenticate(username, password, onProgress);
+    if (result.success) {
+      sendEvent('complete', { token: result.token, contactId: result.contactId });
+    } else {
+      sendEvent('error', { error: result.error || 'Authentication failed' });
+    }
+  } catch (error) {
+    logError(`[Auth] login-stream error for ${username}:`, error);
+    sendEvent('error', { error: 'Internal server error' });
+  }
+  res.end();
 });
 
 // API proxy endpoint (forwards requests to Scouts API with the provided token)
