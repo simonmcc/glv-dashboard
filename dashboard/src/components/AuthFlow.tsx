@@ -110,8 +110,8 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
           } else if (type === 'complete') {
             terminated = true;
             const token = payload.token;
-            const contactId = payload.contactId;
-            if (!token || !contactId) {
+            const contactId = payload.contactId ?? '';
+            if (!token) {
               const msg = 'Authentication failed: invalid response from authentication server';
               span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
               onAuthError(msg);
