@@ -102,22 +102,31 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
           return;
         }
 
-        let completed = false;
+        let terminated = false;
         await parseSSEStream(response.body, (type, data) => {
           const payload = data as Record<string, string>;
           if (type === 'progress') {
             setLoginStep(payload.message || '');
           } else if (type === 'complete') {
-            completed = true;
+            terminated = true;
+            const token = payload.token;
+            const contactId = payload.contactId;
+            if (!token || !contactId) {
+              const msg = 'Authentication failed: invalid response from authentication server';
+              span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
+              onAuthError(msg);
+              return;
+            }
             span.setStatus({ code: SpanStatusCode.OK });
-            onAuthComplete(payload.token || '', payload.contactId || '', username);
+            onAuthComplete(token, contactId, username);
           } else if (type === 'error') {
+            terminated = true;
             span.setStatus({ code: SpanStatusCode.ERROR, message: payload.error || 'Authentication failed' });
             onAuthError(payload.error || 'Authentication failed');
           }
         });
 
-        if (!completed) {
+        if (!terminated) {
           span.setStatus({ code: SpanStatusCode.ERROR, message: 'Stream ended without completing' });
           onAuthError('Authentication failed: connection closed unexpectedly');
         }
