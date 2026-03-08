@@ -20,10 +20,48 @@ interface AuthFlowProps {
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
+async function parseSSEStream(
+  body: ReadableStream<Uint8Array>,
+  onEvent: (type: string, data: unknown) => void
+): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop() ?? '';
+
+    for (const part of parts) {
+      let eventType = 'message';
+      let dataLine = '';
+      for (const line of part.split('\n')) {
+        if (line.startsWith('event: ')) {
+          eventType = line.slice(7).trim();
+        } else if (line.startsWith('data: ')) {
+          dataLine = line.slice(6).trim();
+        }
+      }
+      if (dataLine) {
+        try {
+          onEvent(eventType, JSON.parse(dataLine));
+        } catch {
+          // ignore malformed JSON
+        }
+      }
+    }
+  }
+}
+
 export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, mockMode = false }: AuthFlowProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loginStep, setLoginStep] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +72,7 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
     }
 
     setIsLoading(true);
+    setLoginStep('');
     onAuthStart();
 
     // In mock mode, authenticate immediately without calling the backend
@@ -47,7 +86,7 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
 
     await tracer.startActiveSpan('auth.login', async (span) => {
       try {
-        const response = await fetch(`${BACKEND_URL}/auth/login`, {
+        const response = await fetch(`${BACKEND_URL}/auth/login-stream`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -55,14 +94,41 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
           body: JSON.stringify({ username, password }),
         });
 
-        const result = await response.json();
+        if (!response.ok || !response.body) {
+          const result = await response.json().catch(() => ({}));
+          const msg = (result as { error?: string }).error || 'Authentication failed';
+          span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
+          onAuthError(msg);
+          return;
+        }
 
-        if (result.success && result.token) {
-          span.setStatus({ code: SpanStatusCode.OK });
-          onAuthComplete(result.token, result.contactId || '', username);
-        } else {
-          span.setStatus({ code: SpanStatusCode.ERROR, message: result.error || 'Authentication failed' });
-          onAuthError(result.error || 'Authentication failed');
+        let terminated = false;
+        await parseSSEStream(response.body, (type, data) => {
+          const payload = data as Record<string, string>;
+          if (type === 'progress') {
+            setLoginStep(payload.message || '');
+          } else if (type === 'complete') {
+            terminated = true;
+            const token = payload.token;
+            const contactId = payload.contactId;
+            if (!token || !contactId) {
+              const msg = 'Authentication failed: invalid response from authentication server';
+              span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
+              onAuthError(msg);
+              return;
+            }
+            span.setStatus({ code: SpanStatusCode.OK });
+            onAuthComplete(token, contactId, username);
+          } else if (type === 'error') {
+            terminated = true;
+            span.setStatus({ code: SpanStatusCode.ERROR, message: payload.error || 'Authentication failed' });
+            onAuthError(payload.error || 'Authentication failed');
+          }
+        });
+
+        if (!terminated) {
+          span.setStatus({ code: SpanStatusCode.ERROR, message: 'Stream ended without completing' });
+          onAuthError('Authentication failed: connection closed unexpectedly');
         }
       } catch (err) {
         span.setStatus({ code: SpanStatusCode.ERROR, message: 'Connection failed' });
@@ -71,6 +137,7 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
       } finally {
         span.end();
         setIsLoading(false);
+        setLoginStep('');
       }
     });
   };
@@ -152,7 +219,7 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
 
           {isLoading && (
             <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm">
-              <p className="font-medium">Authenticating with Scouts portal...</p>
+              <p className="font-medium">{loginStep || 'Authenticating with Scouts portal...'}</p>
               <p className="text-xs mt-1">This may take 15-30 seconds as we securely log in on your behalf.</p>
             </div>
           )}

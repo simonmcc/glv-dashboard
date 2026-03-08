@@ -8,12 +8,18 @@
 import './tracing.js';
 import express from 'express';
 import cors from 'cors';
-import { authenticate, checkLearningByMembershipNumbers } from './auth-service.js';
+import rateLimit from 'express-rate-limit';
+import { authenticate, checkLearningByMembershipNumbers, type ProgressCallback } from './auth-service.js';
 import { log, logError, logDebug } from './logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DEBUG_LOG_TOKENS = process.env.DEBUG_LOG_TOKENS === 'true';
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 login requests per windowMs
+});
 
 // Middleware
 app.use(cors({
@@ -28,7 +34,7 @@ app.get('/health', (_req, res) => {
 });
 
 // Authentication endpoint
-app.post('/auth/login', async (req, res) => {
+app.post('/auth/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -65,6 +71,54 @@ app.post('/auth/login', async (req, res) => {
       success: false,
       error: 'Internal server error',
     });
+  }
+});
+
+// SSE streaming authentication endpoint
+app.post('/auth/login-stream', loginLimiter, async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({
+      success: false,
+      error: 'Username and password are required',
+    });
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  let clientDisconnected = false;
+  req.on('close', () => {
+    clientDisconnected = true;
+  });
+
+  const sendEvent = (type: string, data: unknown) => {
+    if (!clientDisconnected && !res.writableEnded) {
+      res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+    }
+  };
+
+  const onProgress: ProgressCallback = (step, message) => {
+    sendEvent('progress', { step, message });
+  };
+
+  log(`[Auth] Login-stream attempt for: ${username}`);
+  try {
+    const result = await authenticate(username, password, onProgress);
+    if (result.success) {
+      sendEvent('complete', { token: result.token, contactId: result.contactId });
+    } else {
+      sendEvent('error', { error: result.error || 'Authentication failed' });
+    }
+  } catch (error) {
+    logError(`[Auth] login-stream error for ${username}:`, error);
+    sendEvent('error', { error: 'Internal server error' });
+  }
+  if (!res.writableEnded) {
+    res.end();
   }
 });
 
