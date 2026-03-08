@@ -8,12 +8,18 @@
 import './tracing.js';
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { authenticate, checkLearningByMembershipNumbers, type ProgressCallback } from './auth-service.js';
 import { log, logError, logDebug } from './logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DEBUG_LOG_TOKENS = process.env.DEBUG_LOG_TOKENS === 'true';
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 login requests per windowMs
+});
 
 // Middleware
 app.use(cors({
@@ -28,7 +34,7 @@ app.get('/health', (_req, res) => {
 });
 
 // Authentication endpoint
-app.post('/auth/login', async (req, res) => {
+app.post('/auth/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -69,7 +75,7 @@ app.post('/auth/login', async (req, res) => {
 });
 
 // SSE streaming authentication endpoint
-app.post('/auth/login-stream', async (req, res) => {
+app.post('/auth/login-stream', loginLimiter, async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -84,8 +90,15 @@ app.post('/auth/login-stream', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
+  let clientDisconnected = false;
+  req.on('close', () => {
+    clientDisconnected = true;
+  });
+
   const sendEvent = (type: string, data: unknown) => {
-    res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+    if (!clientDisconnected && !res.writableEnded) {
+      res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+    }
   };
 
   const onProgress: ProgressCallback = (step, message) => {
@@ -104,7 +117,9 @@ app.post('/auth/login-stream', async (req, res) => {
     logError(`[Auth] login-stream error for ${username}:`, error);
     sendEvent('error', { error: 'Internal server error' });
   }
-  res.end();
+  if (!res.writableEnded) {
+    res.end();
+  }
 });
 
 // API proxy endpoint (forwards requests to Scouts API with the provided token)
