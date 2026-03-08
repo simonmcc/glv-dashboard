@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 
 // Mock the auth-service module before importing the server
 vi.mock('./auth-service.js', () => ({
@@ -37,6 +38,11 @@ function parseSSEText(text: string): Array<{ type: string; data: unknown }> {
 // Create a fresh app instance for testing (avoiding the listen() call)
 function createTestApp() {
   const app = express();
+
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 login requests per windowMs
+  });
 
   app.use(cors({ origin: '*', credentials: true }));
   app.use(express.json());
@@ -81,7 +87,7 @@ function createTestApp() {
   });
 
   // SSE streaming authentication endpoint
-  app.post('/auth/login-stream', async (req, res) => {
+  app.post('/auth/login-stream', loginLimiter, async (req, res) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
