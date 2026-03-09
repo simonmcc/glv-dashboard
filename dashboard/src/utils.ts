@@ -27,7 +27,8 @@ export function parseExpiryDate(dateStr: string | null): Date | null {
 }
 
 /**
- * Compute status based on current level and expiry date
+ * Compute status based on current level and expiry date.
+ * Status bands: Expired | Expiring (<30d) | Renewal Due (30–60d) | Expiring Soon (60–90d) | Valid (>90d)
  */
 export function computeModuleStatus(currentLevel: string, expiryDate: Date | null, now: Date = new Date()): string {
   if (!expiryDate) {
@@ -36,6 +37,7 @@ export function computeModuleStatus(currentLevel: string, expiryDate: Date | nul
 
   const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const sixtyDaysFromNow = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+  const ninetyDaysFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
 
   if (expiryDate < now) {
     return 'Expired';
@@ -43,9 +45,24 @@ export function computeModuleStatus(currentLevel: string, expiryDate: Date | nul
     return 'Expiring';
   } else if (expiryDate < sixtyDaysFromNow) {
     return 'Renewal Due';
+  } else if (expiryDate < ninetyDaysFromNow) {
+    return 'Expiring Soon';
   } else {
     return 'Valid';
   }
+}
+
+/**
+ * Returns true if dateStr represents a future date within the given threshold (default 90 days).
+ * Accepts ISO date strings or any format parseable by Date constructor.
+ */
+export function isExpiringSoon(dateStr: string | null | undefined, thresholdDays = 90): boolean {
+  if (!dateStr) return false;
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return false;
+  const now = new Date();
+  const threshold = new Date(now.getTime() + thresholdDays * 24 * 60 * 60 * 1000);
+  return date > now && date <= threshold;
 }
 
 /**

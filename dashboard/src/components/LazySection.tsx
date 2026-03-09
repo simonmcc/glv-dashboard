@@ -15,12 +15,13 @@ interface LazySectionProps {
   error: string | null;
   onRetry: () => void;
   children: React.ReactNode;
+  id?: string;
 }
 
 export const LazySection = forwardRef<HTMLElement, LazySectionProps>(
-  function LazySection({ title, state, error, onRetry, children }, ref) {
+  function LazySection({ title, state, error, onRetry, children, id }, ref) {
     return (
-      <section ref={ref}>
+      <section ref={ref} id={id}>
         <div className="flex items-center gap-3 mb-4">
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
           {state === 'loading' && (

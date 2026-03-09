@@ -15,6 +15,7 @@ describe('ScoutsApiClient', () => {
       expect(summary.total).toBe(0);
       expect(summary.byLearningType).toEqual({});
       expect(summary.byStatus).toEqual({});
+      expect(summary.expiringSoon).toBe(0);
     });
 
     it('should compute summary by learning type and status', () => {
@@ -109,6 +110,36 @@ describe('ScoutsApiClient', () => {
       const summary = client.computeComplianceSummary(records);
       expect(summary.byLearningType['Training'].expired).toBe(1);
     });
+
+    it('should categorize Expiring Soon as expiring', () => {
+      const client = new ScoutsApiClient('test-token');
+      const records: LearningRecord[] = [
+        {
+          'First name': 'John',
+          'Last name': 'Doe',
+          'Membership number': '111',
+          'Learning': 'Training',
+          'Status': 'Expiring Soon',
+          'Expiry date': '2025-06-01',
+        },
+      ];
+
+      const summary = client.computeComplianceSummary(records);
+      expect(summary.byLearningType['Training'].expiring).toBe(1);
+    });
+
+    it('should count expiringSoon as sum of Expiring, Renewal Due, and Expiring Soon', () => {
+      const client = new ScoutsApiClient('test-token');
+      const records: LearningRecord[] = [
+        { 'First name': 'A', 'Last name': 'B', 'Membership number': '1', 'Learning': 'T', 'Status': 'Expiring', 'Expiry date': '2025-02-01' },
+        { 'First name': 'C', 'Last name': 'D', 'Membership number': '2', 'Learning': 'T', 'Status': 'Renewal Due', 'Expiry date': '2025-03-01' },
+        { 'First name': 'E', 'Last name': 'F', 'Membership number': '3', 'Learning': 'T', 'Status': 'Expiring Soon', 'Expiry date': '2025-04-01' },
+        { 'First name': 'G', 'Last name': 'H', 'Membership number': '4', 'Learning': 'T', 'Status': 'Valid', 'Expiry date': '2026-01-01' },
+      ];
+
+      const summary = client.computeComplianceSummary(records);
+      expect(summary.expiringSoon).toBe(3);
+    });
   });
 
   describe('computeDisclosureSummary', () => {
@@ -145,9 +176,9 @@ describe('ScoutsApiClient', () => {
       expect(summary.expired).toBe(1);
     });
 
-    it('should count expiring soon disclosures (within 60 days)', () => {
+    it('should count expiring soon disclosures (within 90 days)', () => {
       const client = new ScoutsApiClient('test-token');
-      // Create a date 30 days from now
+      // Create a date 30 days from now (well within 90d threshold)
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
@@ -171,11 +202,11 @@ describe('ScoutsApiClient', () => {
       expect(summary.valid).toBe(0);
     });
 
-    it('should count valid disclosures (more than 60 days)', () => {
+    it('should count valid disclosures (more than 90 days)', () => {
       const client = new ScoutsApiClient('test-token');
-      // Create a date 90 days from now
-      const ninetyDaysFromNow = new Date();
-      ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+      // Create a date 120 days from now (beyond 90d threshold)
+      const oneHundredTwentyDaysFromNow = new Date();
+      oneHundredTwentyDaysFromNow.setDate(oneHundredTwentyDaysFromNow.getDate() + 120);
 
       const records: DisclosureRecord[] = [
         {
@@ -185,7 +216,7 @@ describe('ScoutsApiClient', () => {
           'Disclosure authority': 'DBS',
           'Disclosure status': 'Clear',
           'Disclosure issue date': '2024-01-01',
-          'Disclosure expiry date': ninetyDaysFromNow.toISOString(),
+          'Disclosure expiry date': oneHundredTwentyDaysFromNow.toISOString(),
           'Days since expiry': null,
         },
       ];

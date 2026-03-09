@@ -13,7 +13,7 @@ import { MockScoutsApiClient } from '../mock-api-client';
 const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
 
 const tracer = trace.getTracer('glv-dashboard', '1.0.0');
-import { transformLearningResults } from '../utils';
+import { transformLearningResults, isExpiringSoon } from '../utils';
 import type { LearningRecord, ComplianceSummary, JoiningJourneyRecord, DisclosureRecord, DisclosureSummary, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from '../types';
 import { SummaryTiles } from './SummaryTiles';
 import { ComplianceTable } from './ComplianceTable';
@@ -314,6 +314,10 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
     permits.state === 'loading' ||
     awards.state === 'loading';
 
+  const permitExpiringSoon = useMemo(() => {
+    return permits.data.filter(r => isExpiringSoon(r['Permit expiry date'])).length;
+  }, [permits.data]);
+
   if (selectedMember) {
     return (
       <MemberDashboard
@@ -424,11 +428,16 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
               </span>
             )}
           </div>
-          <SummaryTiles summary={summary} isLoading={primaryLoading} />
+          <SummaryTiles
+            summary={summary}
+            isLoading={primaryLoading}
+            disclosureExpiringSoon={disclosures.data.summary?.expiringSoon ?? 0}
+            permitExpiringSoon={permitExpiringSoon}
+          />
         </section>
 
         {/* Learning Compliance Table - Always load immediately */}
-        <section>
+        <section id="section-learning">
           <div className="flex items-center gap-3 mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Learning Records</h2>
             {primaryLoading && (
@@ -458,6 +467,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
         {/* Disclosure Compliance - Lazy loaded */}
         <LazySection
           ref={disclosuresRef}
+          id="section-disclosures"
           title="Disclosure Compliance"
           state={disclosures.state}
           error={disclosures.error}
@@ -497,6 +507,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
         {/* Permits - Lazy loaded */}
         <LazySection
           ref={permitsRef}
+          id="section-permits"
           title="Permits"
           state={permits.state}
           error={permits.error}

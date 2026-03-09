@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseExpiryDate, computeModuleStatus, transformLearningResults, FIRST_RESPONSE_MODULE } from './utils';
+import { parseExpiryDate, computeModuleStatus, transformLearningResults, isExpiringSoon, FIRST_RESPONSE_MODULE } from './utils';
 import type { MemberLearningResult } from './types';
 
 describe('parseExpiryDate', () => {
@@ -57,9 +57,42 @@ describe('computeModuleStatus', () => {
     expect(computeModuleStatus('Achieved skill', renewalDate, fixedNow)).toBe('Renewal Due');
   });
 
-  it('should return "Valid" for expiry more than 60 days away', () => {
+  it('should return "Expiring Soon" for expiry within 90 days but after 60 days', () => {
+    const expiringSoonDate = new Date('2025-04-01T00:00:00Z'); // 75 days from fixedNow
+    expect(computeModuleStatus('Achieved skill', expiringSoonDate, fixedNow)).toBe('Expiring Soon');
+  });
+
+  it('should return "Valid" for expiry more than 90 days away', () => {
     const validDate = new Date('2025-06-01T00:00:00Z'); // 137 days from fixedNow
     expect(computeModuleStatus('Achieved skill', validDate, fixedNow)).toBe('Valid');
+  });
+});
+
+describe('isExpiringSoon', () => {
+  it('should return false for null/undefined', () => {
+    expect(isExpiringSoon(null)).toBe(false);
+    expect(isExpiringSoon(undefined)).toBe(false);
+    expect(isExpiringSoon('')).toBe(false);
+  });
+
+  it('should return false for past dates', () => {
+    expect(isExpiringSoon(new Date(Date.now() - 86400000).toISOString())).toBe(false);
+  });
+
+  it('should return true for dates within 90 days', () => {
+    const thirtyDays = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    expect(isExpiringSoon(thirtyDays)).toBe(true);
+  });
+
+  it('should return false for dates beyond 90 days', () => {
+    const farFuture = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString();
+    expect(isExpiringSoon(farFuture)).toBe(false);
+  });
+
+  it('should respect a custom threshold', () => {
+    const fortyDays = new Date(Date.now() + 40 * 24 * 60 * 60 * 1000).toISOString();
+    expect(isExpiringSoon(fortyDays, 30)).toBe(false);
+    expect(isExpiringSoon(fortyDays, 60)).toBe(true);
   });
 });
 

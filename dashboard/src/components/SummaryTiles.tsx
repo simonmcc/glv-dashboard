@@ -9,6 +9,8 @@ import type { ComplianceSummary } from '../types';
 interface SummaryTilesProps {
   summary: ComplianceSummary | null;
   isLoading: boolean;
+  disclosureExpiringSoon?: number;
+  permitExpiringSoon?: number;
 }
 
 interface TileProps {
@@ -115,7 +117,7 @@ function LoadingTile() {
   );
 }
 
-export function SummaryTiles({ summary, isLoading }: SummaryTilesProps) {
+export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, permitExpiringSoon = 0 }: SummaryTilesProps) {
   if (isLoading || !summary) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -158,6 +160,33 @@ export function SummaryTiles({ summary, isLoading }: SummaryTilesProps) {
             </div>
           </div>
         </div>
+        {(summary.expiringSoon > 0 || disclosureExpiringSoon > 0 || permitExpiringSoon > 0) && (
+          <div className="mt-3 pt-3 border-t border-amber-200 flex items-center gap-2 text-sm text-amber-800 bg-amber-50 -mx-4 -mb-4 px-4 py-2 rounded-b-lg">
+            <span className="text-amber-500">⚠</span>
+            <span className="font-medium">Expiring within 90 days:</span>
+            {summary.expiringSoon > 0 && (
+              <a href="#section-learning" className="hover:underline">
+                Learning Records <span className="font-semibold">{summary.expiringSoon}</span>
+              </a>
+            )}
+            {summary.expiringSoon > 0 && (disclosureExpiringSoon > 0 || permitExpiringSoon > 0) && (
+              <span className="text-amber-400">·</span>
+            )}
+            {disclosureExpiringSoon > 0 && (
+              <a href="#section-disclosures" className="hover:underline">
+                Disclosures <span className="font-semibold">{disclosureExpiringSoon}</span>
+              </a>
+            )}
+            {disclosureExpiringSoon > 0 && permitExpiringSoon > 0 && (
+              <span className="text-amber-400">·</span>
+            )}
+            {permitExpiringSoon > 0 && (
+              <a href="#section-permits" className="hover:underline">
+                Permits <span className="font-semibold">{permitExpiringSoon}</span>
+              </a>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Learning type tiles */}

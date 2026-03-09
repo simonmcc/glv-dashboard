@@ -21,6 +21,7 @@ export interface ComplianceSummary {
   total: number;
   byLearningType: Record<string, { total: number; compliant: number; expiring: number; expired: number }>;
   byStatus: Record<string, number>;
+  expiringSoon: number;
 }
 
 export interface ApiResponse<T> {
