@@ -314,6 +314,15 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
     permits.state === 'loading' ||
     awards.state === 'loading';
 
+  const permitExpiringSoon = useMemo(() => {
+    const now = new Date();
+    const ninetyDays = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+    return permits.data.filter(r => {
+      const d = r['Permit expiry date'] ? new Date(r['Permit expiry date']) : null;
+      return d !== null && d > now && d <= ninetyDays;
+    }).length;
+  }, [permits.data]);
+
   if (selectedMember) {
     return (
       <MemberDashboard
@@ -424,7 +433,12 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
               </span>
             )}
           </div>
-          <SummaryTiles summary={summary} isLoading={primaryLoading} />
+          <SummaryTiles
+            summary={summary}
+            isLoading={primaryLoading}
+            disclosureExpiringSoon={disclosures.data.summary?.expiringSoon ?? 0}
+            permitExpiringSoon={permitExpiringSoon}
+          />
         </section>
 
         {/* Learning Compliance Table - Always load immediately */}

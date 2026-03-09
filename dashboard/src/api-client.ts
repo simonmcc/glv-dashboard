@@ -299,7 +299,7 @@ export class ScoutsApiClient {
     let valid = 0;
 
     const now = new Date();
-    const sixtyDaysFromNow = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+    const ninetyDaysFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
 
     for (const record of records) {
       const status = record['Disclosure status'] || 'Unknown';
@@ -311,7 +311,7 @@ export class ScoutsApiClient {
         const expiryDate = new Date(record['Disclosure expiry date']);
         if (expiryDate < now) {
           expired++;
-        } else if (expiryDate < sixtyDaysFromNow) {
+        } else if (expiryDate < ninetyDaysFromNow) {
           expiringSoon++;
         } else {
           valid++;
@@ -414,7 +414,7 @@ export class ScoutsApiClient {
       // Categorize by status
       if (status === 'Valid' || status === 'In-Progress') {
         byLearningType[learning].compliant++;
-      } else if (status === 'Expiring' || status === 'Renewal Due') {
+      } else if (status === 'Expiring' || status === 'Renewal Due' || status === 'Expiring Soon') {
         byLearningType[learning].expiring++;
       } else if (status === 'Expired' || status === 'Not Started') {
         byLearningType[learning].expired++;
@@ -424,10 +424,15 @@ export class ScoutsApiClient {
       byStatus[status] = (byStatus[status] || 0) + 1;
     }
 
+    const expiringSoon = records.filter(r =>
+      r.Status === 'Expiring' || r.Status === 'Renewal Due' || r.Status === 'Expiring Soon'
+    ).length;
+
     return {
       total: records.length,
       byLearningType,
       byStatus,
+      expiringSoon,
     };
   }
 

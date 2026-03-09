@@ -6,6 +6,7 @@
 
 import { useState, useMemo } from 'react';
 import type { DisclosureRecord, DisclosureSummary } from '../types';
+import { isExpiringSoon } from '../utils';
 
 interface DisclosureTableProps {
   records: DisclosureRecord[];
@@ -45,7 +46,6 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
   const filteredRecords = useMemo(() => {
     let result = [...records];
     const now = new Date();
-    const sixtyDaysFromNow = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
 
     // Apply expired filter
     if (filterExpired) {
@@ -59,15 +59,9 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
       });
     }
 
-    // Apply expiring soon filter
+    // Apply expiring soon filter (90d threshold)
     if (filterExpiringSoon) {
-      result = result.filter(r => {
-        if (r['Disclosure expiry date']) {
-          const expiry = new Date(r['Disclosure expiry date']);
-          return expiry >= now && expiry < sixtyDaysFromNow;
-        }
-        return false;
-      });
+      result = result.filter(r => isExpiringSoon(r['Disclosure expiry date']));
     }
 
     // Apply status filter
@@ -258,8 +252,10 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
                 </td>
               </tr>
             ) : (
-              filteredRecords.map((record, index) => (
-                <tr key={`${record['Membership number']}-${index}`} className="hover:bg-gray-50">
+              filteredRecords.map((record, index) => {
+                const disclosureExpiringSoon = isExpiringSoon(record['Disclosure expiry date']);
+                return (
+                <tr key={`${record['Membership number']}-${index}`} className={disclosureExpiringSoon ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-gray-50'}>
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
                       {onMemberSelect ? (
@@ -293,8 +289,9 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className={`px-4 py-3 text-sm font-medium ${disclosureExpiringSoon ? 'text-amber-700' : 'text-gray-600'}`}>
                     {formatDate(record['Disclosure expiry date'])}
+                    {disclosureExpiringSoon && <span className="ml-1 text-xs text-amber-600">(expiring soon)</span>}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {record['Unit name'] && <div>{record['Unit name']}</div>}
@@ -302,7 +299,8 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
                     {!record['Unit name'] && !record['Role name'] && '-'}
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

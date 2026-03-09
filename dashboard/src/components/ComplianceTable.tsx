@@ -20,6 +20,7 @@ type SortOrder = 'asc' | 'desc';
 const statusColors: Record<string, string> = {
   'Valid': 'bg-green-100 text-green-800',
   'In-Progress': 'bg-blue-100 text-blue-800',
+  'Expiring Soon': 'bg-amber-100 text-amber-800',
   'Expiring': 'bg-yellow-100 text-yellow-800',
   'Renewal Due': 'bg-orange-100 text-orange-800',
   'Expired': 'bg-red-100 text-red-800',

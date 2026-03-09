@@ -164,10 +164,15 @@ export class MockScoutsApiClient {
       byStatus[status] = (byStatus[status] || 0) + 1;
     }
 
+    const expiringSoon = records.filter(r =>
+      r.Status === 'Expiring' || r.Status === 'Renewal Due' || r.Status === 'Expiring Soon'
+    ).length;
+
     return {
       total: records.length,
       byLearningType,
       byStatus,
+      expiringSoon,
     };
   }
 

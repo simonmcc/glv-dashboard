@@ -6,6 +6,7 @@
 
 import { useState, useMemo } from 'react';
 import type { PermitRecord } from '../types';
+import { isExpiringSoon } from '../utils';
 
 interface PermitsTableProps {
   records: PermitRecord[];
@@ -186,8 +187,10 @@ export function PermitsTable({ records, isLoading, onMemberSelect, searchTerm = 
                 </td>
               </tr>
             ) : (
-              filteredRecords.map((record, index) => (
-                <tr key={`${record['Membership number']}-${record['Permit category']}-${index}`} className="hover:bg-gray-50">
+              filteredRecords.map((record, index) => {
+                const permitExpiringSoon = isExpiringSoon(record['Permit expiry date']);
+                return (
+                <tr key={`${record['Membership number']}-${record['Permit category']}-${index}`} className={permitExpiringSoon ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-gray-50'}>
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
                       {onMemberSelect ? (
@@ -222,11 +225,13 @@ export function PermitsTable({ records, isLoading, onMemberSelect, searchTerm = 
                       {record['Permit status']}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className={`px-4 py-3 text-sm font-medium ${permitExpiringSoon ? 'text-amber-700' : 'text-gray-600'}`}>
                     {formatDate(record['Permit expiry date'])}
+                    {permitExpiringSoon && <span className="ml-1 text-xs text-amber-600">(expiring soon)</span>}
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
