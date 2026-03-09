@@ -13,7 +13,7 @@ import { MockScoutsApiClient } from '../mock-api-client';
 const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
 
 const tracer = trace.getTracer('glv-dashboard', '1.0.0');
-import { transformLearningResults } from '../utils';
+import { transformLearningResults, isExpiringSoon } from '../utils';
 import type { LearningRecord, ComplianceSummary, JoiningJourneyRecord, DisclosureRecord, DisclosureSummary, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from '../types';
 import { SummaryTiles } from './SummaryTiles';
 import { ComplianceTable } from './ComplianceTable';
@@ -315,12 +315,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
     awards.state === 'loading';
 
   const permitExpiringSoon = useMemo(() => {
-    const now = new Date();
-    const ninetyDays = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
-    return permits.data.filter(r => {
-      const d = r['Permit expiry date'] ? new Date(r['Permit expiry date']) : null;
-      return d !== null && d > now && d <= ninetyDays;
-    }).length;
+    return permits.data.filter(r => isExpiringSoon(r['Permit expiry date'])).length;
   }, [permits.data]);
 
   if (selectedMember) {
