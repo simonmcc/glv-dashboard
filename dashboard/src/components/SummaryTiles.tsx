@@ -165,19 +165,25 @@ export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, p
             <span className="text-amber-500">⚠</span>
             <span className="font-medium">Expiring within 90 days:</span>
             {summary.expiringSoon > 0 && (
-              <span>Training <span className="font-semibold">{summary.expiringSoon}</span></span>
+              <a href="#section-learning" className="hover:underline">
+                Learning Records <span className="font-semibold">{summary.expiringSoon}</span>
+              </a>
             )}
             {summary.expiringSoon > 0 && (disclosureExpiringSoon > 0 || permitExpiringSoon > 0) && (
               <span className="text-amber-400">·</span>
             )}
             {disclosureExpiringSoon > 0 && (
-              <span>Disclosures <span className="font-semibold">{disclosureExpiringSoon}</span></span>
+              <a href="#section-disclosures" className="hover:underline">
+                Disclosures <span className="font-semibold">{disclosureExpiringSoon}</span>
+              </a>
             )}
             {disclosureExpiringSoon > 0 && permitExpiringSoon > 0 && (
               <span className="text-amber-400">·</span>
             )}
             {permitExpiringSoon > 0 && (
-              <span>Permits <span className="font-semibold">{permitExpiringSoon}</span></span>
+              <a href="#section-permits" className="hover:underline">
+                Permits <span className="font-semibold">{permitExpiringSoon}</span>
+              </a>
             )}
           </div>
         )}

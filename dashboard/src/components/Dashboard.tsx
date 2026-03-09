@@ -442,7 +442,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
         </section>
 
         {/* Learning Compliance Table - Always load immediately */}
-        <section>
+        <section id="section-learning">
           <div className="flex items-center gap-3 mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Learning Records</h2>
             {primaryLoading && (
@@ -472,6 +472,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
         {/* Disclosure Compliance - Lazy loaded */}
         <LazySection
           ref={disclosuresRef}
+          id="section-disclosures"
           title="Disclosure Compliance"
           state={disclosures.state}
           error={disclosures.error}
@@ -511,6 +512,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
         {/* Permits - Lazy loaded */}
         <LazySection
           ref={permitsRef}
+          id="section-permits"
           title="Permits"
           state={permits.state}
           error={permits.error}
