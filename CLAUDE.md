@@ -27,6 +27,18 @@ The frontend never calls Scouts APIs directly. All requests go through the backe
 
 API responses from Scouts use **space-separated field names** (e.g., `"First name"`, `"Membership number"`, `"Expiry date"`). Types in `dashboard/src/types.ts` reflect this exactly. Do not convert to camelCase.
 
+## Deployment
+
+Both services are live — no manual setup required.
+
+- **Backend**: Cloud Run at `https://glv-backend-gxoc276j2a-ew.a.run.app`
+  - Deployed via `cloudbuild.yaml` (manual) or `.github/workflows/deploy-backend.yml`
+  - `CORS_ORIGIN` is set to `https://glv-dashboard.web.app` in the Cloud Run env vars
+- **Dashboard**: Firebase Hosting at `https://glv-dashboard.web.app`
+  - Merges to `main` auto-deploy via `.github/workflows/firebase-hosting-merge.yml`
+  - PRs get a preview channel deploy via `.github/workflows/firebase-hosting-pull-request.yml`
+  - `VITE_BACKEND_URL` is injected as the Cloud Run URL in the deploy workflow
+
 ## Commands
 
 ### Backend (`backend/`)
@@ -70,6 +82,8 @@ cd dashboard && npx vitest run src/utils.test.ts
 - Dashboard tests use `jsdom` environment with `@testing-library/react` and `@testing-library/jest-dom`. Setup file: `src/test/setup.ts`.
 - Test files live alongside source files (`*.test.ts`).
 - CI runs tests and coverage for both packages, plus lint and build for dashboard (`.github/workflows/test.yml`).
+- `virtual:pwa-register/react` is a Vite build-time virtual module not available in Vitest — it is stubbed via an alias in `vitest.config.ts` → `src/test/pwa-register-stub.ts`. Do not remove this alias.
+- The `Dashboard.test.tsx` tests emit `act()` warnings — these are pre-existing, not a regression signal.
 
 ## Environment Variables
 
@@ -95,6 +109,11 @@ cd dashboard && VITE_OTEL_ENABLED=true npm run dev # frontend with tracing
 
 Tracing is opt-in and has zero overhead when disabled. Manual spans instrument the slow Playwright auth flow and per-member API loops in `backend/src/auth-service.ts`. Frontend fetch calls are auto-instrumented with W3C trace context propagation to the backend.
 
+## Dashboard UI
+
+- Primary accent colour is **purple-600** (`#9333ea`) — used for buttons, focus rings, badges, PWA theme colour, and app icons.
+- Auth tokens are stored in `sessionStorage` (cleared on tab close). See `dashboard/src/session.ts`.
+
 ## Backend API Endpoints
 
 - `POST /auth/login` — Authenticate via Playwright, returns Bearer token + contactId
@@ -119,22 +138,15 @@ Tracing is opt-in and has zero overhead when disabled. Manual spans instrument t
 
    **Recommended worktree workflow**
    ```bash
-   # 1. Clone the repo (default worktree, coordination only)
-   git clone git@github.com:YOUR-ORG/glv-dashboard.git
-   cd glv-dashboard
+   # 1. From the default worktree (must be on main, coordination only):
+   #    Create the branch AND worktree in one step — do NOT run `git switch -c` first,
+   #    as that checks the branch out in the default worktree and blocks `git worktree add`.
+   git worktree add ../glv-TICKET-123 -b feature/TICKET-123
 
-   # 2. Create a feature branch for your ticket
-   git switch -c feature/TICKET-123
-
-   # 3. Create a dedicated worktree directory for that branch
-   git worktree add ../glv-TICKET-123 feature/TICKET-123
-
-   # 4. Do all coding, npm installs, and dev server runs from the worktree
+   # 2. Do all coding, npm installs, and dev server runs from the worktree
    cd ../glv-TICKET-123
    # edit files, run: cd backend && npm run dev, etc.
 
-   # 5. Avoid plain `git push` or `git push origin` with no branch/refspec from a worktree
-   #    `git worktree add` can inherit the branch's upstream tracking from the current branch
-   #    (often origin/main), so a bare push can silently update origin/main instead of your
-   #    feature branch. Either set upstream explicitly, or always push with an explicit refspec:
-   git push origin feature/TICKET-123:feature/TICKET-123
+   # 3. Always push with an explicit refspec.
+   #    Worktree branches track origin/main by default; a bare push silently targets main.
+   git push origin feature/TICKET-123:refs/heads/feature/TICKET-123
