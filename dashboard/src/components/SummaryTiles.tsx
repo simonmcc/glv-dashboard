@@ -120,7 +120,7 @@ function LoadingTile() {
 export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, permitExpiringSoon = 0 }: SummaryTilesProps) {
   if (isLoading || !summary) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <LoadingTile />
         <LoadingTile />
         <LoadingTile />
@@ -144,14 +144,14 @@ export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, p
     <div>
       {/* Overall summary */}
       <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Overall Compliance</h2>
             <p className="text-sm text-gray-500">{summary.total} training records</p>
           </div>
-          <div className="text-right">
+          <div className="sm:text-right">
             <div className="text-sm text-gray-500">Status breakdown</div>
-            <div className="flex gap-3 text-sm">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
               {Object.entries(summary.byStatus).map(([status, count]) => (
                 <span key={status} className="text-gray-600">
                   {status}: <span className="font-medium">{count}</span>
@@ -161,7 +161,7 @@ export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, p
           </div>
         </div>
         {(summary.expiringSoon > 0 || disclosureExpiringSoon > 0 || permitExpiringSoon > 0) && (
-          <div className="mt-3 pt-3 border-t border-amber-200 flex items-center gap-2 text-sm text-amber-800 bg-amber-50 -mx-4 -mb-4 px-4 py-2 rounded-b-lg">
+          <div className="mt-3 pt-3 border-t border-amber-200 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-amber-800 bg-amber-50 -mx-4 -mb-4 px-4 py-2 rounded-b-lg">
             <span className="text-amber-500">⚠</span>
             <span className="font-medium">Expiring within 90 days:</span>
             {summary.expiringSoon > 0 && (
@@ -190,7 +190,7 @@ export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, p
       </div>
 
       {/* Learning type tiles */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {learningTypes.map(([type, stats], index) => (
           <Tile
             key={type}
