@@ -153,7 +153,7 @@ export function PermitsTable({ records, isLoading, onMemberSelect, searchTerm = 
               >
                 Name {renderSortIcon("name")}
               </th>
-              <th className="px-4 py-3 text-sm font-semibold text-gray-900">
+              <th className="hidden sm:table-cell px-4 py-3 text-sm font-semibold text-gray-900">
                 Membership #
               </th>
               <th
@@ -208,7 +208,7 @@ export function PermitsTable({ records, isLoading, onMemberSelect, searchTerm = 
                       <div className="text-sm text-gray-500">{record['Unit name']}</div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 font-mono">
+                  <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
                     {record['Membership number']}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
