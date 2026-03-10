@@ -8,6 +8,13 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(getGitVersion()),
     __APP_URL__: JSON.stringify(getGitUrl()),
   },
+  resolve: {
+    alias: {
+      // vite-plugin-pwa virtual modules are not available in the test environment.
+      // Provide a stub so App.tsx imports resolve without errors.
+      'virtual:pwa-register/react': '/src/test/pwa-register-stub.ts',
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',

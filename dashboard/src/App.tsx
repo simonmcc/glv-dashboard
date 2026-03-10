@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 import type { AuthState } from './types';
 import { AuthFlow } from './components/AuthFlow';
 import { Dashboard } from './components/Dashboard';
@@ -20,6 +21,24 @@ function loadAuthState(): AuthState {
     return { status: 'authenticated', token: session.token, contactId: session.contactId, username: session.username };
   }
   return { status: 'unauthenticated' };
+}
+
+function UpdateToast() {
+  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
+
+  if (!needRefresh) return null;
+
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-gray-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg">
+      <span>A new version is available.</span>
+      <button
+        onClick={() => updateServiceWorker(true)}
+        className="bg-purple-500 hover:bg-purple-400 text-white px-3 py-1 rounded font-medium transition-colors"
+      >
+        Reload
+      </button>
+    </div>
+  );
 }
 
 function App() {
@@ -51,25 +70,31 @@ function App() {
   // Show auth flow if not authenticated
   if (authState.status !== 'authenticated') {
     return (
-      <AuthFlow
-        authState={authState}
-        onAuthStart={handleAuthStart}
-        onAuthComplete={handleAuthComplete}
-        onAuthError={handleAuthError}
-        mockMode={MOCK_MODE}
-      />
+      <>
+        <UpdateToast />
+        <AuthFlow
+          authState={authState}
+          onAuthStart={handleAuthStart}
+          onAuthComplete={handleAuthComplete}
+          onAuthError={handleAuthError}
+          mockMode={MOCK_MODE}
+        />
+      </>
     );
   }
 
   // Show dashboard when authenticated
   return (
-    <Dashboard
-      token={authState.token}
-      contactId={authState.contactId}
-      username={authState.username}
-      onLogout={handleLogout}
-      onTokenExpired={handleTokenExpired}
-    />
+    <>
+      <UpdateToast />
+      <Dashboard
+        token={authState.token}
+        contactId={authState.contactId}
+        username={authState.username}
+        onLogout={handleLogout}
+        onTokenExpired={handleTokenExpired}
+      />
+    </>
   );
 }
 
