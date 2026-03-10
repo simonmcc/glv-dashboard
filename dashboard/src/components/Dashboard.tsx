@@ -343,36 +343,39 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">GLV Dashboard</h1>
-            <p className="text-sm text-gray-500">Training Compliance Overview</p>
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">GLV Dashboard</h1>
+              <p className="text-sm text-gray-500 hidden sm:block">Training Compliance Overview</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={refreshAll}
+                disabled={isAnyLoading}
+                className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+              >
+                {isAnyLoading ? 'Loading...' : 'Refresh'}
+              </button>
+              <button
+                onClick={onLogout}
+                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            {lastUpdated && (
-              <span className="text-sm text-gray-500">
-                Updated: {lastUpdated.toLocaleTimeString()}
-              </span>
-            )}
-            {username && (
-              <span className="text-sm text-gray-600">
-                Signed in as <span className="font-medium">{username}</span>
-              </span>
-            )}
-            <button
-              onClick={refreshAll}
-              disabled={isAnyLoading}
-              className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50"
-            >
-              {isAnyLoading ? 'Loading...' : 'Refresh'}
-            </button>
-            <button
-              onClick={onLogout}
-              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
-            >
-              Sign Out
-            </button>
-          </div>
+          {/* Metadata row — hidden on small screens to save space */}
+          {(lastUpdated || username) && (
+            <div className="hidden sm:flex items-center gap-4 mt-1 text-sm text-gray-500">
+              {lastUpdated && (
+                <span>Updated: {lastUpdated.toLocaleTimeString()}</span>
+              )}
+              {username && (
+                <span>Signed in as <span className="font-medium text-gray-600">{username}</span></span>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
