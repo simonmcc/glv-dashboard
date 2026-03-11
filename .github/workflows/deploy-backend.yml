@@ -58,4 +58,4 @@ jobs:
             --concurrency 10 \
             --min-instances 0 \
             --max-instances 3 \
-            --set-env-vars "CORS_ORIGIN=https://glv-dashboard.web.app"
+            --set-env-vars "CORS_ORIGIN=https://glv-dashboard.web.app,OTEL_ENABLED=true,GOOGLE_CLOUD_PROJECT=$PROJECT_ID"
