@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { SESSION_KEY } from './session';
+import { SESSION_KEY, SESSION_MAX_AGE_MS } from './session';
 
 // Mock the Dashboard component to avoid API calls
 vi.mock('./components/Dashboard', () => ({
@@ -14,12 +14,12 @@ vi.mock('./components/Dashboard', () => ({
 
 describe('App - session management', () => {
   beforeEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
     vi.resetModules();
   });
 
   afterEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
   });
 
   describe('session loading', () => {
@@ -30,10 +30,11 @@ describe('App - session management', () => {
       expect(screen.getByLabelText('Email Address')).toBeInTheDocument();
     });
 
-    it('restores authenticated state from sessionStorage', async () => {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+    it('restores authenticated state from localStorage', async () => {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({
         token: 'saved-token',
         contactId: 'saved-contact',
+        loginAt: Date.now(),
       }));
 
       const { default: App } = await import('./App');
@@ -42,10 +43,40 @@ describe('App - session management', () => {
       expect(screen.getByTestId('dashboard')).toBeInTheDocument();
     });
 
+    it('treats a session older than SESSION_MAX_AGE_MS as expired', async () => {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({
+        token: 'old-token',
+        contactId: 'old-contact',
+        loginAt: Date.now() - SESSION_MAX_AGE_MS - 1,
+      }));
+
+      const { default: App } = await import('./App');
+      render(<App />);
+
+      // Stale session should show login screen, not dashboard
+      expect(screen.getByLabelText('Email Address')).toBeInTheDocument();
+      // And the stale entry should have been cleaned up
+      expect(localStorage.getItem(SESSION_KEY)).toBeNull();
+    });
+
+    it('treats a session with no loginAt (old format) as expired', async () => {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({
+        token: 'legacy-token',
+        contactId: 'legacy-contact',
+        // no loginAt field
+      }));
+
+      const { default: App } = await import('./App');
+      render(<App />);
+
+      expect(screen.getByLabelText('Email Address')).toBeInTheDocument();
+    });
+
     it('requires token to be present for valid session', async () => {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+      localStorage.setItem(SESSION_KEY, JSON.stringify({
         token: '',
         contactId: 'some-contact',
+        loginAt: Date.now(),
       }));
 
       const { default: App } = await import('./App');
@@ -56,7 +87,7 @@ describe('App - session management', () => {
     });
 
     it('handles corrupted JSON gracefully', async () => {
-      sessionStorage.setItem(SESSION_KEY, 'not-valid-json{{{');
+      localStorage.setItem(SESSION_KEY, 'not-valid-json{{{');
 
       const { default: App } = await import('./App');
       render(<App />);
@@ -66,7 +97,7 @@ describe('App - session management', () => {
     });
 
     it('handles missing session properties gracefully', async () => {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ unrelated: 'data' }));
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ unrelated: 'data' }));
 
       const { default: App } = await import('./App');
       render(<App />);
@@ -77,7 +108,7 @@ describe('App - session management', () => {
   });
 
   describe('session saving', () => {
-    it('saves session to sessionStorage on successful auth', async () => {
+    it('saves session to localStorage on successful auth', async () => {
       const { default: App } = await import('./App');
       render(<App />);
 
@@ -100,19 +131,21 @@ describe('App - session management', () => {
         expect(screen.getByTestId('dashboard')).toBeInTheDocument();
       });
 
-      // Verify session was saved
-      const saved = sessionStorage.getItem(SESSION_KEY);
+      // Verify session was saved with a loginAt timestamp
+      const saved = localStorage.getItem(SESSION_KEY);
       expect(saved).not.toBeNull();
       const parsed = JSON.parse(saved!);
       expect(parsed.token).toBe('test-bearer-token');
+      expect(parsed.loginAt).toBeTypeOf('number');
     });
   });
 
   describe('session clearing', () => {
     it('clears session on logout', async () => {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+      localStorage.setItem(SESSION_KEY, JSON.stringify({
         token: 'saved-token',
         contactId: 'saved-contact',
+        loginAt: Date.now(),
       }));
 
       const { default: App } = await import('./App');
@@ -122,14 +155,15 @@ describe('App - session management', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
 
-      expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
+      expect(localStorage.getItem(SESSION_KEY)).toBeNull();
       expect(screen.getByLabelText('Email Address')).toBeInTheDocument();
     });
 
     it('clears session on token expiry', async () => {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+      localStorage.setItem(SESSION_KEY, JSON.stringify({
         token: 'saved-token',
         contactId: 'saved-contact',
+        loginAt: Date.now(),
       }));
 
       const { default: App } = await import('./App');
@@ -139,7 +173,7 @@ describe('App - session management', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Token Expired' }));
 
-      expect(sessionStorage.getItem(SESSION_KEY)).toBeNull();
+      expect(localStorage.getItem(SESSION_KEY)).toBeNull();
       expect(screen.getByText('Your session has expired. Please sign in again.')).toBeInTheDocument();
     });
   });
@@ -147,12 +181,12 @@ describe('App - session management', () => {
 
 describe('App - mock mode', () => {
   beforeEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
     vi.resetModules();
   });
 
   afterEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
     vi.unstubAllEnvs();
   });
 
@@ -169,9 +203,10 @@ describe('App - mock mode', () => {
   it('restores session in mock mode if previously logged in', async () => {
     vi.stubEnv('VITE_MOCK_MODE', 'true');
 
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
       token: 'mock-token',
       contactId: 'mock-contact',
+      loginAt: Date.now(),
     }));
 
     const { default: App } = await import('./App');

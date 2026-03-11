@@ -14,7 +14,7 @@ import { loadSession, saveSession, clearSession } from './session';
 
 const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
 
-/** Load session from sessionStorage and convert to AuthState */
+/** Load session from localStorage and convert to AuthState */
 function loadAuthState(): AuthState {
   const session = loadSession();
   if (session) {
