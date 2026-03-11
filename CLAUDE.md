@@ -97,22 +97,40 @@ cd dashboard && npx vitest run src/utils.test.ts
 - `VITE_OTEL_ENABLED` — Set to `true` to enable frontend browser tracing
 
 
-## Tracing
+## Observability
 
-OpenTelemetry distributed tracing is available for both backend and frontend, exporting to Jaeger via OTLP HTTP.
+### Structured logging (backend)
+
+`backend/src/logger.ts` detects the `K_SERVICE` env var set by Cloud Run and emits structured JSON with `severity`, `message`, and Cloud Logging trace-correlation fields (`logging.googleapis.com/trace`, `logging.googleapis.com/spanId`). Locally it emits human-readable lines. Set `DEBUG=true` to enable debug-level output.
+
+View production logs: Cloud Logging console → `resource.type="cloud_run_revision" resource.labels.service_name="glv-backend"`.
+
+### Tracing (OpenTelemetry)
+
+Tracing is opt-in and has zero overhead when disabled.
+
+**Production (Cloud Trace):** `cloudbuild.yaml` sets `OTEL_ENABLED=true` and `GOOGLE_CLOUD_PROJECT` on the Cloud Run service, which causes `backend/src/tracing.ts` to export directly to **Google Cloud Trace** via `@google-cloud/opentelemetry-cloud-trace-exporter`. Log entries include the trace resource name so Cloud Logging shows a "View trace" link per log line.
+
+> **Known gap:** `deploy-backend.yml` (GitHub Actions path) is missing `OTEL_ENABLED=true` and `GOOGLE_CLOUD_PROJECT` in its `--set-env-vars`. Backends deployed via that path will not emit traces or trace-correlated logs until this is fixed to match `cloudbuild.yaml`.
+
+**Locally (Jaeger):**
 
 ```bash
-docker compose up -d                              # start Jaeger (UI at http://localhost:16686)
+docker compose up -d                               # start Jaeger at http://localhost:16686
 cd backend && npm run dev:traced                   # backend with tracing
 cd dashboard && VITE_OTEL_ENABLED=true npm run dev # frontend with tracing
 ```
 
-Tracing is opt-in and has zero overhead when disabled. Manual spans instrument the slow Playwright auth flow and per-member API loops in `backend/src/auth-service.ts`. Frontend fetch calls are auto-instrumented with W3C trace context propagation to the backend.
+Manual spans instrument the slow Playwright auth flow and per-member API loops in `backend/src/auth-service.ts`. Frontend fetch calls are auto-instrumented with W3C trace context propagation to the backend.
+
+### Cloud Monitoring
+
+No custom metrics are exported. Cloud Run built-in metrics (request count, latency, instance count) are available automatically in the Cloud Monitoring console.
 
 ## Dashboard UI
 
 - Primary accent colour is **purple-600** (`#9333ea`) — used for buttons, focus rings, badges, PWA theme colour, and app icons.
-- Auth tokens are stored in `sessionStorage` (cleared on tab close). See `dashboard/src/session.ts`.
+- Auth tokens are stored in `localStorage` with an 8-hour expiry. See `dashboard/src/session.ts`.
 
 ## Backend API Endpoints
 
