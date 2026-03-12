@@ -289,27 +289,42 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
     let cancelled = false;
 
     async function init() {
-      // Read all caches in parallel for a fast first paint
-      const [
-        cachedRecords,
-        cachedDisclosures,
-        cachedJoiningJourney,
-        cachedSuspensions,
-        cachedTeamReviews,
-        cachedPermits,
-        cachedAwards,
-        cachedLastSync,
-      ] = await Promise.all([
-        readCache('learningRecords', contactId),
-        readCache('disclosures', contactId),
-        readCache('joiningJourney', contactId),
-        readCache('suspensions', contactId),
-        readCache('teamReviews', contactId),
-        readCache('permits', contactId),
-        readCache('awards', contactId),
-        readLastSync(contactId),
-      ]);
+      // Read all caches in parallel for a fast first paint.
+      // If IndexedDB is unavailable/blocked, fall back to empty cache and continue.
+      let cachedRecords: LearningRecord[] | null = null;
+      let cachedDisclosures: DisclosureRecord[] | null = null;
+      let cachedJoiningJourney: JoiningJourneyRecord[] | null = null;
+      let cachedSuspensions: SuspensionRecord[] | null = null;
+      let cachedTeamReviews: TeamReviewRecord[] | null = null;
+      let cachedPermits: PermitRecord[] | null = null;
+      let cachedAwards: AwardRecord[] | null = null;
+      let cachedLastSync: Date | null = null;
 
+      try {
+        [
+          cachedRecords,
+          cachedDisclosures,
+          cachedJoiningJourney,
+          cachedSuspensions,
+          cachedTeamReviews,
+          cachedPermits,
+          cachedAwards,
+          cachedLastSync,
+        ] = await Promise.all([
+          readCache('learningRecords', contactId),
+          readCache('disclosures', contactId),
+          readCache('joiningJourney', contactId),
+          readCache('suspensions', contactId),
+          readCache('teamReviews', contactId),
+          readCache('permits', contactId),
+          readCache('awards', contactId),
+          readLastSync(contactId),
+        ]);
+      } catch (err) {
+        // IndexedDB failed (unavailable, blocked, or quota exceeded).
+        // Proceed without cached data so the network fetch path can still run.
+        console.warn('Failed to read dashboard cache from IndexedDB; continuing without cache.', err);
+      }
       if (cancelled) return;
 
       if (cachedLastSync) setLastSync(cachedLastSync);
