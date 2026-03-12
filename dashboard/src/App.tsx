@@ -5,7 +5,7 @@
  * Fetches data from the Scouts membership portal using the user's session.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import type { AuthState } from './types';
 import { AuthFlow } from './components/AuthFlow';
@@ -43,6 +43,18 @@ function UpdateToast() {
 
 function App() {
   const [authState, setAuthState] = useState<AuthState>(loadAuthState);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const handleAuthStart = useCallback(() => {
     setAuthState({ status: 'authenticating' });
@@ -91,6 +103,7 @@ function App() {
         token={authState.token}
         contactId={authState.contactId}
         username={authState.username}
+        isOnline={isOnline}
         onLogout={handleLogout}
         onTokenExpired={handleTokenExpired}
       />
