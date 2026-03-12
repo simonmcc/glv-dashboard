@@ -286,7 +286,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   // On mount: seed state from IndexedDB cache for immediate render, then
   // fetch fresh data from the network if online.
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
     async function init() {
       // Read all caches in parallel for a fast first paint
@@ -310,7 +310,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         readLastSync(contactId),
       ]);
 
-      if (cancelled) return;
+      if (controller.signal.aborted) return;
 
       if (cachedLastSync) setLastSync(cachedLastSync);
 
@@ -349,14 +349,13 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       }
 
       // Fetch fresh data from the network if online
-      if (isOnline && !cancelled) {
-        const controller = new AbortController();
+      if (isOnline && !controller.signal.aborted) {
         await fetchPrimaryData(controller.signal);
       }
     }
 
     init();
-    return () => { cancelled = true; };
+    return () => { controller.abort(); };
   // Run once on mount only — isOnline and fetchPrimaryData are intentionally
   // excluded to avoid re-running when online state flips mid-session.
   // eslint-disable-next-line react-hooks/exhaustive-deps
