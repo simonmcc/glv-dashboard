@@ -6,7 +6,7 @@
  * data was last synced from the network.
  */
 import { openDB } from 'idb';
-import type { DBSchema, IDBPDatabase } from 'idb';
+import type { DBSchema, IDBPDatabase, StoreNames } from 'idb';
 import type {
   LearningRecord,
   DisclosureRecord,
@@ -28,7 +28,7 @@ interface GLVDatabase extends DBSchema {
   meta:            { key: string; value: { lastSync: number } };
 }
 
-export type CacheStore = Exclude<keyof GLVDatabase, 'meta'>;
+export type CacheStore = Exclude<StoreNames<GLVDatabase>, 'meta'>;
 
 let _db: IDBPDatabase<GLVDatabase> | null = null;
 
@@ -54,8 +54,7 @@ export async function readCache<S extends CacheStore>(
   contactId: string,
 ): Promise<GLVDatabase[S]['value'] | undefined> {
   const db = await getDb();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (db as any).get(store, contactId);
+  return db.get(store, contactId);
 }
 
 export async function writeCache<S extends CacheStore>(
@@ -64,8 +63,7 @@ export async function writeCache<S extends CacheStore>(
   value: GLVDatabase[S]['value'],
 ): Promise<void> {
   const db = await getDb();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (db as any).put(store, value, contactId);
+  await db.put(store, value, contactId);
   await db.put('meta', { lastSync: Date.now() }, contactId);
 }
 
