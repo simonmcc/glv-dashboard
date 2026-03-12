@@ -187,6 +187,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       const data = response.data || [];
       setJoiningJourney({ state: 'loaded', data, error: null });
       await writeCache('joiningJourney', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setJoiningJourney(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
@@ -204,6 +205,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         error: null
       });
       await writeCache('disclosures', contactId, records);
+      setLastSync(Date.now());
     } catch (err) {
       setDisclosures(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
@@ -217,6 +219,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       const data = response.data || [];
       setSuspensions({ state: 'loaded', data, error: null });
       await writeCache('suspensions', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setSuspensions(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
@@ -230,6 +233,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       const data = response.data || [];
       setTeamReviews({ state: 'loaded', data, error: null });
       await writeCache('teamReviews', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setTeamReviews(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
@@ -243,6 +247,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       const data = response.data || [];
       setPermits({ state: 'loaded', data, error: null });
       await writeCache('permits', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setPermits(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
@@ -256,6 +261,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       const data = response.data || [];
       setAwards({ state: 'loaded', data, error: null });
       await writeCache('awards', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setAwards(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
@@ -289,27 +295,42 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
     const controller = new AbortController();
 
     async function init() {
-      // Read all caches in parallel for a fast first paint
-      const [
-        cachedRecords,
-        cachedDisclosures,
-        cachedJoiningJourney,
-        cachedSuspensions,
-        cachedTeamReviews,
-        cachedPermits,
-        cachedAwards,
-        cachedLastSync,
-      ] = await Promise.all([
-        readCache('learningRecords', contactId),
-        readCache('disclosures', contactId),
-        readCache('joiningJourney', contactId),
-        readCache('suspensions', contactId),
-        readCache('teamReviews', contactId),
-        readCache('permits', contactId),
-        readCache('awards', contactId),
-        readLastSync(contactId),
-      ]);
+      // Read all caches in parallel for a fast first paint.
+      // If IndexedDB is unavailable/blocked, fall back to empty cache and continue.
+      let cachedRecords: LearningRecord[] | null = null;
+      let cachedDisclosures: DisclosureRecord[] | null = null;
+      let cachedJoiningJourney: JoiningJourneyRecord[] | null = null;
+      let cachedSuspensions: SuspensionRecord[] | null = null;
+      let cachedTeamReviews: TeamReviewRecord[] | null = null;
+      let cachedPermits: PermitRecord[] | null = null;
+      let cachedAwards: AwardRecord[] | null = null;
+      let cachedLastSync: Date | null = null;
 
+      try {
+        [
+          cachedRecords,
+          cachedDisclosures,
+          cachedJoiningJourney,
+          cachedSuspensions,
+          cachedTeamReviews,
+          cachedPermits,
+          cachedAwards,
+          cachedLastSync,
+        ] = await Promise.all([
+          readCache('learningRecords', contactId),
+          readCache('disclosures', contactId),
+          readCache('joiningJourney', contactId),
+          readCache('suspensions', contactId),
+          readCache('teamReviews', contactId),
+          readCache('permits', contactId),
+          readCache('awards', contactId),
+          readLastSync(contactId),
+        ]);
+      } catch (err) {
+        // IndexedDB failed (unavailable, blocked, or quota exceeded).
+        // Proceed without cached data so the network fetch path can still run.
+        console.warn('Failed to read dashboard cache from IndexedDB; continuing without cache.', err);
+      }
       if (controller.signal.aborted) return;
 
       if (cachedLastSync) setLastSync(cachedLastSync);
@@ -318,6 +339,10 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         setRecords(cachedRecords);
         setSummary(client.computeComplianceSummary(cachedRecords));
         setPrimaryLoading(false);
+      } else if (!isOnline) {
+        // Offline with no cached data — stop loading and surface a message
+        setPrimaryLoading(false);
+        setPrimaryError('You are offline and there is no cached data available.');
       }
       if (cachedDisclosures && cachedDisclosures.length > 0) {
         setDisclosures({
