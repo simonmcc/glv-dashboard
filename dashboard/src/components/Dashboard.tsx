@@ -187,6 +187,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       const data = response.data || [];
       setJoiningJourney({ state: 'loaded', data, error: null });
       await writeCache('joiningJourney', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setJoiningJourney(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
@@ -204,6 +205,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         error: null
       });
       await writeCache('disclosures', contactId, records);
+      setLastSync(Date.now());
     } catch (err) {
       setDisclosures(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
@@ -217,6 +219,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       const data = response.data || [];
       setSuspensions({ state: 'loaded', data, error: null });
       await writeCache('suspensions', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setSuspensions(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
@@ -230,6 +233,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       const data = response.data || [];
       setTeamReviews({ state: 'loaded', data, error: null });
       await writeCache('teamReviews', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setTeamReviews(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
@@ -243,6 +247,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       const data = response.data || [];
       setPermits({ state: 'loaded', data, error: null });
       await writeCache('permits', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setPermits(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
@@ -256,6 +261,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       const data = response.data || [];
       setAwards({ state: 'loaded', data, error: null });
       await writeCache('awards', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setAwards(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
