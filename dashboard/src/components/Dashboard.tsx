@@ -68,6 +68,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   const [awards, setAwards] = useState<SectionState<AwardRecord[]>>({ state: 'idle', data: [], error: null });
 
   const [lastSync, setLastSync] = useState<number | null>(null);
+  const [, setCacheUpdatedAt] = useState<number | null>(null);
 
   // Section refs for intersection observer
   const joiningJourneyRef = useRef<HTMLElement>(null);
@@ -157,6 +158,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         // Cache the results and update sync timestamp
         await writeCache('learningRecords', contactId, data);
         setLastSync(Date.now());
+        setCacheUpdatedAt(Date.now());
 
         span.setStatus({ code: SpanStatusCode.OK });
       } catch (err) {
@@ -317,14 +319,14 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           cachedAwards,
           cachedLastSync,
         ] = await Promise.all([
-          readCache('learningRecords', contactId),
-          readCache('disclosures', contactId),
-          readCache('joiningJourney', contactId),
-          readCache('suspensions', contactId),
-          readCache('teamReviews', contactId),
-          readCache('permits', contactId),
-          readCache('awards', contactId),
-          readLastSync(contactId),
+          readCache('learningRecords', contactId) as Promise<LearningRecord[] | null>,
+          readCache('disclosures', contactId) as Promise<DisclosureRecord[] | null>,
+          readCache('joiningJourney', contactId) as Promise<JoiningJourneyRecord[] | null>,
+          readCache('suspensions', contactId) as Promise<SuspensionRecord[] | null>,
+          readCache('teamReviews', contactId) as Promise<TeamReviewRecord[] | null>,
+          readCache('permits', contactId) as Promise<PermitRecord[] | null>,
+          readCache('awards', contactId) as Promise<AwardRecord[] | null>,
+          readLastSync(contactId) as Promise<Date | null>,
         ]);
       } catch (err) {
         // IndexedDB failed (unavailable, blocked, or quota exceeded).
@@ -333,7 +335,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       }
       if (controller.signal.aborted) return;
 
-      if (cachedLastSync) setLastSync(cachedLastSync);
+      if (cachedLastSync) setLastSync(cachedLastSync.getTime());
 
       if (cachedRecords && cachedRecords.length > 0) {
         setRecords(cachedRecords);
