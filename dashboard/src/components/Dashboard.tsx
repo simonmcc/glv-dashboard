@@ -3,6 +3,7 @@
  *
  * Orchestrates the dashboard layout and data fetching.
  * Uses lazy loading to fetch section data when scrolled into view.
+ * Caches all fetched data in IndexedDB for offline access.
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -26,11 +27,14 @@ import { AwardsTable } from './AwardsTable';
 import { LazySection } from './LazySection';
 import type { LoadState } from './LazySection';
 import { MemberDashboard } from './MemberDashboard';
+import { SyncStatus } from './SyncStatus';
+import { readCache, writeCache, readLastSync } from '../db';
 
 interface DashboardProps {
   token: string;
   contactId: string;
   username?: string;
+  isOnline: boolean;
   onLogout: () => void;
   onTokenExpired: () => void;
 }
@@ -42,7 +46,7 @@ interface SectionState<T> {
   error: string | null;
 }
 
-export function Dashboard({ token, contactId, username, onLogout, onTokenExpired }: DashboardProps) {
+export function Dashboard({ token, contactId, username, isOnline, onLogout, onTokenExpired }: DashboardProps) {
   // Primary data (loaded immediately - always visible at top)
   const [records, setRecords] = useState<LearningRecord[]>([]);
   const [summary, setSummary] = useState<ComplianceSummary | null>(null);
@@ -63,7 +67,8 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
   const [permits, setPermits] = useState<SectionState<PermitRecord[]>>({ state: 'idle', data: [], error: null });
   const [awards, setAwards] = useState<SectionState<AwardRecord[]>>({ state: 'idle', data: [], error: null });
 
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [lastSync, setLastSync] = useState<number | null>(null);
+  const [, setCacheUpdatedAt] = useState<number | null>(null);
 
   // Section refs for intersection observer
   const joiningJourneyRef = useRef<HTMLElement>(null);
@@ -149,7 +154,12 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
         const data = transformLearningResults(learningResult.members, undefined, memberStartDates);
         setRecords(data);
         setSummary(client.computeComplianceSummary(data));
-        setLastUpdated(new Date());
+
+        // Cache the results and update sync timestamp
+        await writeCache('learningRecords', contactId, data);
+        setLastSync(Date.now());
+        setCacheUpdatedAt(Date.now());
+
         span.setStatus({ code: SpanStatusCode.OK });
       } catch (err) {
         // Ignore aborted fetches — a new fetch will have already been started.
@@ -170,17 +180,20 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
     });
   }, [client, contactId, onTokenExpired]);
 
-  // Section loaders
+  // Section loaders — fetch from network and write to cache on success.
   const loadJoiningJourney = useCallback(async () => {
     setJoiningJourney(s => ({ ...s, state: 'loading', error: null }));
     try {
       const response = await client.getJoiningJourney(500);
       if (response.error) throw new Error(response.error);
-      setJoiningJourney({ state: 'loaded', data: response.data || [], error: null });
+      const data = response.data || [];
+      setJoiningJourney({ state: 'loaded', data, error: null });
+      await writeCache('joiningJourney', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setJoiningJourney(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
-  }, [client]);
+  }, [client, contactId]);
 
   const loadDisclosures = useCallback(async () => {
     setDisclosures(s => ({ ...s, state: 'loading', error: null }));
@@ -193,54 +206,68 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
         data: { records, summary: client.computeDisclosureSummary(records) },
         error: null
       });
+      await writeCache('disclosures', contactId, records);
+      setLastSync(Date.now());
     } catch (err) {
       setDisclosures(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
-  }, [client]);
+  }, [client, contactId]);
 
   const loadSuspensions = useCallback(async () => {
     setSuspensions(s => ({ ...s, state: 'loading', error: null }));
     try {
       const response = await client.getSuspensions(500);
       if (response.error) throw new Error(response.error);
-      setSuspensions({ state: 'loaded', data: response.data || [], error: null });
+      const data = response.data || [];
+      setSuspensions({ state: 'loaded', data, error: null });
+      await writeCache('suspensions', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setSuspensions(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
-  }, [client]);
+  }, [client, contactId]);
 
   const loadTeamReviews = useCallback(async () => {
     setTeamReviews(s => ({ ...s, state: 'loading', error: null }));
     try {
       const response = await client.getTeamReviews(500);
       if (response.error) throw new Error(response.error);
-      setTeamReviews({ state: 'loaded', data: response.data || [], error: null });
+      const data = response.data || [];
+      setTeamReviews({ state: 'loaded', data, error: null });
+      await writeCache('teamReviews', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setTeamReviews(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
-  }, [client]);
+  }, [client, contactId]);
 
   const loadPermits = useCallback(async () => {
     setPermits(s => ({ ...s, state: 'loading', error: null }));
     try {
       const response = await client.getPermits(500);
       if (response.error) throw new Error(response.error);
-      setPermits({ state: 'loaded', data: response.data || [], error: null });
+      const data = response.data || [];
+      setPermits({ state: 'loaded', data, error: null });
+      await writeCache('permits', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setPermits(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
-  }, [client]);
+  }, [client, contactId]);
 
   const loadAwards = useCallback(async () => {
     setAwards(s => ({ ...s, state: 'loading', error: null }));
     try {
       const response = await client.getAwards(500);
       if (response.error) throw new Error(response.error);
-      setAwards({ state: 'loaded', data: response.data || [], error: null });
+      const data = response.data || [];
+      setAwards({ state: 'loaded', data, error: null });
+      await writeCache('awards', contactId, data);
+      setLastSync(Date.now());
     } catch (err) {
       setAwards(s => ({ ...s, state: 'error', error: (err as Error).message }));
     }
-  }, [client]);
+  }, [client, contactId]);
 
   // Refresh all data
   const refreshAll = useCallback(async () => {
@@ -264,14 +291,102 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
     if (awards.state === 'idle') loadAwards();
   }, [joiningJourney.state, loadJoiningJourney, disclosures.state, loadDisclosures, teamReviews.state, loadTeamReviews, permits.state, loadPermits, awards.state, loadAwards]);
 
-  // Load primary data on mount.
-  // Return an AbortController cleanup so React StrictMode's synthetic
-  // unmount/remount in development cancels the first in-flight fetch.
+  // On mount: seed state from IndexedDB cache for immediate render, then
+  // fetch fresh data from the network if online.
   useEffect(() => {
     const controller = new AbortController();
-    fetchPrimaryData(controller.signal);
-    return () => controller.abort();
-  }, [fetchPrimaryData]);
+
+    async function init() {
+      // Read all caches in parallel for a fast first paint.
+      // If IndexedDB is unavailable/blocked, fall back to empty cache and continue.
+      let cachedRecords: LearningRecord[] | null = null;
+      let cachedDisclosures: DisclosureRecord[] | null = null;
+      let cachedJoiningJourney: JoiningJourneyRecord[] | null = null;
+      let cachedSuspensions: SuspensionRecord[] | null = null;
+      let cachedTeamReviews: TeamReviewRecord[] | null = null;
+      let cachedPermits: PermitRecord[] | null = null;
+      let cachedAwards: AwardRecord[] | null = null;
+      let cachedLastSync: Date | null = null;
+
+      try {
+        [
+          cachedRecords,
+          cachedDisclosures,
+          cachedJoiningJourney,
+          cachedSuspensions,
+          cachedTeamReviews,
+          cachedPermits,
+          cachedAwards,
+          cachedLastSync,
+        ] = await Promise.all([
+          readCache('learningRecords', contactId) as Promise<LearningRecord[] | null>,
+          readCache('disclosures', contactId) as Promise<DisclosureRecord[] | null>,
+          readCache('joiningJourney', contactId) as Promise<JoiningJourneyRecord[] | null>,
+          readCache('suspensions', contactId) as Promise<SuspensionRecord[] | null>,
+          readCache('teamReviews', contactId) as Promise<TeamReviewRecord[] | null>,
+          readCache('permits', contactId) as Promise<PermitRecord[] | null>,
+          readCache('awards', contactId) as Promise<AwardRecord[] | null>,
+          readLastSync(contactId) as Promise<Date | null>,
+        ]);
+      } catch (err) {
+        // IndexedDB failed (unavailable, blocked, or quota exceeded).
+        // Proceed without cached data so the network fetch path can still run.
+        console.warn('Failed to read dashboard cache from IndexedDB; continuing without cache.', err);
+      }
+      if (controller.signal.aborted) return;
+
+      if (cachedLastSync) setLastSync(cachedLastSync.getTime());
+
+      if (cachedRecords && cachedRecords.length > 0) {
+        setRecords(cachedRecords);
+        setSummary(client.computeComplianceSummary(cachedRecords));
+        setPrimaryLoading(false);
+      } else if (!isOnline) {
+        // Offline with no cached data — stop loading and surface a message
+        setPrimaryLoading(false);
+        setPrimaryError('You are offline and there is no cached data available.');
+      }
+      if (cachedDisclosures && cachedDisclosures.length > 0) {
+        setDisclosures({
+          state: 'loaded',
+          data: { records: cachedDisclosures, summary: client.computeDisclosureSummary(cachedDisclosures) },
+          error: null,
+        });
+        triggeredSections.current.add('disclosures');
+      }
+      if (cachedJoiningJourney && cachedJoiningJourney.length > 0) {
+        setJoiningJourney({ state: 'loaded', data: cachedJoiningJourney, error: null });
+        triggeredSections.current.add('joiningJourney');
+      }
+      if (cachedSuspensions && cachedSuspensions.length > 0) {
+        setSuspensions({ state: 'loaded', data: cachedSuspensions, error: null });
+        triggeredSections.current.add('suspensions');
+      }
+      if (cachedTeamReviews && cachedTeamReviews.length > 0) {
+        setTeamReviews({ state: 'loaded', data: cachedTeamReviews, error: null });
+        triggeredSections.current.add('teamReviews');
+      }
+      if (cachedPermits && cachedPermits.length > 0) {
+        setPermits({ state: 'loaded', data: cachedPermits, error: null });
+        triggeredSections.current.add('permits');
+      }
+      if (cachedAwards && cachedAwards.length > 0) {
+        setAwards({ state: 'loaded', data: cachedAwards, error: null });
+        triggeredSections.current.add('awards');
+      }
+
+      // Fetch fresh data from the network if online
+      if (isOnline && !controller.signal.aborted) {
+        await fetchPrimaryData(controller.signal);
+      }
+    }
+
+    init();
+    return () => { controller.abort(); };
+  // Run once on mount only — isOnline and fetchPrimaryData are intentionally
+  // excluded to avoid re-running when online state flips mid-session.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Set up intersection observers for lazy sections
   useEffect(() => {
@@ -289,7 +404,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
         entries.forEach(entry => {
           if (entry.isIntersecting) {
             const section = sections.find(s => s.ref.current === entry.target);
-            if (section && !triggeredSections.current.has(section.key)) {
+            if (section && !triggeredSections.current.has(section.key) && isOnline) {
               triggeredSections.current.add(section.key);
               section.load();
             }
@@ -304,7 +419,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
     });
 
     return () => observer.disconnect();
-  }, [loadJoiningJourney, loadDisclosures, loadSuspensions, loadTeamReviews, loadPermits, loadAwards]);
+  }, [isOnline, loadJoiningJourney, loadDisclosures, loadSuspensions, loadTeamReviews, loadPermits, loadAwards]);
 
   const isAnyLoading = primaryLoading ||
     joiningJourney.state === 'loading' ||
@@ -351,13 +466,6 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={refreshAll}
-                disabled={isAnyLoading}
-                className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50"
-              >
-                {isAnyLoading ? 'Loading...' : 'Refresh'}
-              </button>
-              <button
                 onClick={onLogout}
                 className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
               >
@@ -365,17 +473,20 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
               </button>
             </div>
           </div>
-          {/* Metadata row — hidden on small screens to save space */}
-          {(lastUpdated || username) && (
-            <div className="hidden sm:flex items-center gap-4 mt-1 text-sm text-gray-500">
-              {lastUpdated && (
-                <span>Updated: {lastUpdated.toLocaleTimeString()}</span>
-              )}
-              {username && (
-                <span>Signed in as <span className="font-medium text-gray-600">{username}</span></span>
-              )}
-            </div>
-          )}
+          {/* Metadata + sync status row */}
+          <div className="mt-2 space-y-1">
+            {username && (
+              <div className="hidden sm:block text-sm text-gray-500">
+                Signed in as <span className="font-medium text-gray-600">{username}</span>
+              </div>
+            )}
+            <SyncStatus
+              lastSync={lastSync}
+              isOnline={isOnline}
+              isLoading={isAnyLoading}
+              onRefresh={refreshAll}
+            />
+          </div>
         </div>
       </header>
 
@@ -533,7 +644,7 @@ export function Dashboard({ token, contactId, username, onLogout, onTokenExpired
 
       {/* Footer */}
       <footer className="max-w-7xl mx-auto px-4 py-6 text-center text-sm text-gray-500">
-        Data fetched directly from the Scouts membership portal. No data is stored.{' '}
+        Data fetched directly from the Scouts membership portal. Cached locally for offline access.{' '}
         <a
           href={__APP_URL__}
           target="_blank"

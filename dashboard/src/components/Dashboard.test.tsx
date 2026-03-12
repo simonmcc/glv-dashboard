@@ -22,6 +22,13 @@ vi.mock('../mock-api-client', () => ({
   })),
 }));
 
+// Mock IndexedDB cache module so tests don't touch real IDB
+vi.mock('../db', () => ({
+  readCache: vi.fn().mockResolvedValue(undefined),
+  writeCache: vi.fn().mockResolvedValue(undefined),
+  readLastSync: vi.fn().mockResolvedValue(null),
+}));
+
 // Mock OpenTelemetry tracer
 vi.mock('@opentelemetry/api', () => ({
   trace: {
@@ -50,6 +57,7 @@ describe('Dashboard footer', () => {
       <Dashboard
         token="test-token"
         contactId="test-contact"
+        isOnline={true}
         onLogout={vi.fn()}
         onTokenExpired={vi.fn()}
       />
@@ -66,6 +74,7 @@ describe('Dashboard footer', () => {
       <Dashboard
         token="test-token"
         contactId="test-contact"
+        isOnline={true}
         onLogout={vi.fn()}
         onTokenExpired={vi.fn()}
       />
@@ -84,6 +93,7 @@ describe('Dashboard footer', () => {
       <Dashboard
         token="test-token"
         contactId="test-contact"
+        isOnline={true}
         onLogout={vi.fn()}
         onTokenExpired={vi.fn()}
       />
