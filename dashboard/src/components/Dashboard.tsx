@@ -333,6 +333,10 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         setRecords(cachedRecords);
         setSummary(client.computeComplianceSummary(cachedRecords));
         setPrimaryLoading(false);
+      } else if (!isOnline) {
+        // Offline with no cached data — stop loading and surface a message
+        setPrimaryLoading(false);
+        setPrimaryError('You are offline and there is no cached data available.');
       }
       if (cachedDisclosures && cachedDisclosures.length > 0) {
         setDisclosures({
