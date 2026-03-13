@@ -263,4 +263,22 @@ describe('MemberDashboard', () => {
     expect(section.textContent).toContain('Valid');
     expect(section.textContent).toContain('Expiring');
   });
+
+  it('calls onBack when Escape is pressed', () => {
+    const onBack = vi.fn();
+    render(<MemberDashboard {...defaultProps} onBack={onBack} />);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onBack).toHaveBeenCalledOnce();
+  });
+
+  it('does not call onBack when other keys are pressed', () => {
+    const onBack = vi.fn();
+    render(<MemberDashboard {...defaultProps} onBack={onBack} />);
+
+    fireEvent.keyDown(document, { key: 'Enter' });
+    fireEvent.keyDown(document, { key: 'ArrowLeft' });
+    fireEvent.keyDown(document, { key: 'a' });
+    expect(onBack).not.toHaveBeenCalled();
+  });
 });
