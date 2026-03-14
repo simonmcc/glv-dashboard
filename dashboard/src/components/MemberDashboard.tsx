@@ -7,6 +7,7 @@
  * Accessed by clicking a member name in any table in the main dashboard.
  */
 
+import { useEffect } from 'react';
 import type { LearningRecord, JoiningJourneyRecord, DisclosureRecord, TeamReviewRecord, PermitRecord, AwardRecord } from '../types';
 import type { LoadState } from './LazySection';
 
@@ -147,6 +148,14 @@ export function MemberDashboard({
   awardsState,
   onBack,
 }: MemberDashboardProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onBack();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onBack]);
+
   const memberLearning = learningRecords.filter(
     r => r['Membership number'] === membershipNumber
   );
