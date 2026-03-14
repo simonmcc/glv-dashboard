@@ -349,7 +349,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         cachedAwards,
       ]) => {
         if (controller.signal.aborted) return;
-        if (cachedDisclosures && cachedDisclosures.length > 0) {
+        if (!triggeredSections.current.has('disclosures') && cachedDisclosures && cachedDisclosures.length > 0) {
           setDisclosures({
             state: 'loaded',
             data: { records: cachedDisclosures, summary: client.computeDisclosureSummary(cachedDisclosures) },
@@ -357,23 +357,23 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           });
           triggeredSections.current.add('disclosures');
         }
-        if (cachedJoiningJourney && cachedJoiningJourney.length > 0) {
+        if (!triggeredSections.current.has('joiningJourney') && cachedJoiningJourney && cachedJoiningJourney.length > 0) {
           setJoiningJourney({ state: 'loaded', data: cachedJoiningJourney, error: null });
           triggeredSections.current.add('joiningJourney');
         }
-        if (cachedSuspensions && cachedSuspensions.length > 0) {
+        if (!triggeredSections.current.has('suspensions') && cachedSuspensions && cachedSuspensions.length > 0) {
           setSuspensions({ state: 'loaded', data: cachedSuspensions, error: null });
           triggeredSections.current.add('suspensions');
         }
-        if (cachedTeamReviews && cachedTeamReviews.length > 0) {
+        if (!triggeredSections.current.has('teamReviews') && cachedTeamReviews && cachedTeamReviews.length > 0) {
           setTeamReviews({ state: 'loaded', data: cachedTeamReviews, error: null });
           triggeredSections.current.add('teamReviews');
         }
-        if (cachedPermits && cachedPermits.length > 0) {
+        if (!triggeredSections.current.has('permits') && cachedPermits && cachedPermits.length > 0) {
           setPermits({ state: 'loaded', data: cachedPermits, error: null });
           triggeredSections.current.add('permits');
         }
-        if (cachedAwards && cachedAwards.length > 0) {
+        if (!triggeredSections.current.has('awards') && cachedAwards && cachedAwards.length > 0) {
           setAwards({ state: 'loaded', data: cachedAwards, error: null });
           triggeredSections.current.add('awards');
         }
