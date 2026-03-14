@@ -297,41 +297,22 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
     const controller = new AbortController();
 
     async function init() {
-      // Read all caches in parallel for a fast first paint.
+      // Phase 1: Read only the primary (learning records) cache first so the
+      // primary network fetch can start as soon as possible without waiting for
+      // secondary caches that are only needed on-demand.
       // If IndexedDB is unavailable/blocked, fall back to empty cache and continue.
       let cachedRecords: LearningRecord[] | null = null;
-      let cachedDisclosures: DisclosureRecord[] | null = null;
-      let cachedJoiningJourney: JoiningJourneyRecord[] | null = null;
-      let cachedSuspensions: SuspensionRecord[] | null = null;
-      let cachedTeamReviews: TeamReviewRecord[] | null = null;
-      let cachedPermits: PermitRecord[] | null = null;
-      let cachedAwards: AwardRecord[] | null = null;
       let cachedLastSync: Date | null = null;
 
       try {
-        [
-          cachedRecords,
-          cachedDisclosures,
-          cachedJoiningJourney,
-          cachedSuspensions,
-          cachedTeamReviews,
-          cachedPermits,
-          cachedAwards,
-          cachedLastSync,
-        ] = await Promise.all([
+        [cachedRecords, cachedLastSync] = await Promise.all([
           readCache('learningRecords', contactId) as Promise<LearningRecord[] | null>,
-          readCache('disclosures', contactId) as Promise<DisclosureRecord[] | null>,
-          readCache('joiningJourney', contactId) as Promise<JoiningJourneyRecord[] | null>,
-          readCache('suspensions', contactId) as Promise<SuspensionRecord[] | null>,
-          readCache('teamReviews', contactId) as Promise<TeamReviewRecord[] | null>,
-          readCache('permits', contactId) as Promise<PermitRecord[] | null>,
-          readCache('awards', contactId) as Promise<AwardRecord[] | null>,
           readLastSync(contactId) as Promise<Date | null>,
         ]);
       } catch (err) {
         // IndexedDB failed (unavailable, blocked, or quota exceeded).
         // Proceed without cached data so the network fetch path can still run.
-        console.warn('Failed to read dashboard cache from IndexedDB; continuing without cache.', err);
+        console.warn('Failed to read primary cache from IndexedDB; continuing without cache.', err);
       }
       if (controller.signal.aborted) return;
 
@@ -346,34 +327,59 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         setPrimaryLoading(false);
         setPrimaryError('You are offline and there is no cached data available.');
       }
-      if (cachedDisclosures && cachedDisclosures.length > 0) {
-        setDisclosures({
-          state: 'loaded',
-          data: { records: cachedDisclosures, summary: client.computeDisclosureSummary(cachedDisclosures) },
-          error: null,
-        });
-        triggeredSections.current.add('disclosures');
-      }
-      if (cachedJoiningJourney && cachedJoiningJourney.length > 0) {
-        setJoiningJourney({ state: 'loaded', data: cachedJoiningJourney, error: null });
-        triggeredSections.current.add('joiningJourney');
-      }
-      if (cachedSuspensions && cachedSuspensions.length > 0) {
-        setSuspensions({ state: 'loaded', data: cachedSuspensions, error: null });
-        triggeredSections.current.add('suspensions');
-      }
-      if (cachedTeamReviews && cachedTeamReviews.length > 0) {
-        setTeamReviews({ state: 'loaded', data: cachedTeamReviews, error: null });
-        triggeredSections.current.add('teamReviews');
-      }
-      if (cachedPermits && cachedPermits.length > 0) {
-        setPermits({ state: 'loaded', data: cachedPermits, error: null });
-        triggeredSections.current.add('permits');
-      }
-      if (cachedAwards && cachedAwards.length > 0) {
-        setAwards({ state: 'loaded', data: cachedAwards, error: null });
-        triggeredSections.current.add('awards');
-      }
+
+      if (controller.signal.aborted) return;
+
+      // Phase 2: Seed secondary section caches in the background — do NOT await
+      // before starting the primary network fetch so loading isn't delayed by
+      // on-demand sections that haven't been scrolled into view yet.
+      Promise.all([
+        readCache('disclosures', contactId) as Promise<DisclosureRecord[] | null>,
+        readCache('joiningJourney', contactId) as Promise<JoiningJourneyRecord[] | null>,
+        readCache('suspensions', contactId) as Promise<SuspensionRecord[] | null>,
+        readCache('teamReviews', contactId) as Promise<TeamReviewRecord[] | null>,
+        readCache('permits', contactId) as Promise<PermitRecord[] | null>,
+        readCache('awards', contactId) as Promise<AwardRecord[] | null>,
+      ]).then(([
+        cachedDisclosures,
+        cachedJoiningJourney,
+        cachedSuspensions,
+        cachedTeamReviews,
+        cachedPermits,
+        cachedAwards,
+      ]) => {
+        if (controller.signal.aborted) return;
+        if (cachedDisclosures && cachedDisclosures.length > 0) {
+          setDisclosures({
+            state: 'loaded',
+            data: { records: cachedDisclosures, summary: client.computeDisclosureSummary(cachedDisclosures) },
+            error: null,
+          });
+          triggeredSections.current.add('disclosures');
+        }
+        if (cachedJoiningJourney && cachedJoiningJourney.length > 0) {
+          setJoiningJourney({ state: 'loaded', data: cachedJoiningJourney, error: null });
+          triggeredSections.current.add('joiningJourney');
+        }
+        if (cachedSuspensions && cachedSuspensions.length > 0) {
+          setSuspensions({ state: 'loaded', data: cachedSuspensions, error: null });
+          triggeredSections.current.add('suspensions');
+        }
+        if (cachedTeamReviews && cachedTeamReviews.length > 0) {
+          setTeamReviews({ state: 'loaded', data: cachedTeamReviews, error: null });
+          triggeredSections.current.add('teamReviews');
+        }
+        if (cachedPermits && cachedPermits.length > 0) {
+          setPermits({ state: 'loaded', data: cachedPermits, error: null });
+          triggeredSections.current.add('permits');
+        }
+        if (cachedAwards && cachedAwards.length > 0) {
+          setAwards({ state: 'loaded', data: cachedAwards, error: null });
+          triggeredSections.current.add('awards');
+        }
+      }).catch(err => {
+        console.warn('Failed to read secondary caches from IndexedDB.', err);
+      });
 
       // Fetch fresh data from the network if online
       if (isOnline && !controller.signal.aborted) {
