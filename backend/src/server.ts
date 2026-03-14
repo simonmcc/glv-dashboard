@@ -9,9 +9,12 @@ import './tracing.js';
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { authenticate, checkLearningByMembershipNumbers, type ProgressCallback } from './auth-service.js';
 import { forwardTraces } from './traces-proxy.js';
 import { log, logError, logDebug } from './logger.js';
+
+const tracer = trace.getTracer('glv-backend-server', '1.0.0');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -222,45 +225,59 @@ app.post('/api/proxy', async (req, res) => {
   const apiUrl = `https://tsa-memportal-prod-fun01.azurewebsites.net/api${endpoint}`;
 
   try {
-    const startTime = Date.now();
-    const response = await fetch(apiUrl, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json, text/plain, */*',
-      },
-      body: body ? JSON.stringify(body) : undefined,
+    return await tracer.startActiveSpan('scouts.api.proxy', async (proxySpan) => {
+      proxySpan.setAttribute('scouts.api.endpoint', endpoint);
+      if (body?.table) proxySpan.setAttribute('scouts.api.table', body.table);
+
+      try {
+        const startTime = Date.now();
+        const response = await fetch(apiUrl, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json, text/plain, */*',
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+
+        const duration = Date.now() - startTime;
+        log(`[Proxy] Response: ${response.status} (${duration}ms)`);
+        proxySpan.setAttribute('http.response.status_code', response.status);
+
+        if (response.status === 401) {
+          proxySpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Token expired' });
+          log('[Proxy] Token expired');
+          return res.status(401).json({
+            success: false,
+            error: 'Token expired',
+          });
+        }
+
+        const text = await response.text();
+        log(`[Proxy] Raw response (first 500 chars):`, text.substring(0, 500));
+
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          logError('[Proxy] Failed to parse response as JSON');
+          proxySpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Invalid JSON response from API' });
+          return res.status(500).json({ success: false, error: 'Invalid JSON response from API' });
+        }
+
+        log(`[Proxy] Data received:`, {
+          hasData: !!data.data,
+          dataLength: data.data?.length,
+          error: data.error
+        });
+        proxySpan.setAttribute('response.record_count', data.data?.length ?? 0);
+        proxySpan.setStatus({ code: SpanStatusCode.OK });
+        return res.json(data);
+      } finally {
+        proxySpan.end();
+      }
     });
-
-    const duration = Date.now() - startTime;
-    log(`[Proxy] Response: ${response.status} (${duration}ms)`);
-
-    if (response.status === 401) {
-      log('[Proxy] Token expired');
-      return res.status(401).json({
-        success: false,
-        error: 'Token expired',
-      });
-    }
-
-    const text = await response.text();
-    log(`[Proxy] Raw response (first 500 chars):`, text.substring(0, 500));
-
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      logError('[Proxy] Failed to parse response as JSON');
-      return res.status(500).json({ success: false, error: 'Invalid JSON response from API' });
-    }
-
-    log(`[Proxy] Data received:`, {
-      hasData: !!data.data,
-      dataLength: data.data?.length,
-      error: data.error
-    });
-    return res.json(data);
   } catch (error) {
     logError('[Proxy] Error:', error);
     return res.status(500).json({
