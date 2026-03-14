@@ -235,49 +235,60 @@ async function searchMemberByNumber(
   token: string,
   membershipNumber: string
 ): Promise<{ id: string; fullname: string; firstname: string; lastname: string; preferredName: string } | null> {
-  try {
-    const response = await fetch(`${API_BASE}/MemberListingAsync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        pagesize: 10,
-        nexttoken: 1,
-        filter: {
-          global: '',
-          globaland: false,
-          fieldand: true,
-          filterfields: [
-            {
-              field: 'membershipnumber',
-              value: membershipNumber,
-            },
-          ],
+  return tracer.startActiveSpan('scouts.api.searchMember', async (span) => {
+    span.setAttribute('member.number', membershipNumber);
+    try {
+      const response = await fetch(`${API_BASE}/MemberListingAsync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-        isSuspended: false,
-      }),
-    });
+        body: JSON.stringify({
+          pagesize: 10,
+          nexttoken: 1,
+          filter: {
+            global: '',
+            globaland: false,
+            fieldand: true,
+            filterfields: [
+              {
+                field: 'membershipnumber',
+                value: membershipNumber,
+              },
+            ],
+          },
+          isSuspended: false,
+        }),
+      });
 
-    const data = await response.json();
-    if (data.data && data.data.length > 0) {
-      const member = data.data[0];
-      // Use PreferredName if available, otherwise fall back to firstname
-      const preferredName = member.PreferredName?.trim() || member.firstname?.trim() || '';
-      return {
-        id: member.id,
-        fullname: member.fullname,
-        firstname: member.firstname,
-        lastname: member.lastname,
-        preferredName,
-      };
+      const data = await response.json();
+      if (data.data && data.data.length > 0) {
+        const member = data.data[0];
+        // Use PreferredName if available, otherwise fall back to firstname
+        const preferredName = member.PreferredName?.trim() || member.firstname?.trim() || '';
+        span.setAttribute('member.found', true);
+        span.setStatus({ code: SpanStatusCode.OK });
+        return {
+          id: member.id,
+          fullname: member.fullname,
+          firstname: member.firstname,
+          lastname: member.lastname,
+          preferredName,
+        };
+      }
+      span.setAttribute('member.found', false);
+      span.setStatus({ code: SpanStatusCode.OK });
+      return null;
+    } catch (error) {
+      logError(`[API] Search failed for ${membershipNumber}:`, error);
+      span.recordException(error as Error);
+      span.setStatus({ code: SpanStatusCode.ERROR });
+      return null;
+    } finally {
+      span.end();
     }
-    return null;
-  } catch (error) {
-    logError(`[API] Search failed for ${membershipNumber}:`, error);
-    return null;
-  }
+  });
 }
 
 /**
@@ -287,34 +298,46 @@ async function getLearningForContact(
   token: string,
   contactId: string
 ): Promise<LearningModule[]> {
-  try {
-    const response = await fetch(`${API_BASE}/GetLmsDetailsAsync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        contactid: contactId,
-      }),
-    });
+  return tracer.startActiveSpan('scouts.api.getLearning', async (span) => {
+    span.setAttribute('member.contact_id', contactId);
+    try {
+      const response = await fetch(`${API_BASE}/GetLmsDetailsAsync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          contactid: contactId,
+        }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!Array.isArray(data)) {
-      log(`[API] Unexpected response for learning: ${JSON.stringify(data).substring(0, 200)}`);
+      if (!Array.isArray(data)) {
+        log(`[API] Unexpected response for learning: ${JSON.stringify(data).substring(0, 200)}`);
+        span.setAttribute('member.module_count', 0);
+        span.setStatus({ code: SpanStatusCode.OK });
+        return [];
+      }
+
+      const modules = data.map((m: Record<string, unknown>) => ({
+        title: String(m.title || ''),
+        expiryDate: m.expiryDate ? String(m.expiryDate) : null,
+        currentLevel: String(m.currentLevel || ''),
+      }));
+      span.setAttribute('member.module_count', modules.length);
+      span.setStatus({ code: SpanStatusCode.OK });
+      return modules;
+    } catch (error) {
+      logError(`[API] Failed to get learning for ${contactId}:`, error);
+      span.recordException(error as Error);
+      span.setStatus({ code: SpanStatusCode.ERROR });
       return [];
+    } finally {
+      span.end();
     }
-
-    return data.map((m: Record<string, unknown>) => ({
-      title: String(m.title || ''),
-      expiryDate: m.expiryDate ? String(m.expiryDate) : null,
-      currentLevel: String(m.currentLevel || ''),
-    }));
-  } catch (error) {
-    logError(`[API] Failed to get learning for ${contactId}:`, error);
-    return [];
-  }
+  });
 }
 
 // Maximum number of member lookups to run in parallel.

@@ -130,6 +130,8 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         const uniqueMembershipNumbers = [...new Set(
           (memberListResponse.data || []).map(r => r['Membership number'])
         )];
+        span.setAttribute('records.learning_compliance', memberListResponse.data?.length ?? 0);
+        span.setAttribute('records.members_checked', uniqueMembershipNumbers.length);
 
         // Fetch learning details
         const learningResult = await client.checkLearningByMembershipNumbers(uniqueMembershipNumbers, signal);
@@ -183,90 +185,138 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   // Section loaders — fetch from network and write to cache on success.
   const loadJoiningJourney = useCallback(async () => {
     setJoiningJourney(s => ({ ...s, state: 'loading', error: null }));
-    try {
-      const response = await client.getJoiningJourney(500);
-      if (response.error) throw new Error(response.error);
-      const data = response.data || [];
-      setJoiningJourney({ state: 'loaded', data, error: null });
-      await writeCache('joiningJourney', contactId, data);
-      setLastSync(Date.now());
-    } catch (err) {
-      setJoiningJourney(s => ({ ...s, state: 'error', error: (err as Error).message }));
-    }
+    return tracer.startActiveSpan('dashboard.load.joiningJourney', async (span) => {
+      try {
+        const response = await client.getJoiningJourney(500);
+        if (response.error) throw new Error(response.error);
+        const data = response.data || [];
+        span.setAttribute('records.count', data.length);
+        span.setStatus({ code: SpanStatusCode.OK });
+        setJoiningJourney({ state: 'loaded', data, error: null });
+        await writeCache('joiningJourney', contactId, data);
+        setLastSync(Date.now());
+      } catch (err) {
+        span.recordException(err as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        setJoiningJourney(s => ({ ...s, state: 'error', error: (err as Error).message }));
+      } finally {
+        span.end();
+      }
+    });
   }, [client, contactId]);
 
   const loadDisclosures = useCallback(async () => {
     setDisclosures(s => ({ ...s, state: 'loading', error: null }));
-    try {
-      const response = await client.getDisclosureCompliance(500);
-      if (response.error) throw new Error(response.error);
-      const records = response.data || [];
-      setDisclosures({
-        state: 'loaded',
-        data: { records, summary: client.computeDisclosureSummary(records) },
-        error: null
-      });
-      await writeCache('disclosures', contactId, records);
-      setLastSync(Date.now());
-    } catch (err) {
-      setDisclosures(s => ({ ...s, state: 'error', error: (err as Error).message }));
-    }
+    return tracer.startActiveSpan('dashboard.load.disclosures', async (span) => {
+      try {
+        const response = await client.getDisclosureCompliance(500);
+        if (response.error) throw new Error(response.error);
+        const records = response.data || [];
+        span.setAttribute('records.count', records.length);
+        span.setStatus({ code: SpanStatusCode.OK });
+        setDisclosures({
+          state: 'loaded',
+          data: { records, summary: client.computeDisclosureSummary(records) },
+          error: null
+        });
+        await writeCache('disclosures', contactId, records);
+        setLastSync(Date.now());
+      } catch (err) {
+        span.recordException(err as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        setDisclosures(s => ({ ...s, state: 'error', error: (err as Error).message }));
+      } finally {
+        span.end();
+      }
+    });
   }, [client, contactId]);
 
   const loadSuspensions = useCallback(async () => {
     setSuspensions(s => ({ ...s, state: 'loading', error: null }));
-    try {
-      const response = await client.getSuspensions(500);
-      if (response.error) throw new Error(response.error);
-      const data = response.data || [];
-      setSuspensions({ state: 'loaded', data, error: null });
-      await writeCache('suspensions', contactId, data);
-      setLastSync(Date.now());
-    } catch (err) {
-      setSuspensions(s => ({ ...s, state: 'error', error: (err as Error).message }));
-    }
+    return tracer.startActiveSpan('dashboard.load.suspensions', async (span) => {
+      try {
+        const response = await client.getSuspensions(500);
+        if (response.error) throw new Error(response.error);
+        const data = response.data || [];
+        span.setAttribute('records.count', data.length);
+        span.setStatus({ code: SpanStatusCode.OK });
+        setSuspensions({ state: 'loaded', data, error: null });
+        await writeCache('suspensions', contactId, data);
+        setLastSync(Date.now());
+      } catch (err) {
+        span.recordException(err as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        setSuspensions(s => ({ ...s, state: 'error', error: (err as Error).message }));
+      } finally {
+        span.end();
+      }
+    });
   }, [client, contactId]);
 
   const loadTeamReviews = useCallback(async () => {
     setTeamReviews(s => ({ ...s, state: 'loading', error: null }));
-    try {
-      const response = await client.getTeamReviews(500);
-      if (response.error) throw new Error(response.error);
-      const data = response.data || [];
-      setTeamReviews({ state: 'loaded', data, error: null });
-      await writeCache('teamReviews', contactId, data);
-      setLastSync(Date.now());
-    } catch (err) {
-      setTeamReviews(s => ({ ...s, state: 'error', error: (err as Error).message }));
-    }
+    return tracer.startActiveSpan('dashboard.load.teamReviews', async (span) => {
+      try {
+        const response = await client.getTeamReviews(500);
+        if (response.error) throw new Error(response.error);
+        const data = response.data || [];
+        span.setAttribute('records.count', data.length);
+        span.setStatus({ code: SpanStatusCode.OK });
+        setTeamReviews({ state: 'loaded', data, error: null });
+        await writeCache('teamReviews', contactId, data);
+        setLastSync(Date.now());
+      } catch (err) {
+        span.recordException(err as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        setTeamReviews(s => ({ ...s, state: 'error', error: (err as Error).message }));
+      } finally {
+        span.end();
+      }
+    });
   }, [client, contactId]);
 
   const loadPermits = useCallback(async () => {
     setPermits(s => ({ ...s, state: 'loading', error: null }));
-    try {
-      const response = await client.getPermits(500);
-      if (response.error) throw new Error(response.error);
-      const data = response.data || [];
-      setPermits({ state: 'loaded', data, error: null });
-      await writeCache('permits', contactId, data);
-      setLastSync(Date.now());
-    } catch (err) {
-      setPermits(s => ({ ...s, state: 'error', error: (err as Error).message }));
-    }
+    return tracer.startActiveSpan('dashboard.load.permits', async (span) => {
+      try {
+        const response = await client.getPermits(500);
+        if (response.error) throw new Error(response.error);
+        const data = response.data || [];
+        span.setAttribute('records.count', data.length);
+        span.setStatus({ code: SpanStatusCode.OK });
+        setPermits({ state: 'loaded', data, error: null });
+        await writeCache('permits', contactId, data);
+        setLastSync(Date.now());
+      } catch (err) {
+        span.recordException(err as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        setPermits(s => ({ ...s, state: 'error', error: (err as Error).message }));
+      } finally {
+        span.end();
+      }
+    });
   }, [client, contactId]);
 
   const loadAwards = useCallback(async () => {
     setAwards(s => ({ ...s, state: 'loading', error: null }));
-    try {
-      const response = await client.getAwards(500);
-      if (response.error) throw new Error(response.error);
-      const data = response.data || [];
-      setAwards({ state: 'loaded', data, error: null });
-      await writeCache('awards', contactId, data);
-      setLastSync(Date.now());
-    } catch (err) {
-      setAwards(s => ({ ...s, state: 'error', error: (err as Error).message }));
-    }
+    return tracer.startActiveSpan('dashboard.load.awards', async (span) => {
+      try {
+        const response = await client.getAwards(500);
+        if (response.error) throw new Error(response.error);
+        const data = response.data || [];
+        span.setAttribute('records.count', data.length);
+        span.setStatus({ code: SpanStatusCode.OK });
+        setAwards({ state: 'loaded', data, error: null });
+        await writeCache('awards', contactId, data);
+        setLastSync(Date.now());
+      } catch (err) {
+        span.recordException(err as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        setAwards(s => ({ ...s, state: 'error', error: (err as Error).message }));
+      } finally {
+        span.end();
+      }
+    });
   }, [client, contactId]);
 
   // Refresh all data
