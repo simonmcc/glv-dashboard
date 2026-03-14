@@ -135,6 +135,9 @@ Both services are live — no manual setup required.
 
 The backend ships structured observability that routes automatically to Google Cloud when deployed.
 
+- **Logs**: [Google Cloud Console: Observability/Logs](https://console.cloud.google.com/run/detail/europe-west1/glv-backend/observability/logs?project=glv-dashboard)
+- **Traces**: [Google Cloud Console: Trace Explorer](https://console.cloud.google.com/traces/explorer;query=%7B%22plotType%22:%22HEATMAP%22,%22pointConnectionMethod%22:%22GAP_DETECTION%22,%22targetAxis%22:%22Y1%22,%22traceQuery%22:%7B%22resourceContainer%22:%22projects%2Fglv-dashboard%22,%22spanDataValue%22:%22SPAN_DURATION%22,%22spanFilters%22:%7B%22apphubServices%22:%5B%5D,%22apphubWorkloads%22:%5B%5D,%22applicationIds%22:%5B%5D,%22attributes%22:%5B%5D,%22displayNames%22:%5B%5D,%22isRootSpan%22:false,%22kinds%22:%5B%5D,%22maxDuration%22:%22%22,%22minDuration%22:%22%22,%22services%22:%5B%5D,%22status%22:%5B%5D%7D%7D%7D;duration=P1D?project=glv-dashboard)
+
 #### Cloud Logging (backend, automatic)
 
 Cloud Run captures all stdout/stderr. `backend/src/logger.ts` detects the `K_SERVICE` env var set by Cloud Run and switches to structured JSON output with the fields Cloud Logging expects:
