@@ -16,6 +16,10 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const DEBUG_LOG_TOKENS = process.env.DEBUG_LOG_TOKENS === 'true';
 
+// Cloud Run sits behind Google's load balancer which sets X-Forwarded-For.
+// Trust the first proxy hop so express-rate-limit can identify client IPs correctly.
+app.set('trust proxy', 1);
+
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 login requests per windowMs
