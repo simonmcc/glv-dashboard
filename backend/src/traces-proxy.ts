@@ -64,9 +64,11 @@ function injectGCPProjectId(body: unknown, projectId: string): unknown {
           ? (rsObj.resource as Record<string, unknown>)
           : {};
       const existing = Array.isArray(resource.attributes) ? resource.attributes : [];
-      const filtered = (existing as Array<{ key: string }>).filter(
-        (a) => a.key !== 'gcp.project_id'
-      );
+      const filtered = existing.filter((a): a is { key: string } => {
+        if (a === null || typeof a !== 'object') return false;
+        const key = (a as any).key;
+        return typeof key === 'string' && key !== 'gcp.project_id';
+      });
       return {
         ...rsObj,
         resource: { ...resource, attributes: [...filtered, gcpAttr] },
