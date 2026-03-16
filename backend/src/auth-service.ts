@@ -325,6 +325,15 @@ async function getLearningForContact(
       currentLevel: String(m.currentLevel || ''),
     }));
   } catch (error) {
+    if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+      logError(
+        `[API] GetLmsDetailsAsync timed out for ${contactId} after ${AZURE_REQUEST_TIMEOUT_MS}ms:`,
+        error
+      );
+      // Surface timeout/abort upstream instead of returning indistinguishable empty data
+      throw error;
+    }
+
     logError(`[API] Failed to get learning for ${contactId}:`, error);
     return [];
   }
