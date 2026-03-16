@@ -40,10 +40,48 @@ async function getGCPAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-export async function forwardTraces(body: unknown): Promise<void> {
-  const payload = JSON.stringify(body);
+/**
+ * Inject gcp.project_id into every resourceSpans resource so Cloud Trace
+ * accepts the payload.  The attribute is required by telemetry.googleapis.com
+ * but is not sent by the browser SDK.
+ */
+function injectGCPProjectId(body: unknown, projectId: string): unknown {
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !Array.isArray((body as Record<string, unknown>).resourceSpans)
+  ) {
+    return body;
+  }
 
+  const gcpAttr = { key: 'gcp.project_id', value: { stringValue: projectId } };
+  const resourceSpans = ((body as Record<string, unknown>).resourceSpans as unknown[]).map(
+    (rs: unknown) => {
+      if (typeof rs !== 'object' || rs === null) return rs;
+      const rsObj = rs as Record<string, unknown>;
+      const resource =
+        typeof rsObj.resource === 'object' && rsObj.resource !== null
+          ? (rsObj.resource as Record<string, unknown>)
+          : {};
+      const existing = Array.isArray(resource.attributes) ? resource.attributes : [];
+      const filtered = (existing as Array<{ key: string }>).filter(
+        (a) => a.key !== 'gcp.project_id'
+      );
+      return {
+        ...rsObj,
+        resource: { ...resource, attributes: [...filtered, gcpAttr] },
+      };
+    }
+  );
+
+  return { ...(body as Record<string, unknown>), resourceSpans };
+}
+
+export async function forwardTraces(body: unknown): Promise<void> {
   if (IS_GCP) {
+    const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+    const enriched = projectId ? injectGCPProjectId(body, projectId) : body;
+    const payload = JSON.stringify(enriched);
     const token = await getGCPAccessToken();
     const response = await fetch(GCP_OTLP_ENDPOINT, {
       method: 'POST',
@@ -64,7 +102,7 @@ export async function forwardTraces(body: unknown): Promise<void> {
     const response = await fetch(LOCAL_OTLP_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: payload,
+      body: JSON.stringify(body),
     });
     if (!response.ok) {
       const text = await response.text();
