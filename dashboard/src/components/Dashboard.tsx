@@ -366,7 +366,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       }
       if (controller.signal.aborted) return;
 
-      if (cachedLastSync) setLastSync(cachedLastSync);
+      if (cachedLastSync !== null) setLastSync(cachedLastSync);
 
       if (cachedRecords && cachedRecords.length > 0) {
         setRecords(cachedRecords);
