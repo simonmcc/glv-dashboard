@@ -10,7 +10,15 @@ const GCP_OTLP_ENDPOINT = 'https://telemetry.googleapis.com/v1/traces';
 const LOCAL_OTLP_ENDPOINT =
   process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces';
 
+let cachedGCPAccessToken: string | null = null;
+let cachedGCPAccessTokenExpiryMs = 0;
+
 async function getGCPAccessToken(): Promise<string> {
+  const now = Date.now();
+  if (cachedGCPAccessToken && now < cachedGCPAccessTokenExpiryMs) {
+    return cachedGCPAccessToken;
+  }
+
   const response = await fetch(
     'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token',
     { headers: { 'Metadata-Flavor': 'Google' } }
@@ -18,7 +26,17 @@ async function getGCPAccessToken(): Promise<string> {
   if (!response.ok) {
     throw new Error(`Metadata server returned ${response.status}`);
   }
-  const data = await response.json() as { access_token: string };
+  const data = await response.json() as { access_token: string; expires_in?: number };
+
+  if (data.expires_in && Number.isFinite(data.expires_in)) {
+    const safetySeconds = Math.max(data.expires_in - 60, 0);
+    cachedGCPAccessTokenExpiryMs = now + safetySeconds * 1000;
+    cachedGCPAccessToken = data.access_token;
+  } else {
+    cachedGCPAccessToken = null;
+    cachedGCPAccessTokenExpiryMs = 0;
+  }
+
   return data.access_token;
 }
 
