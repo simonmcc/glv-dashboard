@@ -10,6 +10,7 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { authenticate, checkLearningByMembershipNumbers, type ProgressCallback } from './auth-service.js';
+import { forwardTraces } from './traces-proxy.js';
 import { log, logError, logDebug } from './logger.js';
 
 const app = express();
@@ -26,7 +27,7 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '4mb' }));
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -235,6 +236,17 @@ app.post('/api/check-learning', async (req, res) => {
       success: false,
       error: 'Failed to check learning',
     });
+  }
+});
+
+// OTLP trace proxy - receives browser spans and forwards to Cloud Trace (GCP) or local collector
+app.post('/v1/traces', async (req, res) => {
+  try {
+    await forwardTraces(req.body);
+    res.status(200).json({});
+  } catch (error) {
+    logError('[Traces] Failed to forward spans:', error);
+    res.status(500).json({ error: 'Failed to forward traces' });
   }
 });
 
