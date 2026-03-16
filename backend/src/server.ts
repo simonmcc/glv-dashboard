@@ -9,9 +9,12 @@ import './tracing.js';
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { authenticate, checkLearningByMembershipNumbers, type ProgressCallback } from './auth-service.js';
 import { forwardTraces } from './traces-proxy.js';
 import { log, logError, logDebug } from './logger.js';
+
+const tracer = trace.getTracer('glv-backend-server', '1.0.0');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -27,6 +30,45 @@ if (TRUST_PROXY_ENABLED) {
   app.set('trust proxy', 1);
 }
 
+// Allow-list of HTTP methods supported by the proxy
+const ALLOWED_PROXY_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
+
+/**
+ * Validate and normalize the endpoint path for the Scouts API proxy.
+ * Ensures the value is a simple path under /api and prevents path traversal.
+ */
+function validateProxyEndpoint(endpoint: unknown): string | null {
+  if (typeof endpoint !== 'string') {
+    return null;
+  }
+
+  const trimmed = endpoint.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  // Disallow full URLs to avoid accidentally letting callers override the host.
+  if (/^https?:\/\//i.test(trimmed)) {
+    return null;
+  }
+
+  // Ensure the endpoint starts with a single leading slash.
+  if (!trimmed.startsWith('/')) {
+    return null;
+  }
+
+  // Basic traversal/hardening: no ".." segments or double slashes
+  if (trimmed.includes('..') || trimmed.includes('//')) {
+    return null;
+  }
+
+  // Restrict to a conservative character set for paths.
+  if (!/^\/[A-Za-z0-9/_\-]*$/.test(trimmed)) {
+    return null;
+  }
+
+  return trimmed;
+}
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 login requests per windowMs
@@ -183,6 +225,9 @@ app.post('/auth/login-stream', loginLimiter, async (req, res) => {
 app.post('/api/proxy', async (req, res) => {
   const { endpoint, method = 'POST', body, token } = req.body;
 
+  const normalizedMethod = String(method || 'POST').toUpperCase();
+  const validatedEndpoint = validateProxyEndpoint(endpoint);
+
   // Log high-level metadata only (don't expose sensitive data like membership numbers)
   const bodyMetadata = body ? {
     tableName: body.table,
@@ -192,19 +237,27 @@ app.post('/api/proxy', async (req, res) => {
   } : undefined;
   
   if (bodyMetadata) {
-    log(`[Proxy] Request: ${method} ${endpoint} metadata: ${JSON.stringify(bodyMetadata)}`);
+    log(`[Proxy] Request: ${normalizedMethod} ${endpoint} metadata: ${JSON.stringify(bodyMetadata)}`);
   } else {
-    log(`[Proxy] Request: ${method} ${endpoint}`);
+    log(`[Proxy] Request: ${normalizedMethod} ${endpoint}`);
   }
   
   // Full body logging only in debug mode (may contain sensitive data)
   logDebug(`[Proxy] Full body:`, JSON.stringify(body));
 
-  if (!endpoint || !token) {
-    log('[Proxy] Missing endpoint or token');
+  if (!validatedEndpoint || !token) {
+    log('[Proxy] Missing or invalid endpoint, or missing token');
     return res.status(400).json({
       success: false,
-      error: 'Endpoint and token are required',
+      error: 'Valid endpoint and token are required',
+    });
+  }
+
+  if (!ALLOWED_PROXY_METHODS.has(normalizedMethod)) {
+    log(`[Proxy] Disallowed HTTP method: ${normalizedMethod}`);
+    return res.status(400).json({
+      success: false,
+      error: 'HTTP method not allowed',
     });
   }
 
@@ -219,48 +272,82 @@ app.post('/api/proxy', async (req, res) => {
     log(`[Proxy] Token length: ${token.length}`);
   }
 
-  const apiUrl = `https://tsa-memportal-prod-fun01.azurewebsites.net/api${endpoint}`;
+  const apiUrl = `https://tsa-memportal-prod-fun01.azurewebsites.net/api${validatedEndpoint}`;
 
   try {
-    const startTime = Date.now();
-    const response = await fetch(apiUrl, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json, text/plain, */*',
-      },
-      body: body ? JSON.stringify(body) : undefined,
+    return await tracer.startActiveSpan('scouts.api.proxy', async (proxySpan) => {
+      proxySpan.setAttribute('scouts.api.endpoint', validatedEndpoint);
+      if (body?.table) proxySpan.setAttribute('scouts.api.table', body.table);
+
+      try {
+        const startTime = Date.now();
+        const response = await fetch(apiUrl, {
+          method: normalizedMethod,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json, text/plain, */*',
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+
+        const duration = Date.now() - startTime;
+        log(`[Proxy] Response: ${response.status} (${duration}ms)`);
+        proxySpan.setAttribute('http.response.status_code', response.status);
+
+        if (response.status === 401) {
+          proxySpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Token expired' });
+          log('[Proxy] Token expired');
+          return res.status(401).json({
+            success: false,
+            error: 'Token expired',
+          });
+        }
+
+        const text = await response.text();
+        log(`[Proxy] Raw response (first 500 chars):`, text.substring(0, 500));
+
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          logError('[Proxy] Failed to parse response as JSON');
+          proxySpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Invalid JSON response from API' });
+          return res.status(500).json({ success: false, error: 'Invalid JSON response from API' });
+        }
+
+        log(`[Proxy] Data received:`, {
+          hasData: !!data.data,
+          dataLength: data.data?.length,
+          error: data.error
+        });
+        proxySpan.setAttribute('response.record_count', data.data?.length ?? 0);
+
+        // Set span status based on HTTP status and/or payload error
+        if (response.status >= 400) {
+          const message = `Upstream HTTP ${response.status}`;
+          proxySpan.setStatus({ code: SpanStatusCode.ERROR, message });
+        } else if (data && data.error) {
+          proxySpan.setAttribute('response.error', String(data.error));
+          proxySpan.setStatus({ code: SpanStatusCode.ERROR, message: String(data.error) });
+        } else {
+          proxySpan.setStatus({ code: SpanStatusCode.OK });
+        }
+
+        return res.json(data);
+      } catch (error) {
+        logError('[Proxy] Error while proxying:', error);
+        // Ensure the span reflects the failure and records the exception
+        proxySpan.recordException(error as any);
+        proxySpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Failed to proxy request' });
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to proxy request',
+        });
+      } finally {
+        proxySpan.end();
+      }
     });
-
-    const duration = Date.now() - startTime;
-    log(`[Proxy] Response: ${response.status} (${duration}ms)`);
-
-    if (response.status === 401) {
-      log('[Proxy] Token expired');
-      return res.status(401).json({
-        success: false,
-        error: 'Token expired',
-      });
-    }
-
-    const text = await response.text();
-    log(`[Proxy] Raw response (first 500 chars):`, text.substring(0, 500));
-
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      logError('[Proxy] Failed to parse response as JSON');
-      return res.status(500).json({ success: false, error: 'Invalid JSON response from API' });
-    }
-
-    log(`[Proxy] Data received:`, {
-      hasData: !!data.data,
-      dataLength: data.data?.length,
-      error: data.error
-    });
-    return res.json(data);
   } catch (error) {
     logError('[Proxy] Error:', error);
     return res.status(500).json({

@@ -235,61 +235,77 @@ const API_BASE = 'https://tsa-memportal-prod-fun01.azurewebsites.net/api';
 // as a hang and moving on.  Covers cold-start latency (~5-10 s) with headroom.
 const AZURE_REQUEST_TIMEOUT_MS = 15_000;
 
+// Maximum time to wait for a single Azure Functions API call before treating it
+// as a hang and moving on.  Covers cold-start latency (~5-10 s) with headroom.
+const AZURE_REQUEST_TIMEOUT_MS = 15_000;
+
 async function searchMemberByNumber(
   token: string,
   membershipNumber: string
 ): Promise<{ id: string; fullname: string; firstname: string; lastname: string; preferredName: string } | null> {
-  try {
-    const response = await fetch(`${API_BASE}/MemberListingAsync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      signal: AbortSignal.timeout(AZURE_REQUEST_TIMEOUT_MS),
-      body: JSON.stringify({
-        pagesize: 10,
-        nexttoken: 1,
-        filter: {
-          global: '',
-          globaland: false,
-          fieldand: true,
-          filterfields: [
-            {
-              field: 'membershipnumber',
-              value: membershipNumber,
-            },
-          ],
+  return tracer.startActiveSpan('scouts.api.searchMember', async (span) => {
+    span.setAttribute('member.number', membershipNumber);
+    try {
+      const response = await fetch(`${API_BASE}/MemberListingAsync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-        isSuspended: false,
-      }),
-    });
+        signal: AbortSignal.timeout(AZURE_REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(AZURE_REQUEST_TIMEOUT_MS),
+        body: JSON.stringify({
+          pagesize: 10,
+          nexttoken: 1,
+          filter: {
+            global: '',
+            globaland: false,
+            fieldand: true,
+            filterfields: [
+              {
+                field: 'membershipnumber',
+                value: membershipNumber,
+              },
+            ],
+          },
+          isSuspended: false,
+        }),
+      });
 
-    const data = await response.json();
-    if (data.data && data.data.length > 0) {
-      const member = data.data[0];
-      // Use PreferredName if available, otherwise fall back to firstname
-      const preferredName = member.PreferredName?.trim() || member.firstname?.trim() || '';
-      return {
-        id: member.id,
-        fullname: member.fullname,
-        firstname: member.firstname,
-        lastname: member.lastname,
-        preferredName,
-      };
+      const data = await response.json();
+      if (data.data && data.data.length > 0) {
+        const member = data.data[0];
+        // Use PreferredName if available, otherwise fall back to firstname
+        const preferredName = member.PreferredName?.trim() || member.firstname?.trim() || '';
+        span.setAttribute('member.found', true);
+        span.setStatus({ code: SpanStatusCode.OK });
+        return {
+          id: member.id,
+          fullname: member.fullname,
+          firstname: member.firstname,
+          lastname: member.lastname,
+          preferredName,
+        };
+      }
+      span.setAttribute('member.found', false);
+      span.setStatus({ code: SpanStatusCode.OK });
+      return null;
+    } catch (error) {
+      span.recordException(error as Error);
+      span.setStatus({ code: SpanStatusCode.ERROR });
+      // Distinguish timeout/abort errors from genuine "not found" so callers
+      // don't misclassify transient Azure Function cold-starts as missing members.
+      if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+        logError(`[API] Search for ${membershipNumber} timed out or was aborted:`, error);
+        // Propagate timeout/abort so upstream can decide whether to retry or surface an error.
+        throw error;
+      }
+      logError(`[API] Search failed for ${membershipNumber}:`, error);
+      return null;
+    } finally {
+      span.end();
     }
-    return null;
-  } catch (error) {
-    // Distinguish timeout/abort errors from genuine "not found" so callers
-    // don't misclassify transient Azure Function cold-starts as missing members.
-    if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
-      logError(`[API] Search for ${membershipNumber} timed out or was aborted:`, error);
-      // Propagate timeout/abort so upstream can decide whether to retry or surface an error.
-      throw error;
-    }
-    logError(`[API] Search failed for ${membershipNumber}:`, error);
-    return null;
-  }
+  });
 }
 
 /**
@@ -299,33 +315,40 @@ async function getLearningForContact(
   token: string,
   contactId: string
 ): Promise<LearningModule[]> {
-  try {
-    const response = await fetch(`${API_BASE}/GetLmsDetailsAsync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      signal: AbortSignal.timeout(AZURE_REQUEST_TIMEOUT_MS),
-      body: JSON.stringify({
-        contactid: contactId,
-      }),
-    });
+  return tracer.startActiveSpan('scouts.api.getLearning', async (span) => {
+    span.setAttribute('member.contact_id', contactId);
+    try {
+      const response = await fetch(`${API_BASE}/GetLmsDetailsAsync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        signal: AbortSignal.timeout(AZURE_REQUEST_TIMEOUT_MS),
+        body: JSON.stringify({
+          contactid: contactId,
+        }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!Array.isArray(data)) {
-      log(`[API] Unexpected response for learning: ${JSON.stringify(data).substring(0, 200)}`);
-      return [];
-    }
+      if (!Array.isArray(data)) {
+        log(`[API] Unexpected response for learning: ${JSON.stringify(data).substring(0, 200)}`);
+        span.setAttribute('member.module_count', 0);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Unexpected non-array response' });
+        return [];
+      }
 
-    return data.map((m: Record<string, unknown>) => ({
-      title: String(m.title || ''),
-      expiryDate: m.expiryDate ? String(m.expiryDate) : null,
-      currentLevel: String(m.currentLevel || ''),
-    }));
-  } catch (error) {
-    if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+      const modules = data.map((m: Record<string, unknown>) => ({
+        title: String(m.title || ''),
+        expiryDate: m.expiryDate ? String(m.expiryDate) : null,
+        currentLevel: String(m.currentLevel || ''),
+      }));
+      span.setAttribute('member.module_count', modules.length);
+      span.setStatus({ code: SpanStatusCode.OK });
+      return modules;
+    } catch (error) {
+      if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
       logError(
         `[API] GetLmsDetailsAsync timed out for ${contactId} after ${AZURE_REQUEST_TIMEOUT_MS}ms:`,
         error
@@ -335,8 +358,22 @@ async function getLearningForContact(
     }
 
     logError(`[API] Failed to get learning for ${contactId}:`, error);
-    return [];
-  }
+      span.recordException(error as Error);
+      span.setStatus({ code: SpanStatusCode.ERROR });
+      if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+        logError(
+          `[API] GetLmsDetailsAsync timed out for ${contactId} after ${AZURE_REQUEST_TIMEOUT_MS}ms:`,
+          error
+        );
+        // Surface timeout/abort upstream instead of returning indistinguishable empty data
+        throw error;
+      }
+      logError(`[API] Failed to get learning for ${contactId}:`, error);
+      return [];
+    } finally {
+      span.end();
+    }
+  });
 }
 
 // Maximum number of member lookups to run in parallel.
