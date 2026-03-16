@@ -8,6 +8,7 @@ on:
 
 env:
   VITE_BACKEND_URL: https://glv-backend-gxoc276j2a-ew.a.run.app
+  VITE_OTEL_ENABLED: 'true'
 
 jobs:
   build_and_deploy:

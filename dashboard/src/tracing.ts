@@ -9,7 +9,9 @@ import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
 
 export function initTracing() {
-  const collectorUrl = import.meta.env.VITE_OTEL_COLLECTOR_URL || 'http://localhost:4318/v1/traces';
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+  const collectorUrl =
+    import.meta.env.VITE_OTEL_COLLECTOR_URL || `${backendUrl}/v1/traces`;
 
   const exporter = new OTLPTraceExporter({ url: collectorUrl });
 
@@ -26,13 +28,12 @@ export function initTracing() {
     propagator: new W3CTraceContextPropagator(),
   });
 
+  // Propagate W3C trace context to the backend so browser and server spans share a trace
+  const backendPattern = new RegExp(backendUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   registerInstrumentations({
     instrumentations: [
       new FetchInstrumentation({
-        propagateTraceHeaderCorsUrls: [
-          /localhost:3001/,
-          /\/api\//,
-        ],
+        propagateTraceHeaderCorsUrls: [backendPattern],
       }),
     ],
   });
