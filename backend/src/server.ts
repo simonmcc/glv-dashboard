@@ -22,6 +22,52 @@ const loginLimiter = rateLimit({
   max: 100, // limit each IP to 100 login requests per windowMs
 });
 
+// Dedicated rate limiter for trace ingestion to protect Cloud Trace costs and backend load
+const tracesLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 300, // limit each IP to 300 trace requests per minute
+});
+
+/**
+ * Validate that trace requests originate from the configured frontend origin (when set).
+ * If CORS_ORIGIN is not set, this middleware is a no-op and allows all requests.
+ */
+function validateTraceOrigin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const allowedOrigin = process.env.CORS_ORIGIN;
+
+  // If no CORS_ORIGIN is configured, behave as before and allow all requests
+  if (!allowedOrigin) {
+    return next();
+  }
+
+  const requestOrigin = req.headers.origin as string | undefined;
+  const referer = req.headers.referer as string | undefined;
+
+  // Direct origin match
+  if (requestOrigin === allowedOrigin) {
+    return next();
+  }
+
+  // Fallback: compare referer origin (e.g. https://frontend.example.com/path -> https://frontend.example.com)
+  if (referer) {
+    try {
+      const refererUrl = new URL(referer);
+      if (refererUrl.origin === allowedOrigin) {
+        return next();
+      }
+    } catch {
+      // Malformed referer header; fall through to rejection
+    }
+  }
+
+  logDebug(
+    '[Traces] Rejected trace request due to invalid origin/referer',
+    { origin: requestOrigin, referer },
+  );
+
+  return res.status(403).json({ error: 'Forbidden' });
+}
+
 // Middleware
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -240,7 +286,7 @@ app.post('/api/check-learning', async (req, res) => {
 });
 
 // OTLP trace proxy - receives browser spans and forwards to Cloud Trace (GCP) or local collector
-app.post('/v1/traces', async (req, res) => {
+app.post('/v1/traces', tracesLimiter, validateTraceOrigin, async (req, res) => {
   try {
     await forwardTraces(req.body);
     res.status(200).json({});
