@@ -2,7 +2,7 @@
  * Backend Server for GLV Dashboard
  *
  * Provides authentication proxy and API endpoints.
- * Can be run locally or deployed to AWS Lambda.
+ * Can be run locally or deployed to Google Cloud Run (behind a load balancer/proxy).
  */
 
 import './tracing.js';
