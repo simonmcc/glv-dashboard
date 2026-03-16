@@ -14,6 +14,7 @@ env:
   PROJECT_ID: glv-dashboard
   REGION: europe-west1
   SERVICE: glv-backend
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   deploy:
