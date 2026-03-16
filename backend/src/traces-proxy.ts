@@ -3,7 +3,7 @@
  * the appropriate backend (Cloud Trace on GCP, local Jaeger/collector otherwise).
  */
 
-import { log, logError } from './logger.js';
+import { log } from './logger.js';
 
 const IS_GCP = Boolean(process.env.K_SERVICE);
 const GCP_OTLP_ENDPOINT = 'https://telemetry.googleapis.com/v1/traces';
