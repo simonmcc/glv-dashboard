@@ -235,10 +235,6 @@ const API_BASE = 'https://tsa-memportal-prod-fun01.azurewebsites.net/api';
 // as a hang and moving on.  Covers cold-start latency (~5-10 s) with headroom.
 const AZURE_REQUEST_TIMEOUT_MS = 15_000;
 
-// Maximum time to wait for a single Azure Functions API call before treating it
-// as a hang and moving on.  Covers cold-start latency (~5-10 s) with headroom.
-const AZURE_REQUEST_TIMEOUT_MS = 15_000;
-
 async function searchMemberByNumber(
   token: string,
   membershipNumber: string
@@ -253,7 +249,6 @@ async function searchMemberByNumber(
           Authorization: `Bearer ${token}`,
         },
         signal: AbortSignal.timeout(AZURE_REQUEST_TIMEOUT_MS),
-      signal: AbortSignal.timeout(AZURE_REQUEST_TIMEOUT_MS),
         body: JSON.stringify({
           pagesize: 10,
           nexttoken: 1,
@@ -348,16 +343,6 @@ async function getLearningForContact(
       span.setStatus({ code: SpanStatusCode.OK });
       return modules;
     } catch (error) {
-      if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
-      logError(
-        `[API] GetLmsDetailsAsync timed out for ${contactId} after ${AZURE_REQUEST_TIMEOUT_MS}ms:`,
-        error
-      );
-      // Surface timeout/abort upstream instead of returning indistinguishable empty data
-      throw error;
-    }
-
-    logError(`[API] Failed to get learning for ${contactId}:`, error);
       span.recordException(error as Error);
       span.setStatus({ code: SpanStatusCode.ERROR });
       if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {

@@ -274,8 +274,7 @@ app.post('/api/proxy', async (req, res) => {
 
   const apiUrl = `https://tsa-memportal-prod-fun01.azurewebsites.net/api${validatedEndpoint}`;
 
-  try {
-    return await tracer.startActiveSpan('scouts.api.proxy', async (proxySpan) => {
+  return await tracer.startActiveSpan('scouts.api.proxy', async (proxySpan) => {
       proxySpan.setAttribute('scouts.api.endpoint', validatedEndpoint);
       if (body?.table) proxySpan.setAttribute('scouts.api.table', body.table);
 
@@ -348,13 +347,6 @@ app.post('/api/proxy', async (req, res) => {
         proxySpan.end();
       }
     });
-  } catch (error) {
-    logError('[Proxy] Error:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to proxy request',
-    });
-  }
 });
 
 // Check learning by membership numbers - uses GetLmsDetailsAsync for accurate expiry dates
