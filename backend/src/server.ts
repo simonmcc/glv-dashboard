@@ -2,7 +2,7 @@
  * Backend Server for GLV Dashboard
  *
  * Provides authentication proxy and API endpoints.
- * Can be run locally or deployed to AWS Lambda.
+ * Can be run locally or deployed to Google Cloud Run (behind a load balancer/proxy).
  */
 
 import './tracing.js';
@@ -16,6 +16,16 @@ import { log, logError, logDebug } from './logger.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DEBUG_LOG_TOKENS = process.env.DEBUG_LOG_TOKENS === 'true';
+const TRUST_PROXY_ENABLED =
+  process.env.TRUST_PROXY === 'true' || Boolean(process.env.K_SERVICE);
+
+// Only trust proxy headers when we know we're behind a trusted reverse proxy.
+// - Cloud Run: K_SERVICE is set and Google load balancer sets X-Forwarded-For
+// - Other environments: opt-in via TRUST_PROXY=true
+if (TRUST_PROXY_ENABLED) {
+  // Trust the first proxy hop so express-rate-limit can identify client IPs correctly.
+  app.set('trust proxy', 1);
+}
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
