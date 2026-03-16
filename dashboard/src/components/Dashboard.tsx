@@ -352,12 +352,12 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       // secondary caches that are only needed on-demand.
       // If IndexedDB is unavailable/blocked, fall back to empty cache and continue.
       let cachedRecords: LearningRecord[] | null = null;
-      let cachedLastSync: Date | null = null;
+      let cachedLastSync: number | null = null;
 
       try {
         [cachedRecords, cachedLastSync] = await Promise.all([
           readCache('learningRecords', contactId) as Promise<LearningRecord[] | null>,
-          readLastSync(contactId) as Promise<Date | null>,
+          readLastSync(contactId),
         ]);
       } catch (err) {
         // IndexedDB failed (unavailable, blocked, or quota exceeded).
@@ -366,7 +366,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       }
       if (controller.signal.aborted) return;
 
-      if (cachedLastSync) setLastSync(cachedLastSync.getTime());
+      if (cachedLastSync !== null) setLastSync(cachedLastSync);
 
       if (cachedRecords && cachedRecords.length > 0) {
         setRecords(cachedRecords);
