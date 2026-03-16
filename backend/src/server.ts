@@ -265,8 +265,28 @@ app.post('/api/proxy', async (req, res) => {
           error: data.error
         });
         proxySpan.setAttribute('response.record_count', data.data?.length ?? 0);
-        proxySpan.setStatus({ code: SpanStatusCode.OK });
+
+        // Set span status based on HTTP status and/or payload error
+        if (response.status >= 400) {
+          const message = `Upstream HTTP ${response.status}`;
+          proxySpan.setStatus({ code: SpanStatusCode.ERROR, message });
+        } else if (data && data.error) {
+          proxySpan.setAttribute('response.error', String(data.error));
+          proxySpan.setStatus({ code: SpanStatusCode.ERROR, message: String(data.error) });
+        } else {
+          proxySpan.setStatus({ code: SpanStatusCode.OK });
+        }
+
         return res.json(data);
+      } catch (error) {
+        logError('[Proxy] Error while proxying:', error);
+        // Ensure the span reflects the failure and records the exception
+        proxySpan.recordException(error as any);
+        proxySpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Failed to proxy request' });
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to proxy request',
+        });
       } finally {
         proxySpan.end();
       }
