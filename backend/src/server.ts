@@ -15,10 +15,16 @@ import { log, logError, logDebug } from './logger.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DEBUG_LOG_TOKENS = process.env.DEBUG_LOG_TOKENS === 'true';
+const TRUST_PROXY_ENABLED =
+  process.env.TRUST_PROXY === 'true' || Boolean(process.env.K_SERVICE);
 
-// Cloud Run sits behind Google's load balancer which sets X-Forwarded-For.
-// Trust the first proxy hop so express-rate-limit can identify client IPs correctly.
-app.set('trust proxy', 1);
+// Only trust proxy headers when we know we're behind a trusted reverse proxy.
+// - Cloud Run: K_SERVICE is set and Google load balancer sets X-Forwarded-For
+// - Other environments: opt-in via TRUST_PROXY=true
+if (TRUST_PROXY_ENABLED) {
+  // Trust the first proxy hop so express-rate-limit can identify client IPs correctly.
+  app.set('trust proxy', 1);
+}
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
