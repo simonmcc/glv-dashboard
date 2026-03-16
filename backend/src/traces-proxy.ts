@@ -57,7 +57,9 @@ export async function forwardTraces(body: unknown): Promise<void> {
       const text = await response.text();
       throw new Error(`Cloud Trace rejected spans: ${response.status} ${text}`);
     }
-    log('[Traces] Forwarded browser spans to Cloud Trace');
+    if (process.env.NODE_ENV !== 'production') {
+      log('[Traces] Forwarded browser spans to Cloud Trace');
+    }
   } else {
     const response = await fetch(LOCAL_OTLP_ENDPOINT, {
       method: 'POST',
@@ -68,6 +70,8 @@ export async function forwardTraces(body: unknown): Promise<void> {
       const text = await response.text();
       throw new Error(`OTLP collector rejected spans: ${response.status} ${text}`);
     }
-    log(`[Traces] Forwarded browser spans to ${LOCAL_OTLP_ENDPOINT}`);
+    if (process.env.NODE_ENV !== 'production') {
+      log(`[Traces] Forwarded browser spans to ${LOCAL_OTLP_ENDPOINT}`);
+    }
   }
 }
