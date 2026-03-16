@@ -280,6 +280,13 @@ async function searchMemberByNumber(
     }
     return null;
   } catch (error) {
+    // Distinguish timeout/abort errors from genuine "not found" so callers
+    // don't misclassify transient Azure Function cold-starts as missing members.
+    if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+      logError(`[API] Search for ${membershipNumber} timed out or was aborted:`, error);
+      // Propagate timeout/abort so upstream can decide whether to retry or surface an error.
+      throw error;
+    }
     logError(`[API] Search failed for ${membershipNumber}:`, error);
     return null;
   }
