@@ -231,6 +231,10 @@ const API_BASE = 'https://tsa-memportal-prod-fun01.azurewebsites.net/api';
 /**
  * Search for a member by membership number using MemberListingAsync
  */
+// Maximum time to wait for a single Azure Functions API call before treating it
+// as a hang and moving on.  Covers cold-start latency (~5-10 s) with headroom.
+const AZURE_REQUEST_TIMEOUT_MS = 15_000;
+
 async function searchMemberByNumber(
   token: string,
   membershipNumber: string
@@ -242,6 +246,7 @@ async function searchMemberByNumber(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
+      signal: AbortSignal.timeout(AZURE_REQUEST_TIMEOUT_MS),
       body: JSON.stringify({
         pagesize: 10,
         nexttoken: 1,
@@ -294,6 +299,7 @@ async function getLearningForContact(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
+      signal: AbortSignal.timeout(AZURE_REQUEST_TIMEOUT_MS),
       body: JSON.stringify({
         contactid: contactId,
       }),
