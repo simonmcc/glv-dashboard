@@ -13,12 +13,25 @@ glv-dashboard/
 
 ## Prerequisites
 
-- Node.js 20+
-- npm
+- [nvm](https://github.com/nvm-sh/nvm) (recommended) or Node.js 24+
+- npm (included with Node.js)
 
 ## Development Setup
 
-### 1. Install dependencies
+### 1. Set up Node.js
+
+The required Node version is pinned in `.nvmrc`. With nvm:
+
+```bash
+# Install nvm (if not already installed)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+
+# Install and activate the correct Node version
+nvm install   # reads .nvmrc
+nvm use       # activates it in the current shell
+```
+
+### 2. Install dependencies
 
 ```bash
 # Install backend dependencies
