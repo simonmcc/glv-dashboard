@@ -13,7 +13,7 @@ glv-dashboard/
 
 ## Prerequisites
 
-- [nvm](https://github.com/nvm-sh/nvm) (recommended) or Node.js 24+
+- [nvm](https://github.com/nvm-sh/nvm) (recommended) or Node.js 22+
 - npm (included with Node.js)
 
 ## Development Setup
