@@ -43,7 +43,7 @@ cd ../dashboard
 npm install
 ```
 
-### 2. Start the backend
+### 3. Start the backend
 
 The backend provides authentication and API proxy services.
 
@@ -54,7 +54,7 @@ npm run dev
 
 This starts the backend on `http://localhost:3001` with hot-reload.
 
-### 3. Start the dashboard
+### 4. Start the dashboard
 
 In a separate terminal:
 
