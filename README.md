@@ -26,6 +26,10 @@ The required Node version is pinned in `.nvmrc`. With nvm:
 # Install nvm (if not already installed)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
 
+# Load nvm into the current shell (or open a new terminal and skip this step)
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
 # Install and activate the correct Node version
 nvm install   # reads .nvmrc
 nvm use       # activates it in the current shell
