@@ -10,6 +10,7 @@
 import { useEffect } from 'react';
 import type { LearningRecord, JoiningJourneyRecord, DisclosureRecord, TeamReviewRecord, PermitRecord, AwardRecord } from '../types';
 import type { LoadState } from './LazySection';
+import { GROWING_ROOTS_MODULES } from '../utils';
 
 interface MemberDashboardProps {
   membershipNumber: string;
@@ -232,15 +233,45 @@ export function MemberDashboard({
               {memberJoiningJourney.length === 0 ? (
                 <div className="px-4"><EmptySection label="joining journey records" /></div>
               ) : (
-                memberJoiningJourney.map((r, i) => (
-                  <div key={`${r.Item}-${i}`} className={`flex items-center justify-between px-4 py-3 ${joiningStatusColors[r.Status] || 'bg-white border-gray-200'}`}>
-                    <div className="flex items-center gap-3">
-                      <StatusDot status={r.Status} colorMap={joiningStatusColors} />
-                      <span className="font-medium text-sm">{r.Item}</span>
+                memberJoiningJourney.map((r, i) => {
+                  const isGrowingRoots = r.Item === 'Growing Roots';
+                  return (
+                    <div key={`${r.Item}-${i}`}>
+                      <div className={`flex items-center justify-between px-4 py-3 ${joiningStatusColors[r.Status] || 'bg-white border-gray-200'}`}>
+                        <div className="flex items-center gap-3">
+                          <StatusDot status={r.Status} colorMap={joiningStatusColors} />
+                          <span className="font-medium text-sm">{r.Item}</span>
+                        </div>
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60">{r.Status}</span>
+                      </div>
+                      {/* Expand Growing Roots to individual module status */}
+                      {isGrowingRoots && GROWING_ROOTS_MODULES.map(grModule => {
+                        const moduleRecord = memberLearning.find(lr => lr.Learning === grModule.name);
+                        const status = moduleRecord?.Status ?? 'Not Started';
+                        const colorClass = learningStatusColors[status] || 'bg-white border-gray-200';
+                        return (
+                          <div key={grModule.name} className={`flex items-center justify-between pl-10 pr-4 py-2 border-t border-gray-100 ${colorClass}`}>
+                            <div className="flex items-center gap-2">
+                              <StatusDot status={status} colorMap={learningStatusColors} />
+                              <span className="text-sm text-gray-800">{grModule.name}</span>
+                              {grModule.deadlineDays !== null && (
+                                <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium">
+                                  {grModule.deadlineDays}d deadline
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60">{status}</span>
+                              {moduleRecord?.['Expiry date'] && (
+                                <span className="text-xs text-gray-600 tabular-nums">{formatDate(moduleRecord['Expiry date'])}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60">{r.Status}</span>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           )}

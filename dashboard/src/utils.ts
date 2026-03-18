@@ -9,6 +9,25 @@ import type { LearningRecord, MemberLearningResult } from './types';
 export const FIRST_RESPONSE_MODULE = 'First Response';
 
 /**
+ * Growing Roots modules required as part of the joining journey.
+ * deadlineDays: number of days from role start by which this module must be completed (null = no deadline).
+ * These names are matched against module titles returned by GetLmsDetailsAsync.
+ */
+export const GROWING_ROOTS_MODULES: ReadonlyArray<{ name: string; deadlineDays: number | null }> = [
+  { name: 'Safeguarding', deadlineDays: 30 },
+  { name: 'Safety', deadlineDays: 30 },
+  { name: 'Who We Are and What We Do', deadlineDays: null },
+  { name: 'Creating Inclusion', deadlineDays: null },
+  { name: 'Data Protection in Scouts', deadlineDays: null },
+  { name: 'Delivering a Great Programme', deadlineDays: null },
+];
+
+/** Returns true if the module title matches a known Growing Roots module */
+export function isGrowingRootsModule(title: string): boolean {
+  return GROWING_ROOTS_MODULES.some(m => m.name === title);
+}
+
+/**
  * Parse expiry date from API format "MM/DD/YYYY HH:MM:SS" to Date
  */
 export function parseExpiryDate(dateStr: string | null): Date | null {
@@ -84,9 +103,9 @@ export function transformLearningResults(
   for (const member of members) {
     const hasFirstResponse = member.modules.some(m => m.title === FIRST_RESPONSE_MODULE);
 
-    // Include modules with expiry dates, plus First Response regardless of expiry date
+    // Include modules with expiry dates, First Response, and all Growing Roots modules
     const includedModules = member.modules.filter(
-      m => m.expiryDate !== null || m.title === FIRST_RESPONSE_MODULE,
+      m => m.expiryDate !== null || m.title === FIRST_RESPONSE_MODULE || isGrowingRootsModule(m.title),
     );
 
     for (const module of includedModules) {
@@ -121,6 +140,21 @@ export function transformLearningResults(
         'Expiry date': null,
         'Start date': memberStartDates?.get(member.membershipNumber) ?? null,
       });
+    }
+
+    // Synthesise "Not Started" records for any Growing Roots modules missing from the LMS entirely
+    for (const grModule of GROWING_ROOTS_MODULES) {
+      const hasModule = member.modules.some(m => m.title === grModule.name);
+      if (!hasModule) {
+        records.push({
+          'First name': member.firstName,
+          'Last name': member.lastName,
+          'Membership number': member.membershipNumber,
+          'Learning': grModule.name,
+          'Status': 'Not Started',
+          'Expiry date': null,
+        });
+      }
     }
   }
 

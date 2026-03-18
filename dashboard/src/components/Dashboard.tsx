@@ -19,6 +19,7 @@ import type { LearningRecord, ComplianceSummary, JoiningJourneyRecord, Disclosur
 import { SummaryTiles } from './SummaryTiles';
 import { ComplianceTable } from './ComplianceTable';
 import { JoiningJourneyTable } from './JoiningJourneyTable';
+import { JoiningJourneyProgress } from './JoiningJourneyProgress';
 import { DisclosureTable } from './DisclosureTable';
 import { SuspensionsTable } from './SuspensionsTable';
 import { TeamReviewsTable } from './TeamReviewsTable';
@@ -58,6 +59,9 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
 
   // Per-member view
   const [selectedMember, setSelectedMember] = useState<{ membershipNumber: string; name: string } | null>(null);
+
+  // Joining Journey view toggle
+  const [joiningJourneyView, setJoiningJourneyView] = useState<'progress' | 'items'>('progress');
 
   // Lazy-loaded sections
   const [joiningJourney, setJoiningJourney] = useState<SectionState<JoiningJourneyRecord[]>>({ state: 'idle', data: [], error: null });
@@ -630,8 +634,36 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           state={joiningJourney.state}
           error={joiningJourney.error}
           onRetry={() => { triggeredSections.current.delete('joiningJourney'); loadJoiningJourney(); }}
+          headerExtra={
+            joiningJourney.state === 'loaded' && joiningJourney.data.length > 0 ? (
+              <div className="flex gap-1 rounded-lg overflow-hidden border border-gray-200 text-sm">
+                <button
+                  onClick={() => setJoiningJourneyView('progress')}
+                  className={`px-3 py-1 ${joiningJourneyView === 'progress' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                >
+                  Progress
+                </button>
+                <button
+                  onClick={() => setJoiningJourneyView('items')}
+                  className={`px-3 py-1 ${joiningJourneyView === 'items' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                >
+                  All Items
+                </button>
+              </div>
+            ) : undefined
+          }
         >
-          <JoiningJourneyTable records={joiningJourney.data} isLoading={joiningJourney.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
+          {joiningJourneyView === 'progress' ? (
+            <JoiningJourneyProgress
+              joiningJourneyRecords={joiningJourney.data}
+              learningRecords={records}
+              isLoading={joiningJourney.state === 'loading'}
+              onMemberSelect={handleMemberSelect}
+              searchTerm={searchTerm}
+            />
+          ) : (
+            <JoiningJourneyTable records={joiningJourney.data} isLoading={joiningJourney.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
+          )}
         </LazySection>
 
         {/* Disclosure Compliance - Lazy loaded */}

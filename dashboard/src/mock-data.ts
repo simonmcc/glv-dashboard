@@ -148,6 +148,43 @@ export const mockLearningRecords: LearningRecord[] = [
     'Expiry date': null,
     'Start date': daysAgo(14),
   },
+  // Growing Roots modules — David Brown (new joiner, 30 days in)
+  {
+    'First name': 'David',
+    'Last name': 'Brown',
+    'Membership number': '45678901',
+    'Learning': 'Who We Are and What We Do',
+    'Status': 'Valid',
+    'Expiry date': null,
+    'Start date': daysAgo(30),
+  },
+  {
+    'First name': 'David',
+    'Last name': 'Brown',
+    'Membership number': '45678901',
+    'Learning': 'Creating Inclusion',
+    'Status': 'Not Started',
+    'Expiry date': null,
+    'Start date': daysAgo(30),
+  },
+  {
+    'First name': 'David',
+    'Last name': 'Brown',
+    'Membership number': '45678901',
+    'Learning': 'Data Protection in Scouts',
+    'Status': 'Not Started',
+    'Expiry date': null,
+    'Start date': daysAgo(30),
+  },
+  {
+    'First name': 'David',
+    'Last name': 'Brown',
+    'Membership number': '45678901',
+    'Learning': 'Delivering a Great Programme',
+    'Status': 'Not Started',
+    'Expiry date': null,
+    'Start date': daysAgo(30),
+  },
 ];
 
 export const mockDisclosureRecords: DisclosureRecord[] = [
@@ -214,6 +251,14 @@ export const mockJoiningJourneyRecords: JoiningJourneyRecord[] = [
     'Item': 'References',
     'Status': 'Incomplete',
     'Due date': daysFromNow(30),
+  },
+  {
+    'First name': 'David',
+    'Last name': 'Brown',
+    'Membership number': '45678901',
+    'Item': 'Growing Roots',
+    'Status': 'Incomplete',
+    'Due date': daysFromNow(60),
   },
   {
     'First name': 'Grace',

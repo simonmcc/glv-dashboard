@@ -16,10 +16,11 @@ interface LazySectionProps {
   onRetry: () => void;
   children: React.ReactNode;
   id?: string;
+  headerExtra?: React.ReactNode;
 }
 
 export const LazySection = forwardRef<HTMLElement, LazySectionProps>(
-  function LazySection({ title, state, error, onRetry, children, id }, ref) {
+  function LazySection({ title, state, error, onRetry, children, id, headerExtra }, ref) {
     return (
       <section ref={ref} id={id}>
         <div className="flex items-center gap-3 mb-4">
@@ -45,6 +46,7 @@ export const LazySection = forwardRef<HTMLElement, LazySectionProps>(
               Loading...
             </span>
           )}
+          {headerExtra && <div className="ml-auto">{headerExtra}</div>}
         </div>
 
         {state === 'error' && (
