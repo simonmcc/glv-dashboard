@@ -28,7 +28,7 @@ feat: joining journey progress view and Growing Roots module expansion
 
 ---
 
-### 4. No tests for JoiningJourneyProgress component
+### 4. No tests for JoiningJourneyProgress component — ✅ DONE
 **File:** `dashboard/src/components/JoiningJourneyProgress.tsx` lines ~79 and ~105
 **Feedback:** The component has non-trivial grouping, filtering, sorting, and Growing Roots expansion logic with no test coverage.
 **Fix:** Create `dashboard/src/components/JoiningJourneyProgress.test.tsx` with focused tests covering:
