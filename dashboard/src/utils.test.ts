@@ -118,8 +118,9 @@ describe('transformLearningResults', () => {
 
     const result = transformLearningResults(members, fixedNow);
 
-    // Safety Training (with expiry) + synthesised First Response + synthesised Growing Roots = 8 records
-    expect(result).toHaveLength(8);
+    // Safety Training (with expiry) + synthesised First Response = 2 records
+    // (Growing Roots modules are NOT synthesised — UI handles missing modules as "Not Started")
+    expect(result).toHaveLength(2);
     const safetyRecord = result.find(r => r['Learning'] === 'Safety Training');
     expect(safetyRecord?.['First name']).toBe('John');
     expect(safetyRecord?.['Last name']).toBe('Doe');
@@ -154,7 +155,7 @@ describe('transformLearningResults', () => {
 
     // 'One-time Training' is excluded (no expiry, not First Response or Growing Roots)
     // 'Renewable Training' is included (has expiry)
-    // 'First Response' and all Growing Roots modules are synthesised
+    // 'First Response' is synthesised; Growing Roots modules are NOT synthesised
     expect(result.find(r => r['Learning'] === 'Renewable Training')).toBeDefined();
     expect(result.find(r => r['Learning'] === 'First Response')).toBeDefined();
     expect(result.find(r => r['Learning'] === 'One-time Training')).toBeUndefined();
@@ -185,10 +186,11 @@ describe('transformLearningResults', () => {
 
     const result = transformLearningResults(members, fixedNow);
 
-    // Alice: Module A + Module B + synthesised First Response + 6 Growing Roots = 9
-    // Bob:   Module C + synthesised First Response + 6 Growing Roots = 8
-    expect(result.filter(r => r['First name'] === 'Alice')).toHaveLength(9);
-    expect(result.filter(r => r['First name'] === 'Bob')).toHaveLength(8);
+    // Alice: Module A + Module B + synthesised First Response = 3
+    // Bob:   Module C + synthesised First Response = 2
+    // (Growing Roots modules are NOT synthesised)
+    expect(result.filter(r => r['First name'] === 'Alice')).toHaveLength(3);
+    expect(result.filter(r => r['First name'] === 'Bob')).toHaveLength(2);
     expect(result.find(r => r['Learning'] === 'Module B')?.Status).toBe('Expired');
     expect(result.find(r => r['Learning'] === 'Module C')?.Status).toBe('Expiring');
   });
@@ -212,7 +214,7 @@ describe('transformLearningResults', () => {
     ];
 
     const result = transformLearningResults(members, fixedNow);
-    // Non-GR modules without expiry are excluded; FR and GR are synthesised
+    // Non-GR modules without expiry are excluded; FR is synthesised
     expect(result.find(r => r['Learning'] === 'Module 1')).toBeUndefined();
     expect(result.find(r => r['Learning'] === 'Module 2')).toBeUndefined();
     expect(result.find(r => r['Learning'] === 'First Response')).toBeDefined();
@@ -342,7 +344,7 @@ describe('transformLearningResults – First Response', () => {
     expect(frRecords).toHaveLength(1);
   });
 
-  it('should handle members with no modules (synthesise First Response and Growing Roots)', () => {
+  it('should handle members with no modules (synthesise First Response only, not Growing Roots)', () => {
     const members: MemberLearningResult[] = [
       {
         membershipNumber: '777',
@@ -355,11 +357,12 @@ describe('transformLearningResults – First Response', () => {
 
     const result = transformLearningResults(members, fixedNow);
 
+    // Only First Response is synthesised; absent Growing Roots modules are not
+    expect(result).toHaveLength(1);
     const fr = result.find(r => r['Learning'] === FIRST_RESPONSE_MODULE);
     expect(fr).toBeDefined();
     expect(fr!['Status']).toBe('Not Started');
-    // All 6 Growing Roots modules should be synthesised
-    expect(result.filter(r => r['Learning'] === 'Safeguarding')[0]?.Status).toBe('Not Started');
-    expect(result.filter(r => r['Learning'] === 'Safety')[0]?.Status).toBe('Not Started');
+    expect(result.find(r => r['Learning'] === 'Safeguarding')).toBeUndefined();
+    expect(result.find(r => r['Learning'] === 'Safety')).toBeUndefined();
   });
 });

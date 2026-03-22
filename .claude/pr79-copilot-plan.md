@@ -7,10 +7,10 @@ feat: joining journey progress view and Growing Roots module expansion
 
 ## Issues to fix
 
-### 1. Duplicate Safety record in mock data
+### 1. Duplicate Safety record in mock data — ✅ RESOLVED (no action needed)
 **File:** `dashboard/src/mock-data.ts`
 **Feedback:** `mockLearningRecords` has two Safety entries for David Brown — one earlier in the list and another added in the new "Growing Roots modules" block. This produces duplicate rows/counts in the UI.
-**Fix:** Remove the duplicate Safety record from the new Growing Roots block, keeping only modules not already present for David Brown.
+**Fix:** Inspected the merged code — David Brown's "Growing Roots modules" block contains only Who We Are, Creating Inclusion, Data Protection in Scouts, and Delivering a Great Programme. The Safety record appears only once (in the general Safety training block). The duplicate was resolved before/during the merge.
 
 ---
 
@@ -51,14 +51,14 @@ feat: joining journey progress view and Growing Roots module expansion
 
 ---
 
-### 6. Synthesising "Not Started" Growing Roots records inflates learning data
+### 6. Synthesising "Not Started" Growing Roots records inflates learning data — ✅ DONE
 **File:** `dashboard/src/utils.ts` line ~158
 **Feedback:** `transformLearningResults` now synthesises 6 extra "Not Started" records per member. This inflates `learningRecords` size (IndexedDB cache, ComplianceTable, compliance summary) even though the UI already handles missing modules via a fallback.
 **Fix:** Remove the synthesis of missing Growing Roots modules from `transformLearningResults`. The `JoiningJourneyProgress` and `MemberDashboard` components already have UI-level fallbacks that treat absent records as "Not Started". Removing synthesis keeps compliance stats accurate and avoids cache bloat. Update `utils.test.ts` expectations to match the removed synthesised records.
 
 ---
 
-### 7. Outdated doc comment on `transformLearningResults`
+### 7. Outdated doc comment on `transformLearningResults` — ✅ DONE
 **File:** `dashboard/src/utils.ts` line ~109
 **Feedback:** The JSDoc comment still describes the old behaviour (only includes modules with expiry dates + First Response). The comment is now misleading to callers.
 **Fix:** Update the function-level JSDoc to accurately describe the current inclusion rules:
