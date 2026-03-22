@@ -127,14 +127,35 @@ export function JoiningJourneyProgress({
 
   // Sort
   const sorted = useMemo(() => {
+    // Count the number of visible chips a member would show, expanding Growing Roots
+    // to individual module chips so the sort matches what the user sees.
+    const getChipCount = (member: { membershipNumber: string; outstandingItems: Set<string> }): number => {
+      const memberModules = learningByMember.get(member.membershipNumber);
+      let count = 0;
+      for (const item of member.outstandingItems) {
+        if (item === 'Growing Roots') {
+          const outstandingGR = GROWING_ROOTS_MODULES.filter(grModule => {
+            const rawStatus = memberModules?.get(grModule.name);
+            const status = rawStatus ? learningStatusToItemStatus(rawStatus) : 'not-started';
+            return status !== 'valid' && status !== 'complete';
+          }).length;
+          // At least 1 (the fallback chip) even if all GR modules are done
+          count += Math.max(outstandingGR, 1);
+        } else {
+          count += 1;
+        }
+      }
+      return count;
+    };
+
     return [...filtered].sort((a, b) => {
       if (sortBy === 'outstanding') {
-        return b.outstandingItems.size - a.outstandingItems.size ||
+        return getChipCount(b) - getChipCount(a) ||
           `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
       }
       return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
     });
-  }, [filtered, sortBy]);
+  }, [filtered, sortBy, learningByMember]);
 
   if (isLoading) {
     return (
@@ -187,6 +208,15 @@ export function JoiningJourneyProgress({
             const memberModules = learningByMember.get(member.membershipNumber);
             const growingRootsOutstanding = member.outstandingItems.has('Growing Roots');
 
+            // Compute outstanding GR module chips; if all are done show a fallback chip
+            const outstandingGRChips = growingRootsOutstanding
+              ? GROWING_ROOTS_MODULES.map(grModule => {
+                  const rawStatus = memberModules?.get(grModule.name);
+                  const status = rawStatus ? learningStatusToItemStatus(rawStatus) : 'not-started' as ItemStatus;
+                  return { ...grModule, status };
+                }).filter(m => m.status !== 'valid' && m.status !== 'complete')
+              : [];
+
             return (
               <div key={member.membershipNumber} className="px-4 py-3">
                 <div className="flex items-start gap-3">
@@ -215,21 +245,20 @@ export function JoiningJourneyProgress({
                       );
                     })}
 
-                    {/* Growing Roots — expanded to individual modules */}
-                    {growingRootsOutstanding && GROWING_ROOTS_MODULES.map(grModule => {
-                      const rawStatus = memberModules?.get(grModule.name);
-                      const status = rawStatus ? learningStatusToItemStatus(rawStatus) : 'not-started';
-                      const done = status === 'valid' || status === 'complete';
-                      if (done) return null; // only show outstanding
-                      return (
-                        <StatusChip
-                          key={grModule.name}
-                          status={status}
-                          label={grModule.name}
-                          deadline30={grModule.deadlineDays === 30}
-                        />
-                      );
-                    })}
+                    {/* Growing Roots — expanded to individual module chips */}
+                    {growingRootsOutstanding && (
+                      outstandingGRChips.length > 0
+                        ? outstandingGRChips.map(grModule => (
+                            <StatusChip
+                              key={grModule.name}
+                              status={grModule.status}
+                              label={grModule.name}
+                              deadline30={grModule.deadlineDays === 30}
+                            />
+                          ))
+                        // Fallback: all modules are done but GR is still marked outstanding in the journey
+                        : <StatusChip status="incomplete" label="Growing Roots" />
+                    )}
 
                     {/* Core Learning (if outstanding, shown as-is — individual modules unknown) */}
                     {member.outstandingItems.has('Core Learning') && (

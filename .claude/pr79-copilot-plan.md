@@ -14,14 +14,14 @@ feat: joining journey progress view and Growing Roots module expansion
 
 ---
 
-### 2. "Most outstanding" sort counts Growing Roots as 1 item
+### 2. "Most outstanding" sort counts Growing Roots as 1 item — ✅ DONE
 **File:** `dashboard/src/components/JoiningJourneyProgress.tsx` line ~137
 **Feedback:** The sort key uses `outstandingItems.size`, which counts "Growing Roots" as a single item even though the UI expands it into multiple module chips. Members with many outstanding GR modules are sorted incorrectly.
 **Fix:** Compute an `outstandingCount` that replaces the single "Growing Roots" entry with the count of outstanding Growing Roots modules (from `learningRecords`) before sorting. This makes the sort order consistent with what the user sees.
 
 ---
 
-### 3. Growing Roots row disappears when all modules are "done"
+### 3. Growing Roots row disappears when all modules are "done" — ✅ DONE
 **File:** `dashboard/src/components/JoiningJourneyProgress.tsx` line ~232
 **Feedback:** When `growingRootsOutstanding` is true but every module maps to a done/valid status, zero chips are rendered and the outstanding item becomes invisible.
 **Fix:** After filtering modules to outstanding-only, if the resulting list is empty, render a single fallback "Growing Roots" chip so the item is never silently hidden.
