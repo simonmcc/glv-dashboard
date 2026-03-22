@@ -40,7 +40,7 @@ feat: joining journey progress view and Growing Roots module expansion
 
 ---
 
-### 5. No tests for Growing Roots expansion in MemberDashboard
+### 5. No tests for Growing Roots expansion in MemberDashboard — ✅ DONE
 **File:** `dashboard/src/components/MemberDashboard.tsx` line ~261
 **Feedback:** The new per-module sub-row expansion in the member profile has no test coverage.
 **Fix:** Add tests to the existing `MemberDashboard.test.tsx` covering:
