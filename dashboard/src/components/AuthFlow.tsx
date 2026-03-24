@@ -101,11 +101,18 @@ export function AuthFlow({
     }
 
     // Check if we can use the fast-path (matching stored credential hash)
-    const passwordHash = await hashPassword(password);
     const stored = loadCredentials();
-    const isFastPath = !!(stored && stored.username === username && stored.passwordHash === passwordHash);
+    let isFastPath = false;
 
-    if (isFastPath) {
+    try {
+      const passwordHash = await hashPassword(password);
+      isFastPath = !!(stored && stored.username === username && stored.passwordHash === passwordHash);
+    } catch {
+      // If hashing fails (e.g. WebCrypto unavailable), fall back to normal foreground auth
+      isFastPath = false;
+    }
+
+    if (isFastPath && stored) {
       // Show the dashboard immediately with cached data while auth continues in background
       onStartBackgroundAuth(stored.contactId, username);
     } else {
