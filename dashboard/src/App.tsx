@@ -79,8 +79,34 @@ function App() {
     setAuthState({ status: 'error', message: 'Your session has expired. Please sign in again.' });
   }, []);
 
-  // Show auth flow if not authenticated
-  if (authState.status !== 'authenticated') {
+  // Background auth handlers (fast-path: show cached dashboard while auth runs in background)
+  const handleStartBackgroundAuth = useCallback((contactId: string, username?: string) => {
+    setAuthState({ status: 'background-auth', contactId, username, bgAuthMessage: 'Signing in…' });
+  }, []);
+
+  const handleBackgroundAuthProgress = useCallback((message: string) => {
+    setAuthState(prev =>
+      prev.status === 'background-auth' ? { ...prev, bgAuthMessage: message } : prev
+    );
+  }, []);
+
+  const handleBackgroundAuthComplete = useCallback((token: string, contactId: string, username?: string) => {
+    saveSession(token, contactId, username);
+    setAuthState({ status: 'authenticated', token, contactId, username });
+  }, []);
+
+  const handleBackgroundAuthError = useCallback((message: string) => {
+    setAuthState(prev =>
+      prev.status === 'background-auth' ? { ...prev, bgAuthError: message } : prev
+    );
+  }, []);
+
+  // Show auth flow for unauthenticated / authenticating / error states
+  if (
+    authState.status === 'unauthenticated' ||
+    authState.status === 'authenticating' ||
+    authState.status === 'error'
+  ) {
     return (
       <>
         <UpdateToast />
@@ -89,23 +115,33 @@ function App() {
           onAuthStart={handleAuthStart}
           onAuthComplete={handleAuthComplete}
           onAuthError={handleAuthError}
+          onStartBackgroundAuth={handleStartBackgroundAuth}
+          onBackgroundAuthProgress={handleBackgroundAuthProgress}
+          onBackgroundAuthComplete={handleBackgroundAuthComplete}
+          onBackgroundAuthError={handleBackgroundAuthError}
           mockMode={MOCK_MODE}
         />
       </>
     );
   }
 
-  // Show dashboard when authenticated
+  // Show dashboard for both 'authenticated' and 'background-auth' states
+  const token = authState.status === 'authenticated' ? authState.token : null;
+  const backgroundAuth = authState.status === 'background-auth'
+    ? { message: authState.bgAuthMessage, isError: !!authState.bgAuthError, errorMessage: authState.bgAuthError }
+    : undefined;
+
   return (
     <>
       <UpdateToast />
       <Dashboard
-        token={authState.token}
+        token={token}
         contactId={authState.contactId}
         username={authState.username}
         isOnline={isOnline}
         onLogout={handleLogout}
         onTokenExpired={handleTokenExpired}
+        backgroundAuth={backgroundAuth}
       />
     </>
   );

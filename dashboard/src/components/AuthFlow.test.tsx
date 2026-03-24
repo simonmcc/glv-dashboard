@@ -7,6 +7,10 @@ const defaultProps = {
   onAuthStart: vi.fn(),
   onAuthComplete: vi.fn(),
   onAuthError: vi.fn(),
+  onStartBackgroundAuth: vi.fn(),
+  onBackgroundAuthProgress: vi.fn(),
+  onBackgroundAuthComplete: vi.fn(),
+  onBackgroundAuthError: vi.fn(),
 };
 
 describe('AuthFlow - mock mode', () => {

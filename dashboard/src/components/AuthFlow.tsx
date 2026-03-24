@@ -2,11 +2,14 @@
  * Authentication Flow Component
  *
  * Authenticates with the Scouts membership portal via the backend proxy.
+ * On repeat logins with matching credentials, shows the dashboard immediately
+ * while authentication continues in the background.
  */
 
 import { useState } from 'react';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
 import type { AuthState } from '../types';
+import { hashPassword, saveCredentials, loadCredentials } from '../session';
 
 const tracer = trace.getTracer('glv-dashboard', '1.0.0');
 
@@ -15,6 +18,10 @@ interface AuthFlowProps {
   onAuthStart: () => void;
   onAuthComplete: (token: string, contactId: string, username?: string) => void;
   onAuthError: (message: string) => void;
+  onStartBackgroundAuth: (contactId: string, username?: string) => void;
+  onBackgroundAuthProgress: (message: string) => void;
+  onBackgroundAuthComplete: (token: string, contactId: string, username?: string) => void;
+  onBackgroundAuthError: (message: string) => void;
   mockMode?: boolean;
 }
 
@@ -57,7 +64,17 @@ async function parseSSEStream(
   }
 }
 
-export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, mockMode = false }: AuthFlowProps) {
+export function AuthFlow({
+  authState,
+  onAuthStart,
+  onAuthComplete,
+  onAuthError,
+  onStartBackgroundAuth,
+  onBackgroundAuthProgress,
+  onBackgroundAuthComplete,
+  onBackgroundAuthError,
+  mockMode = false,
+}: AuthFlowProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -73,7 +90,6 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
 
     setIsLoading(true);
     setLoginStep('');
-    onAuthStart();
 
     // In mock mode, authenticate immediately without calling the backend
     if (mockMode) {
@@ -82,6 +98,18 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
         onAuthComplete('mock-token', 'mock-contact', username);
       }, 500);
       return;
+    }
+
+    // Check if we can use the fast-path (matching stored credential hash)
+    const passwordHash = await hashPassword(password);
+    const stored = loadCredentials();
+    const isFastPath = !!(stored && stored.username === username && stored.passwordHash === passwordHash);
+
+    if (isFastPath) {
+      // Show the dashboard immediately with cached data while auth continues in background
+      onStartBackgroundAuth(stored.contactId, username);
+    } else {
+      onAuthStart();
     }
 
     await tracer.startActiveSpan('auth.login', async (span) => {
@@ -98,7 +126,11 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
           const result = await response.json().catch(() => ({}));
           const msg = (result as { error?: string }).error || 'Authentication failed';
           span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
-          onAuthError(msg);
+          if (isFastPath) {
+            onBackgroundAuthError(msg);
+          } else {
+            onAuthError(msg);
+          }
           return;
         }
 
@@ -106,7 +138,12 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
         await parseSSEStream(response.body, (type, data) => {
           const payload = data as Record<string, string>;
           if (type === 'progress') {
-            setLoginStep(payload.message || '');
+            const msg = payload.message || '';
+            if (isFastPath) {
+              onBackgroundAuthProgress(msg);
+            } else {
+              setLoginStep(msg);
+            }
           } else if (type === 'complete') {
             terminated = true;
             const token = payload.token;
@@ -114,26 +151,51 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
             if (!token) {
               const msg = 'Authentication failed: invalid response from authentication server';
               span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
-              onAuthError(msg);
+              if (isFastPath) {
+                onBackgroundAuthError(msg);
+              } else {
+                onAuthError(msg);
+              }
               return;
             }
             span.setStatus({ code: SpanStatusCode.OK });
-            onAuthComplete(token, contactId, username);
+            // Save credential hash after every successful login
+            void saveCredentials(username, passwordHash, contactId);
+            if (isFastPath) {
+              onBackgroundAuthComplete(token, contactId, username);
+            } else {
+              onAuthComplete(token, contactId, username);
+            }
           } else if (type === 'error') {
             terminated = true;
-            span.setStatus({ code: SpanStatusCode.ERROR, message: payload.error || 'Authentication failed' });
-            onAuthError(payload.error || 'Authentication failed');
+            const msg = payload.error || 'Authentication failed';
+            span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
+            if (isFastPath) {
+              onBackgroundAuthError(msg);
+            } else {
+              onAuthError(msg);
+            }
           }
         });
 
         if (!terminated) {
           span.setStatus({ code: SpanStatusCode.ERROR, message: 'Stream ended without completing' });
-          onAuthError('Authentication failed: connection closed unexpectedly');
+          const msg = 'Authentication failed: connection closed unexpectedly';
+          if (isFastPath) {
+            onBackgroundAuthError(msg);
+          } else {
+            onAuthError(msg);
+          }
         }
       } catch (err) {
         span.setStatus({ code: SpanStatusCode.ERROR, message: 'Connection failed' });
         span.recordException(err as Error);
-        onAuthError('Failed to connect to authentication server. Is the backend running?');
+        const msg = 'Failed to connect to authentication server. Is the backend running?';
+        if (isFastPath) {
+          onBackgroundAuthError(msg);
+        } else {
+          onAuthError(msg);
+        }
       } finally {
         span.end();
         setIsLoading(false);
@@ -230,7 +292,7 @@ export function AuthFlow({ authState, onAuthStart, onAuthComplete, onAuthError, 
         </div>
 
         <p className="mt-4 text-center text-xs text-gray-500">
-          Your credentials are transmitted securely and are not stored.
+          Your password is never stored. A secure hash is saved locally to enable instant access on return visits.
           <br />
           Data is fetched directly from the Scouts API.
         </p>

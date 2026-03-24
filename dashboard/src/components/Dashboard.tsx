@@ -32,12 +32,13 @@ import { SyncStatus } from './SyncStatus';
 import { readCache, writeCache, readLastSync } from '../db';
 
 interface DashboardProps {
-  token: string;
+  token: string | null;
   contactId: string;
   username?: string;
   isOnline: boolean;
   onLogout: () => void;
   onTokenExpired: () => void;
+  backgroundAuth?: { message: string; isError?: boolean; errorMessage?: string };
 }
 
 // Section state for lazy loading
@@ -47,7 +48,7 @@ interface SectionState<T> {
   error: string | null;
 }
 
-export function Dashboard({ token, contactId, username, isOnline, onLogout, onTokenExpired }: DashboardProps) {
+export function Dashboard({ token, contactId, username, isOnline, onLogout, onTokenExpired, backgroundAuth }: DashboardProps) {
   // Primary data (loaded immediately - always visible at top)
   const [records, setRecords] = useState<LearningRecord[]>([]);
   const [summary, setSummary] = useState<ComplianceSummary | null>(null);
@@ -91,7 +92,9 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       console.log('[Dashboard] Using mock API client');
       return new MockScoutsApiClient();
     }
-    const c = new ScoutsApiClient(token);
+    // When token is null (background-auth state), create client with empty token —
+    // network calls are guarded by the token null-check in fetchPrimaryData.
+    const c = new ScoutsApiClient(token ?? '');
     if (contactId) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (c as any).contactId = contactId;
@@ -104,6 +107,12 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   // when React StrictMode double-mounts the component in development.
   const fetchPrimaryData = useCallback(async (signal?: AbortSignal) => {
     return tracer.startActiveSpan('dashboard.fetchPrimaryData', async (span) => {
+      // Skip network fetch when we don't have a valid token yet (background-auth state)
+      if (!token && !MOCK_MODE) {
+        span.end();
+        return;
+      }
+
       setPrimaryLoading(true);
       setPrimaryError(null);
 
@@ -335,6 +344,17 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
     await fetchPrimaryData();
   }, [fetchPrimaryData]);
 
+  // When token transitions from null → string (background auth completes), trigger a full refresh
+  const prevTokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (token && prevTokenRef.current === null) {
+      void refreshAll();
+    }
+    prevTokenRef.current = token;
+  // refreshAll is intentionally excluded to avoid re-running when it changes due to other deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   // Handle member selection - load all lazy sections that are still idle
   const handleMemberSelect = useCallback((membershipNumber: string, name: string) => {
     setSelectedMember({ membershipNumber, name });
@@ -435,8 +455,8 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         console.warn('Failed to read secondary caches from IndexedDB.', err);
       });
 
-      // Fetch fresh data from the network if online
-      if (isOnline && !controller.signal.aborted) {
+      // Fetch fresh data from the network if online and authenticated
+      if (isOnline && token && !controller.signal.aborted) {
         await fetchPrimaryData(controller.signal);
       }
     }
@@ -545,6 +565,8 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
               isOnline={isOnline}
               isLoading={isAnyLoading}
               onRefresh={refreshAll}
+              onLogout={onLogout}
+              backgroundAuth={backgroundAuth}
             />
           </div>
         </div>
