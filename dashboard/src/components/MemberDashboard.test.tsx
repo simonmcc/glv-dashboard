@@ -282,3 +282,105 @@ describe('MemberDashboard', () => {
     expect(onBack).not.toHaveBeenCalled();
   });
 });
+
+describe('MemberDashboard – Growing Roots expansion', () => {
+  const grLearningRecords: LearningRecord[] = [
+    {
+      'First name': 'Alice', 'Last name': 'Johnson', 'Membership number': '12345678',
+      Learning: 'Safeguarding', Status: 'Valid', 'Expiry date': '2026-06-01',
+    },
+    {
+      'First name': 'Alice', 'Last name': 'Johnson', 'Membership number': '12345678',
+      Learning: 'Safety', Status: 'Not Started', 'Expiry date': null,
+    },
+    {
+      'First name': 'Alice', 'Last name': 'Johnson', 'Membership number': '12345678',
+      Learning: 'Creating Inclusion', Status: 'In-Progress', 'Expiry date': null,
+    },
+    // Who We Are and What We Do, Data Protection in Scouts, Delivering a Great Programme
+    // are intentionally absent — they should fall back to "Not Started"
+  ];
+
+  const grJoiningJourneyRecords: JoiningJourneyRecord[] = [
+    {
+      'First name': 'Alice', 'Last name': 'Johnson', 'Membership number': '12345678',
+      Item: 'Growing Roots', Status: 'Incomplete',
+    },
+  ];
+
+  const grProps = {
+    membershipNumber: '12345678',
+    name: 'Alice Johnson',
+    learningRecords: grLearningRecords,
+    joiningJourneyRecords: grJoiningJourneyRecords,
+    joiningJourneyState: 'loaded' as const,
+    disclosureRecords: [],
+    disclosuresState: 'loaded' as const,
+    teamReviewRecords: [],
+    teamReviewsState: 'loaded' as const,
+    permitRecords: [],
+    permitsState: 'loaded' as const,
+    awardRecords: [],
+    awardsState: 'loaded' as const,
+    onBack: vi.fn(),
+  };
+
+  it('renders per-module sub-rows when Growing Roots is in the joining journey', () => {
+    render(<MemberDashboard {...grProps} />);
+    const section = screen.getByTestId('joining-journey-section');
+    // All six GR modules should be listed as sub-rows
+    expect(section.textContent).toContain('Safeguarding');
+    expect(section.textContent).toContain('Safety');
+    expect(section.textContent).toContain('Who We Are and What We Do');
+    expect(section.textContent).toContain('Creating Inclusion');
+    expect(section.textContent).toContain('Data Protection in Scouts');
+    expect(section.textContent).toContain('Delivering a Great Programme');
+  });
+
+  it('shows status from learningRecords for modules that have a record', () => {
+    render(<MemberDashboard {...grProps} />);
+    const section = screen.getByTestId('joining-journey-section');
+    // Safeguarding is Valid, Safety is Not Started, Creating Inclusion is In-Progress
+    expect(section.textContent).toContain('Valid');
+    expect(section.textContent).toContain('Not Started');
+    expect(section.textContent).toContain('In-Progress');
+  });
+
+  it('falls back to "Not Started" for GR modules absent from learningRecords', () => {
+    render(<MemberDashboard {...grProps} />);
+    const section = screen.getByTestId('joining-journey-section');
+    // Who We Are, Data Protection, Delivering a Great Programme have no record → Not Started
+    // Count "Not Started" occurrences: Safety + the 3 absent modules = at least 4
+    const notStartedCount = (section.textContent?.match(/Not Started/g) ?? []).length;
+    expect(notStartedCount).toBeGreaterThanOrEqual(4);
+  });
+
+  it('shows deadline badge for Safeguarding and Safety sub-rows', () => {
+    render(<MemberDashboard {...grProps} />);
+    const section = screen.getByTestId('joining-journey-section');
+    // Both Safeguarding and Safety have deadlineDays=30 → "30d deadline" badge
+    const badgeCount = (section.textContent?.match(/30d deadline/g) ?? []).length;
+    expect(badgeCount).toBe(2);
+  });
+
+  it('does not show deadline badge for other GR modules', () => {
+    render(<MemberDashboard {...grProps} />);
+    const section = screen.getByTestId('joining-journey-section');
+    // Only 2 deadline badges (Safeguarding + Safety)
+    const badgeCount = (section.textContent?.match(/30d deadline/g) ?? []).length;
+    expect(badgeCount).toBe(2);
+  });
+
+  it('does not expand Growing Roots when Growing Roots is not in the joining journey', () => {
+    const noGRProps = {
+      ...grProps,
+      joiningJourneyRecords: [
+        { 'First name': 'Alice', 'Last name': 'Johnson', 'Membership number': '12345678', Item: 'Declaration', Status: 'Incomplete' },
+      ],
+    };
+    render(<MemberDashboard {...noGRProps} />);
+    const section = screen.getByTestId('joining-journey-section');
+    expect(section.textContent).not.toContain('Who We Are and What We Do');
+    expect(section.textContent).not.toContain('Creating Inclusion');
+  });
+});

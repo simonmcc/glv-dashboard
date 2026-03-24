@@ -86,8 +86,15 @@ export function isExpiringSoon(dateStr: string | null | undefined, thresholdDays
 
 /**
  * Transform MemberLearningResult[] from GetLmsDetailsAsync into LearningRecord[] format.
- * Includes modules that have expiry dates, plus First Response (required within 1 year of joining).
- * Synthesises a "Not Started" First Response record for any member missing it entirely.
+ *
+ * Inclusion rules:
+ * - Modules with an expiry date are always included.
+ * - First Response is always included regardless of expiry (required within 1 year of joining).
+ *   If a member has no First Response module at all, a "Not Started" record is synthesised.
+ * - Growing Roots modules present in the member's LMS data are included regardless of expiry.
+ *   Missing Growing Roots modules are NOT synthesised here — the UI (JoiningJourneyProgress,
+ *   MemberDashboard) already treats absent module records as "Not Started" via a fallback.
+ * - All other modules without an expiry date are excluded.
  *
  * @param memberStartDates Optional map of membership number → earliest role start date,
  *   used to populate the Start date field on First Response records so the 1-year deadline
@@ -142,20 +149,6 @@ export function transformLearningResults(
       });
     }
 
-    // Synthesise "Not Started" records for any Growing Roots modules missing from the LMS entirely
-    for (const grModule of GROWING_ROOTS_MODULES) {
-      const hasModule = member.modules.some(m => m.title === grModule.name);
-      if (!hasModule) {
-        records.push({
-          'First name': member.firstName,
-          'Last name': member.lastName,
-          'Membership number': member.membershipNumber,
-          'Learning': grModule.name,
-          'Status': 'Not Started',
-          'Expiry date': null,
-        });
-      }
-    }
   }
 
   return records;
