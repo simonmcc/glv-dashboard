@@ -20,7 +20,7 @@
     "@opentelemetry/instrumentation": "^0.211.0",
     "@opentelemetry/instrumentation-fetch": "^0.211.0",
     "@opentelemetry/resources": "^2.5.0",
-    "@opentelemetry/sdk-trace-base": "^2.5.0",
+    "@opentelemetry/sdk-trace-base": "^2.6.0",
     "@opentelemetry/sdk-trace-web": "^2.5.0",
     "@opentelemetry/semantic-conventions": "^1.39.0",
     "idb": "^8.0.3",
