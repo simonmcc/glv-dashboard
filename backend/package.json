@@ -21,7 +21,7 @@
     "@opentelemetry/auto-instrumentations-node": "^0.71.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.211.0",
     "@opentelemetry/resources": "^2.6.0",
-    "@opentelemetry/sdk-node": "^0.211.0",
+    "@opentelemetry/sdk-node": "^0.213.0",
     "@opentelemetry/semantic-conventions": "^1.39.0",
     "cors": "^2.8.5",
     "express": "^5.2.1",
