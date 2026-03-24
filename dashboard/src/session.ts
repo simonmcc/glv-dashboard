@@ -43,29 +43,78 @@ export function clearSession(): void {
 /** localStorage key for persisting credential hash (enables fast-path login). */
 const CREDENTIALS_KEY = 'glv-dashboard-credentials';
 
-/** Hash a password using SHA-256 (Web Crypto API). Returns a hex string. */
+/**
+ * Credential records older than this are discarded to limit exposure
+ * if localStorage is compromised.
+ */
+const CREDENTIALS_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+/**
+ * Derive a verifier from a password using PBKDF2-SHA-256 (Web Crypto API).
+ * The high iteration count makes offline brute-force attacks significantly
+ * slower compared to a plain digest. Returns a hex-encoded derived key.
+ */
 export async function hashPassword(password: string): Promise<string> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
-  return Array.from(new Uint8Array(buf))
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits'],
+  );
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt: encoder.encode('glv-dashboard-credential-salt'),
+      iterations: 100_000,
+    },
+    keyMaterial,
+    256,
+  );
+  return Array.from(new Uint8Array(derivedBits))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
 }
 
-/** Save credential hash to localStorage for fast-path login on next visit. */
+/** Save credential verifier to localStorage for fast-path login on next visit. */
 export function saveCredentials(username: string, passwordHash: string, contactId: string): void {
-  localStorage.setItem(CREDENTIALS_KEY, JSON.stringify({ username, passwordHash, contactId }));
+  localStorage.setItem(
+    CREDENTIALS_KEY,
+    JSON.stringify({ username, passwordHash, contactId, createdAt: Date.now() }),
+  );
 }
 
-/** Load saved credential hash from localStorage. Returns null if missing or malformed. */
+/**
+ * Load saved credential verifier from localStorage.
+ * Returns null if missing, malformed, fields are not strings, or older than CREDENTIALS_MAX_AGE_MS.
+ */
 export function loadCredentials(): { username: string; passwordHash: string; contactId: string } | null {
   try {
     const stored = localStorage.getItem(CREDENTIALS_KEY);
-    if (stored) return JSON.parse(stored) as { username: string; passwordHash: string; contactId: string };
-  } catch { /* ignore */ }
-  return null;
+    if (!stored) return null;
+    const { username, passwordHash, contactId, createdAt } = JSON.parse(stored) ?? {};
+    if (
+      typeof username !== 'string' || !username ||
+      typeof passwordHash !== 'string' || !passwordHash ||
+      typeof contactId !== 'string' || !contactId
+    ) {
+      localStorage.removeItem(CREDENTIALS_KEY);
+      return null;
+    }
+    if (!createdAt || Date.now() - createdAt > CREDENTIALS_MAX_AGE_MS) {
+      localStorage.removeItem(CREDENTIALS_KEY);
+      return null;
+    }
+    return { username, passwordHash, contactId };
+  } catch {
+    localStorage.removeItem(CREDENTIALS_KEY);
+    return null;
+  }
 }
 
-/** Remove saved credential hash from localStorage. */
+/** Remove saved credential verifier from localStorage. */
 export function clearCredentials(): void {
   localStorage.removeItem(CREDENTIALS_KEY);
 }

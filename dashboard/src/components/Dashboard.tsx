@@ -38,7 +38,7 @@ interface DashboardProps {
   isOnline: boolean;
   onLogout: () => void;
   onTokenExpired: () => void;
-  backgroundAuth?: { message: string; isError?: boolean; errorMessage?: string };
+  backgroundAuth?: { message: string; isError?: boolean };
 }
 
 // Section state for lazy loading
@@ -358,12 +358,14 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   // Handle member selection - load all lazy sections that are still idle
   const handleMemberSelect = useCallback((membershipNumber: string, name: string) => {
     setSelectedMember({ membershipNumber, name });
+    // Don't trigger network loads while background auth is still in progress (no token yet)
+    if (!token && !MOCK_MODE) return;
     if (joiningJourney.state === 'idle') loadJoiningJourney();
     if (disclosures.state === 'idle') loadDisclosures();
     if (teamReviews.state === 'idle') loadTeamReviews();
     if (permits.state === 'idle') loadPermits();
     if (awards.state === 'idle') loadAwards();
-  }, [joiningJourney.state, loadJoiningJourney, disclosures.state, loadDisclosures, teamReviews.state, loadTeamReviews, permits.state, loadPermits, awards.state, loadAwards]);
+  }, [token, joiningJourney.state, loadJoiningJourney, disclosures.state, loadDisclosures, teamReviews.state, loadTeamReviews, permits.state, loadPermits, awards.state, loadAwards]);
 
   // On mount: seed state from IndexedDB cache for immediate render, then
   // fetch fresh data from the network if online.
@@ -484,7 +486,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         entries.forEach(entry => {
           if (entry.isIntersecting) {
             const section = sections.find(s => s.ref.current === entry.target);
-            if (section && !triggeredSections.current.has(section.key) && isOnline) {
+            if (section && !triggeredSections.current.has(section.key) && isOnline && (token || MOCK_MODE)) {
               triggeredSections.current.add(section.key);
               section.load();
             }

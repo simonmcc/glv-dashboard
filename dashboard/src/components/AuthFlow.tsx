@@ -100,16 +100,16 @@ export function AuthFlow({
       return;
     }
 
-    // Check if we can use the fast-path (matching stored credential hash)
+    // Check if we can use the fast-path (matching stored credential verifier).
+    // Fall back to foreground auth if hashing fails (e.g. non-secure context).
     const stored = loadCredentials();
+    let passwordHash = '';
     let isFastPath = false;
-
     try {
-      const passwordHash = await hashPassword(password);
+      passwordHash = await hashPassword(password);
       isFastPath = !!(stored && stored.username === username && stored.passwordHash === passwordHash);
     } catch {
-      // If hashing fails (e.g. WebCrypto unavailable), fall back to normal foreground auth
-      isFastPath = false;
+      // WebCrypto unavailable or failed — proceed with normal foreground auth
     }
 
     if (isFastPath && stored) {

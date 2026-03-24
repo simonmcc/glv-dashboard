@@ -19,7 +19,7 @@ interface SyncStatusProps {
   isLoading: boolean;
   onRefresh: () => void;
   onLogout?: () => void;
-  backgroundAuth?: { message: string; isError?: boolean; errorMessage?: string };
+  backgroundAuth?: { message: string; isError?: boolean };
 }
 
 export function SyncStatus({ lastSync, isOnline, isLoading, onRefresh, onLogout, backgroundAuth }: SyncStatusProps) {

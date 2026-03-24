@@ -10,7 +10,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import type { AuthState } from './types';
 import { AuthFlow } from './components/AuthFlow';
 import { Dashboard } from './components/Dashboard';
-import { loadSession, saveSession, clearSession } from './session';
+import { loadSession, saveSession, clearSession, clearCredentials } from './session';
 
 const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -71,6 +71,7 @@ function App() {
 
   const handleLogout = useCallback(() => {
     clearSession();
+    clearCredentials();
     setAuthState({ status: 'unauthenticated' });
   }, []);
 
@@ -91,8 +92,14 @@ function App() {
   }, []);
 
   const handleBackgroundAuthComplete = useCallback((token: string, contactId: string, username?: string) => {
-    saveSession(token, contactId, username);
-    setAuthState({ status: 'authenticated', token, contactId, username });
+    setAuthState(prev => {
+      if (prev.status !== 'background-auth') {
+        // Stale completion after logout or state change — ignore
+        return prev;
+      }
+      saveSession(token, contactId, username);
+      return { status: 'authenticated', token, contactId, username };
+    });
   }, []);
 
   const handleBackgroundAuthError = useCallback((message: string) => {
@@ -128,7 +135,7 @@ function App() {
   // Show dashboard for both 'authenticated' and 'background-auth' states
   const token = authState.status === 'authenticated' ? authState.token : null;
   const backgroundAuth = authState.status === 'background-auth'
-    ? { message: authState.bgAuthMessage, isError: !!authState.bgAuthError, errorMessage: authState.bgAuthError }
+    ? { message: authState.bgAuthMessage, isError: !!authState.bgAuthError }
     : undefined;
 
   return (
