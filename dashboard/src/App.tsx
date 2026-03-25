@@ -10,7 +10,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import type { AuthState } from './types';
 import { AuthFlow } from './components/AuthFlow';
 import { Dashboard } from './components/Dashboard';
-import { loadSession, saveSession, clearSession, clearCredentials } from './session';
+import { loadSession, saveSession, clearSession } from './session';
 
 const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
 
@@ -71,7 +71,8 @@ function App() {
 
   const handleLogout = useCallback(() => {
     clearSession();
-    clearCredentials();
+    // Do NOT clear credentials on logout — they must persist so the fast-path
+    // works on the next login. The 30-day expiry in loadCredentials() handles cleanup.
     setAuthState({ status: 'unauthenticated' });
   }, []);
 
