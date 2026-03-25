@@ -61,6 +61,7 @@ export type AuthState =
   | { status: 'unauthenticated' }
   | { status: 'authenticating' }
   | { status: 'authenticated'; token: string; contactId: string; username?: string }
+  | { status: 'background-auth'; contactId: string; username?: string; bgAuthMessage: string; bgAuthError?: string }
   | { status: 'error'; message: string };
 
 /**

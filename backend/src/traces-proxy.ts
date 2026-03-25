@@ -141,8 +141,8 @@ if (process.env.NODE_ENV === 'test') {
           ok: true,
           status: 200,
           text: async () => '',
-        })) as unknown as typeof fetch;
-        (globalThis as unknown as { fetch: typeof fetch }).fetch = fetchMock;
+        }));
+        (globalThis as unknown as { fetch: typeof fetch }).fetch = fetchMock as unknown as typeof fetch;
 
         const originalBody = {
           resourceSpans: [
@@ -167,7 +167,7 @@ if (process.env.NODE_ENV === 'test') {
         await forwardTraces(originalBody);
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
-        const [, fetchOptions] = fetchMock.mock.calls[0];
+        const [, fetchOptions] = fetchMock.mock.calls[0] as unknown as Parameters<typeof fetch>;
         const sentPayload = JSON.parse(
           (fetchOptions as { body: string }).body
         ) as { resourceSpans: Array<{ resource?: { attributes?: Array<{ key: string; value: { stringValue: string } }> } }> };

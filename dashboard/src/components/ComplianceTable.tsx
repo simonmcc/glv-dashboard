@@ -34,6 +34,7 @@ export function ComplianceTable({ records, isLoading, onMemberSelect, searchTerm
   const [filterLearning, setFilterLearning] = useState<string>('all');
   const [filterOverdue, setFilterOverdue] = useState(false);
   const [filterNoExpiry, setFilterNoExpiry] = useState(false);
+  const [filterExpiringSoonOrNotStarted, setFilterExpiringSoonOrNotStarted] = useState(true);
 
   // Get unique values for filters
   const statuses = useMemo(() => {
@@ -67,6 +68,11 @@ export function ComplianceTable({ records, isLoading, onMemberSelect, searchTerm
     return records.filter(r => !r['Expiry date']).length;
   }, [records]);
 
+  // Count records that are Expiring Soon or Not Started
+  const expiringSoonOrNotStartedCount = useMemo(() => {
+    return records.filter(r => r.Status === 'Expiring Soon' || r.Status === 'Not Started').length;
+  }, [records]);
+
   // Filter and sort records
   const filteredRecords = useMemo(() => {
     let result = [...records];
@@ -87,6 +93,11 @@ export function ComplianceTable({ records, isLoading, onMemberSelect, searchTerm
     // Apply no expiry filter
     if (filterNoExpiry) {
       result = result.filter(r => !r['Expiry date']);
+    }
+
+    // Apply expiring soon or not started filter
+    if (filterExpiringSoonOrNotStarted) {
+      result = result.filter(r => r.Status === 'Expiring Soon' || r.Status === 'Not Started');
     }
 
     // Apply filters
@@ -131,7 +142,7 @@ export function ComplianceTable({ records, isLoading, onMemberSelect, searchTerm
     });
 
     return result;
-  }, [records, filterStatus, filterLearning, searchTerm, sortField, sortOrder, filterOverdue, filterNoExpiry]);
+  }, [records, filterStatus, filterLearning, searchTerm, sortField, sortOrder, filterOverdue, filterNoExpiry, filterExpiringSoonOrNotStarted]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -214,6 +225,19 @@ export function ComplianceTable({ records, isLoading, onMemberSelect, searchTerm
               }`}
             >
               No Expiry ({noExpiryCount})
+            </button>
+          )}
+
+          {expiringSoonOrNotStartedCount > 0 && (
+            <button
+              onClick={() => setFilterExpiringSoonOrNotStarted(!filterExpiringSoonOrNotStarted)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filterExpiringSoonOrNotStarted
+                  ? 'bg-yellow-600 text-white'
+                  : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+              }`}
+            >
+              Expiring Soon / Not Started ({expiringSoonOrNotStartedCount})
             </button>
           )}
         </div>
