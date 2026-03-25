@@ -20,7 +20,6 @@ type SortOrder = 'asc' | 'desc';
 const statusColors: Record<string, string> = {
   'Valid': 'bg-green-100 text-green-800',
   'In-Progress': 'bg-blue-100 text-blue-800',
-  'Expiring Soon': 'bg-amber-100 text-amber-800',
   'Expiring': 'bg-yellow-100 text-yellow-800',
   'Renewal Due': 'bg-orange-100 text-orange-800',
   'Expired': 'bg-red-100 text-red-800',
@@ -34,7 +33,7 @@ export function ComplianceTable({ records, isLoading, onMemberSelect, searchTerm
   const [filterLearning, setFilterLearning] = useState<string>('all');
   const [filterOverdue, setFilterOverdue] = useState(false);
   const [filterNoExpiry, setFilterNoExpiry] = useState(false);
-  const [filterExpiringSoonOrNotStarted, setFilterExpiringSoonOrNotStarted] = useState(true);
+  const [filterExpiringOrNotStarted, setFilterExpiringOrNotStarted] = useState(true);
 
   // Get unique values for filters
   const statuses = useMemo(() => {
@@ -68,9 +67,9 @@ export function ComplianceTable({ records, isLoading, onMemberSelect, searchTerm
     return records.filter(r => !r['Expiry date']).length;
   }, [records]);
 
-  // Count records that are Expiring Soon or Not Started
-  const expiringSoonOrNotStartedCount = useMemo(() => {
-    return records.filter(r => r.Status === 'Expiring Soon' || r.Status === 'Not Started').length;
+  // Count records that are Expiring or Not Started
+  const expiringOrNotStartedCount = useMemo(() => {
+    return records.filter(r => r.Status === 'Expiring' || r.Status === 'Not Started').length;
   }, [records]);
 
   // Filter and sort records
@@ -95,9 +94,9 @@ export function ComplianceTable({ records, isLoading, onMemberSelect, searchTerm
       result = result.filter(r => !r['Expiry date']);
     }
 
-    // Apply expiring soon or not started filter
-    if (filterExpiringSoonOrNotStarted) {
-      result = result.filter(r => r.Status === 'Expiring Soon' || r.Status === 'Not Started');
+    // Apply expiring or not started filter
+    if (filterExpiringOrNotStarted) {
+      result = result.filter(r => r.Status === 'Expiring' || r.Status === 'Not Started');
     }
 
     // Apply filters
@@ -142,7 +141,7 @@ export function ComplianceTable({ records, isLoading, onMemberSelect, searchTerm
     });
 
     return result;
-  }, [records, filterStatus, filterLearning, searchTerm, sortField, sortOrder, filterOverdue, filterNoExpiry, filterExpiringSoonOrNotStarted]);
+  }, [records, filterStatus, filterLearning, searchTerm, sortField, sortOrder, filterOverdue, filterNoExpiry, filterExpiringOrNotStarted]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -228,16 +227,16 @@ export function ComplianceTable({ records, isLoading, onMemberSelect, searchTerm
             </button>
           )}
 
-          {expiringSoonOrNotStartedCount > 0 && (
+          {expiringOrNotStartedCount > 0 && (
             <button
-              onClick={() => setFilterExpiringSoonOrNotStarted(!filterExpiringSoonOrNotStarted)}
+              onClick={() => setFilterExpiringOrNotStarted(!filterExpiringOrNotStarted)}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filterExpiringSoonOrNotStarted
+                filterExpiringOrNotStarted
                   ? 'bg-yellow-600 text-white'
                   : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
               }`}
             >
-              Expiring Soon / Not Started ({expiringSoonOrNotStartedCount})
+              Expiring / Not Started ({expiringOrNotStartedCount})
             </button>
           )}
         </div>
