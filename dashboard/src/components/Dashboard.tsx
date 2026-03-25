@@ -64,6 +64,11 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   // Joining Journey view toggle
   const [joiningJourneyView, setJoiningJourneyView] = useState<'progress' | 'items'>('progress');
 
+  // Collapsed state for lower-priority sections
+  const [teamReviewsCollapsed, setTeamReviewsCollapsed] = useState(true);
+  const [permitsCollapsed, setPermitsCollapsed] = useState(true);
+  const [awardsCollapsed, setAwardsCollapsed] = useState(true);
+
   // Lazy-loaded sections
   const [joiningJourney, setJoiningJourney] = useState<SectionState<JoiningJourneyRecord[]>>({ state: 'idle', data: [], error: null });
   const [disclosures, setDisclosures] = useState<SectionState<{ records: DisclosureRecord[]; summary: DisclosureSummary | null }>>({ state: 'idle', data: { records: [], summary: null }, error: null });
@@ -364,10 +369,10 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
     if (!token && !MOCK_MODE) return;
     if (joiningJourney.state === 'idle') loadJoiningJourney();
     if (disclosures.state === 'idle') loadDisclosures();
-    if (teamReviews.state === 'idle') loadTeamReviews();
-    if (permits.state === 'idle') loadPermits();
-    if (awards.state === 'idle') loadAwards();
-  }, [token, joiningJourney.state, loadJoiningJourney, disclosures.state, loadDisclosures, teamReviews.state, loadTeamReviews, permits.state, loadPermits, awards.state, loadAwards]);
+    if (!teamReviewsCollapsed && teamReviews.state === 'idle') loadTeamReviews();
+    if (!permitsCollapsed && permits.state === 'idle') loadPermits();
+    if (!awardsCollapsed && awards.state === 'idle') loadAwards();
+  }, [token, joiningJourney.state, loadJoiningJourney, disclosures.state, loadDisclosures, teamReviewsCollapsed, teamReviews.state, loadTeamReviews, permitsCollapsed, permits.state, loadPermits, awardsCollapsed, awards.state, loadAwards]);
 
   // On mount: seed state from IndexedDB cache for immediate render, then
   // fetch fresh data from the network if online.
@@ -475,12 +480,12 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   // Set up intersection observers for lazy sections
   useEffect(() => {
     const sections = [
-      { ref: joiningJourneyRef, key: 'joiningJourney', load: loadJoiningJourney },
-      { ref: disclosuresRef, key: 'disclosures', load: loadDisclosures },
-      { ref: suspensionsRef, key: 'suspensions', load: loadSuspensions },
-      { ref: teamReviewsRef, key: 'teamReviews', load: loadTeamReviews },
-      { ref: permitsRef, key: 'permits', load: loadPermits },
-      { ref: awardsRef, key: 'awards', load: loadAwards },
+      { ref: joiningJourneyRef, key: 'joiningJourney', load: loadJoiningJourney, collapsed: false },
+      { ref: disclosuresRef, key: 'disclosures', load: loadDisclosures, collapsed: false },
+      { ref: suspensionsRef, key: 'suspensions', load: loadSuspensions, collapsed: false },
+      { ref: teamReviewsRef, key: 'teamReviews', load: loadTeamReviews, collapsed: teamReviewsCollapsed },
+      { ref: permitsRef, key: 'permits', load: loadPermits, collapsed: permitsCollapsed },
+      { ref: awardsRef, key: 'awards', load: loadAwards, collapsed: awardsCollapsed },
     ];
 
     const observer = new IntersectionObserver(
@@ -488,7 +493,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         entries.forEach(entry => {
           if (entry.isIntersecting) {
             const section = sections.find(s => s.ref.current === entry.target);
-            if (section && !triggeredSections.current.has(section.key) && isOnline && (token || MOCK_MODE)) {
+            if (section && !section.collapsed && !triggeredSections.current.has(section.key) && isOnline && (token || MOCK_MODE)) {
               triggeredSections.current.add(section.key);
               section.load();
             }
@@ -503,7 +508,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
     });
 
     return () => observer.disconnect();
-  }, [isOnline, loadJoiningJourney, loadDisclosures, loadSuspensions, loadTeamReviews, loadPermits, loadAwards]);
+  }, [isOnline, teamReviewsCollapsed, permitsCollapsed, awardsCollapsed, loadJoiningJourney, loadDisclosures, loadSuspensions, loadTeamReviews, loadPermits, loadAwards]);
 
   const isAnyLoading = primaryLoading ||
     joiningJourney.state === 'loading' ||
@@ -636,23 +641,6 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           />
         </section>
 
-        {/* Learning Compliance Table - Always load immediately */}
-        <section id="section-learning">
-          <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Learning Records</h2>
-            {primaryLoading && (
-              <span className="text-sm text-purple-600 animate-pulse flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Loading...
-              </span>
-            )}
-          </div>
-          <ComplianceTable records={records} isLoading={primaryLoading && records.length === 0} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
-        </section>
-
         {/* Joining Journey - Lazy loaded */}
         <LazySection
           ref={joiningJourneyRef}
@@ -721,18 +709,44 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           <SuspensionsTable records={suspensions.data} isLoading={suspensions.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
         </LazySection>
 
-        {/* Team Reviews - Lazy loaded */}
+        {/* Learning Compliance Table */}
+        <section id="section-learning">
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Learning Records</h2>
+            {primaryLoading && (
+              <span className="text-sm text-purple-600 animate-pulse flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Loading...
+              </span>
+            )}
+          </div>
+          <ComplianceTable records={records} isLoading={primaryLoading && records.length === 0} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
+        </section>
+
+        {/* Team Reviews - Lazy loaded, collapsed by default */}
         <LazySection
           ref={teamReviewsRef}
-          title="Team Directory Reviews"
+          title="Team Directory"
           state={teamReviews.state}
           error={teamReviews.error}
           onRetry={() => { triggeredSections.current.delete('teamReviews'); loadTeamReviews(); }}
+          collapsed={teamReviewsCollapsed}
+          onToggle={() => {
+            const next = !teamReviewsCollapsed;
+            setTeamReviewsCollapsed(next);
+            if (!next && teamReviews.state === 'idle') {
+              triggeredSections.current.add('teamReviews');
+              loadTeamReviews();
+            }
+          }}
         >
           <TeamReviewsTable records={teamReviews.data} isLoading={teamReviews.state === 'loading'} searchTerm={searchTerm} />
         </LazySection>
 
-        {/* Permits - Lazy loaded */}
+        {/* Permits - Lazy loaded, collapsed by default */}
         <LazySection
           ref={permitsRef}
           id="section-permits"
@@ -740,17 +754,35 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           state={permits.state}
           error={permits.error}
           onRetry={() => { triggeredSections.current.delete('permits'); loadPermits(); }}
+          collapsed={permitsCollapsed}
+          onToggle={() => {
+            const next = !permitsCollapsed;
+            setPermitsCollapsed(next);
+            if (!next && permits.state === 'idle') {
+              triggeredSections.current.add('permits');
+              loadPermits();
+            }
+          }}
         >
           <PermitsTable records={permits.data} isLoading={permits.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
         </LazySection>
 
-        {/* Awards - Lazy loaded */}
+        {/* Awards - Lazy loaded, collapsed by default */}
         <LazySection
           ref={awardsRef}
           title="Awards & Recognitions"
           state={awards.state}
           error={awards.error}
           onRetry={() => { triggeredSections.current.delete('awards'); loadAwards(); }}
+          collapsed={awardsCollapsed}
+          onToggle={() => {
+            const next = !awardsCollapsed;
+            setAwardsCollapsed(next);
+            if (!next && awards.state === 'idle') {
+              triggeredSections.current.add('awards');
+              loadAwards();
+            }
+          }}
         >
           <AwardsTable records={awards.data} isLoading={awards.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
         </LazySection>
