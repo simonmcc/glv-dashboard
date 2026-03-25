@@ -98,7 +98,8 @@ export function loadCredentials(): { username: string; passwordHash: string; con
     if (
       typeof username !== 'string' || !username ||
       typeof passwordHash !== 'string' || !passwordHash ||
-      typeof contactId !== 'string' || !contactId
+      typeof contactId !== 'string'
+      // contactId may legitimately be '' — the app fetches it dynamically via client.initialize()
     ) {
       localStorage.removeItem(CREDENTIALS_KEY);
       return null;
