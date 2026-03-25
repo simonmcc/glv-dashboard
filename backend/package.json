@@ -19,24 +19,24 @@
     "@google-cloud/opentelemetry-cloud-trace-exporter": "^3.0.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.71.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.211.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.213.0",
     "@opentelemetry/resources": "^2.6.0",
     "@opentelemetry/sdk-node": "^0.213.0",
     "@opentelemetry/semantic-conventions": "^1.40.0",
     "cors": "^2.8.5",
     "express": "^5.2.1",
-    "playwright": "^1.40.0",
-    "express-rate-limit": "^8.3.0"
+    "playwright": "^1.58.2",
+    "express-rate-limit": "^8.3.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.6",
     "@types/node": "^25.5.0",
     "@types/supertest": "^7.2.0",
-    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/coverage-v8": "^4.1.1",
     "supertest": "^7.1.0",
     "tsx": "^4.7.0",
     "typescript": "^6.0.2",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.1"
   }
 }
