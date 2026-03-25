@@ -332,15 +332,17 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
     });
   }, [client, contactId]);
 
-  // Refresh all data
+  // Refresh all data — preserve existing data while fetching (stale-while-revalidate).
+  // Sections with data go to 'loading' (children still rendered) rather than 'idle' (skeleton).
+  // Non-visible sections stay in 'loading' with stale data until scrolled into view.
   const refreshAll = useCallback(async () => {
     triggeredSections.current.clear();
-    setJoiningJourney({ state: 'idle', data: [], error: null });
-    setDisclosures({ state: 'idle', data: { records: [], summary: null }, error: null });
-    setSuspensions({ state: 'idle', data: [], error: null });
-    setTeamReviews({ state: 'idle', data: [], error: null });
-    setPermits({ state: 'idle', data: [], error: null });
-    setAwards({ state: 'idle', data: [], error: null });
+    setJoiningJourney(s => ({ ...s, state: s.data.length > 0 ? 'loading' : 'idle', error: null }));
+    setDisclosures(s => ({ ...s, state: s.data.records.length > 0 ? 'loading' : 'idle', error: null }));
+    setSuspensions(s => ({ ...s, state: s.data.length > 0 ? 'loading' : 'idle', error: null }));
+    setTeamReviews(s => ({ ...s, state: s.data.length > 0 ? 'loading' : 'idle', error: null }));
+    setPermits(s => ({ ...s, state: s.data.length > 0 ? 'loading' : 'idle', error: null }));
+    setAwards(s => ({ ...s, state: s.data.length > 0 ? 'loading' : 'idle', error: null }));
     await fetchPrimaryData();
   }, [fetchPrimaryData]);
 
@@ -628,7 +630,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           </div>
           <SummaryTiles
             summary={summary}
-            isLoading={primaryLoading}
+            isLoading={primaryLoading && !summary}
             disclosureExpiringSoon={disclosures.data.summary?.expiringSoon ?? 0}
             permitExpiringSoon={permitExpiringSoon}
           />
@@ -648,7 +650,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
               </span>
             )}
           </div>
-          <ComplianceTable records={records} isLoading={primaryLoading} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
+          <ComplianceTable records={records} isLoading={primaryLoading && records.length === 0} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
         </section>
 
         {/* Joining Journey - Lazy loaded */}
