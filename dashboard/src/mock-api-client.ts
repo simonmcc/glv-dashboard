@@ -32,6 +32,7 @@ import {
 
 // Simulate network delay for realistic feel
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const randomDelay = () => delay(3000 + Math.floor(Math.random() * 2000));
 
 export class MockScoutsApiClient {
   private contactId = 'mock-contact-id';
@@ -47,7 +48,7 @@ export class MockScoutsApiClient {
 
   async getAllLearningCompliance(): Promise<ApiResponse<LearningRecord>> {
     console.log('[MockAPI] Returning mock learning compliance data');
-    await delay(200);
+    await randomDelay();
     return {
       data: mockLearningRecords,
       nextPage: null,
@@ -58,7 +59,7 @@ export class MockScoutsApiClient {
 
   async getDisclosureCompliance(): Promise<ApiResponse<DisclosureRecord>> {
     console.log('[MockAPI] Returning mock disclosure compliance data');
-    await delay(200);
+    await randomDelay();
     return {
       data: mockDisclosureRecords,
       nextPage: null,
@@ -69,7 +70,7 @@ export class MockScoutsApiClient {
 
   async getJoiningJourney(): Promise<ApiResponse<JoiningJourneyRecord>> {
     console.log('[MockAPI] Returning mock joining journey data');
-    await delay(200);
+    await randomDelay();
     return {
       data: mockJoiningJourneyRecords,
       nextPage: null,
@@ -80,7 +81,7 @@ export class MockScoutsApiClient {
 
   async getSuspensions(): Promise<ApiResponse<SuspensionRecord>> {
     console.log('[MockAPI] Returning mock suspensions data');
-    await delay(200);
+    await randomDelay();
     return {
       data: mockSuspensionRecords,
       nextPage: null,
@@ -91,7 +92,7 @@ export class MockScoutsApiClient {
 
   async getTeamReviews(): Promise<ApiResponse<TeamReviewRecord>> {
     console.log('[MockAPI] Returning mock team reviews data');
-    await delay(200);
+    await randomDelay();
     return {
       data: mockTeamReviewRecords,
       nextPage: null,
@@ -102,7 +103,7 @@ export class MockScoutsApiClient {
 
   async getPermits(): Promise<ApiResponse<PermitRecord>> {
     console.log('[MockAPI] Returning mock permits data');
-    await delay(200);
+    await randomDelay();
     return {
       data: mockPermitRecords,
       nextPage: null,
@@ -113,7 +114,7 @@ export class MockScoutsApiClient {
 
   async getAwards(): Promise<ApiResponse<AwardRecord>> {
     console.log('[MockAPI] Returning mock awards data');
-    await delay(200);
+    await randomDelay();
     return {
       data: mockAwardRecords,
       nextPage: null,
@@ -132,7 +133,7 @@ export class MockScoutsApiClient {
     membershipNumbers: string[]
   ): Promise<{ success: boolean; members?: MemberLearningResult[]; error?: string }> {
     console.log(`[MockAPI] checkLearningByMembershipNumbers called for ${membershipNumbers.length} members`);
-    await delay(200);
+    await randomDelay();
     const members = mockMemberLearningResults.filter(m =>
       membershipNumbers.includes(m.membershipNumber)
     );
