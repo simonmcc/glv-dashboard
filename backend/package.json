@@ -22,7 +22,7 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.211.0",
     "@opentelemetry/resources": "^2.6.0",
     "@opentelemetry/sdk-node": "^0.213.0",
-    "@opentelemetry/semantic-conventions": "^1.39.0",
+    "@opentelemetry/semantic-conventions": "^1.40.0",
     "cors": "^2.8.5",
     "express": "^5.2.1",
     "playwright": "^1.40.0",
