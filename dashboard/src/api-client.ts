@@ -151,7 +151,7 @@ export class ScoutsApiClient {
     }));
 
     // Deduplicate by membership number + learning type
-    // Keep the record with the earliest start date (for deadline calculation)
+    // Keep the worst-status record (earliest start date as tiebreaker)
     const data = this.deduplicateRecords(rawData);
 
     console.log(`[API] Transformed ${rawData.length} records, deduplicated to ${data.length}`);
@@ -167,9 +167,27 @@ export class ScoutsApiClient {
   /**
    * Deduplicate records by membership number + learning type.
    * When a member has multiple roles, they appear multiple times in the API response.
-   * For compliance, we keep one record per person/learning, using the earliest start date.
+   * We keep the record with the worst compliance status so that "Not Started" or
+   * "Expired" are never silently dropped in favour of a "Valid" record from another role.
+   * When statuses are equal we keep the earliest start date (most relevant for deadline).
+   * When taking the worse-status record we also carry over the earliest start date from
+   * any duplicate, so deadline calculations remain correct.
    */
   private deduplicateRecords(records: LearningRecord[]): LearningRecord[] {
+    // Lower rank = worse status = should be surfaced.
+    const STATUS_RANK: Record<string, number> = {
+      'Not Started': 0,
+      'Expired': 1,
+      'Expiring': 2,
+      'Renewal Due': 3,
+      'Expiring Soon': 4,
+      'In-Progress': 5,
+      'Valid': 6,
+    };
+    const rank = (r: LearningRecord) => STATUS_RANK[r.Status] ?? 5;
+    const startMs = (r: LearningRecord) =>
+      r['Start date'] ? new Date(r['Start date']).getTime() : Infinity;
+
     const seen = new Map<string, LearningRecord>();
 
     for (const record of records) {
@@ -179,13 +197,21 @@ export class ScoutsApiClient {
       if (!existing) {
         seen.set(key, record);
       } else {
-        // Keep the record with the earliest start date (most relevant for deadline)
-        const existingStart = existing['Start date'] ? new Date(existing['Start date']).getTime() : Infinity;
-        const currentStart = record['Start date'] ? new Date(record['Start date']).getTime() : Infinity;
+        const existingRank = rank(existing);
+        const currentRank = rank(record);
 
-        if (currentStart < existingStart) {
+        if (currentRank < existingRank) {
+          // Worse status — take this record but preserve the earliest start date.
+          const earliest = Math.min(startMs(existing), startMs(record));
+          const earliestDate = isFinite(earliest)
+            ? new Date(earliest).toISOString()
+            : existing['Start date'] ?? record['Start date'];
+          seen.set(key, { ...record, 'Start date': earliestDate });
+        } else if (currentRank === existingRank && startMs(record) < startMs(existing)) {
+          // Same status, earlier start date — swap in for deadline accuracy.
           seen.set(key, record);
         }
+        // else: existing is already the worse (or equal) record — keep it.
       }
     }
 
