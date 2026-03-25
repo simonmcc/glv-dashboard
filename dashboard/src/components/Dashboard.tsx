@@ -732,12 +732,16 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           title="Team Directory"
           state={teamReviews.state}
           error={teamReviews.error}
-          onRetry={() => { triggeredSections.current.delete('teamReviews'); loadTeamReviews(); }}
+          onRetry={() => {
+            if (!token && !MOCK_MODE) return;
+            triggeredSections.current.delete('teamReviews');
+            loadTeamReviews();
+          }}
           collapsed={teamReviewsCollapsed}
           onToggle={() => {
             const next = !teamReviewsCollapsed;
             setTeamReviewsCollapsed(next);
-            if (!next && teamReviews.state === 'idle') {
+            if (!next && teamReviews.state === 'idle' && (token || MOCK_MODE)) {
               triggeredSections.current.add('teamReviews');
               loadTeamReviews();
             }
@@ -753,12 +757,16 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           title="Permits"
           state={permits.state}
           error={permits.error}
-          onRetry={() => { triggeredSections.current.delete('permits'); loadPermits(); }}
+          onRetry={() => {
+            if (!token && !MOCK_MODE) return;
+            triggeredSections.current.delete('permits');
+            loadPermits();
+          }}
           collapsed={permitsCollapsed}
           onToggle={() => {
             const next = !permitsCollapsed;
             setPermitsCollapsed(next);
-            if (!next && permits.state === 'idle') {
+            if (!next && permits.state === 'idle' && (token || MOCK_MODE)) {
               triggeredSections.current.add('permits');
               loadPermits();
             }
@@ -773,12 +781,16 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           title="Awards & Recognitions"
           state={awards.state}
           error={awards.error}
-          onRetry={() => { triggeredSections.current.delete('awards'); loadAwards(); }}
+          onRetry={() => {
+            if (!token && !MOCK_MODE) return;
+            triggeredSections.current.delete('awards');
+            loadAwards();
+          }}
           collapsed={awardsCollapsed}
           onToggle={() => {
             const next = !awardsCollapsed;
             setAwardsCollapsed(next);
-            if (!next && awards.state === 'idle') {
+            if (!next && awards.state === 'idle' && (token || MOCK_MODE)) {
               triggeredSections.current.add('awards');
               loadAwards();
             }

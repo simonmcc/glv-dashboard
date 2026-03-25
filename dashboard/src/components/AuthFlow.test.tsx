@@ -83,15 +83,17 @@ describe('AuthFlow - mock mode', () => {
 
 describe('AuthFlow - background auth (fast-path)', () => {
   const mockFetch = vi.fn();
+  const originalFetch = global.fetch;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = mockFetch;
+    global.fetch = mockFetch as unknown as typeof global.fetch;
     vi.mocked(hashPassword).mockResolvedValue('mock-hash-value');
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    global.fetch = originalFetch;
   });
 
   it('uses fast-path when stored hash matches — calls onStartBackgroundAuth, not onAuthStart', async () => {

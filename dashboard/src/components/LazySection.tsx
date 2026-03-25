@@ -46,6 +46,18 @@ export const LazySection = forwardRef<HTMLElement, LazySectionProps>(
           <h2
             className={`text-lg font-semibold text-gray-900 ${onToggle ? 'cursor-pointer select-none' : ''}`}
             onClick={onToggle}
+            role={onToggle ? 'button' : undefined}
+            tabIndex={onToggle ? 0 : undefined}
+            onKeyDown={
+              onToggle
+                ? (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onToggle();
+                    }
+                  }
+                : undefined
+            }
           >
             {title}
           </h2>

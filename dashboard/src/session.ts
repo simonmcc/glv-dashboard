@@ -104,7 +104,13 @@ export function loadCredentials(): { username: string; passwordHash: string; con
       localStorage.removeItem(CREDENTIALS_KEY);
       return null;
     }
-    if (!createdAt || Date.now() - createdAt > CREDENTIALS_MAX_AGE_MS) {
+    const createdAtMs =
+      typeof createdAt === 'number' && Number.isFinite(createdAt)
+        ? createdAt
+        : typeof createdAt === 'string' && createdAt.trim() !== ''
+          ? Number(createdAt)
+          : NaN;
+    if (!Number.isFinite(createdAtMs) || Date.now() - createdAtMs > CREDENTIALS_MAX_AGE_MS) {
       localStorage.removeItem(CREDENTIALS_KEY);
       return null;
     }
