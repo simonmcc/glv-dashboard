@@ -7,7 +7,7 @@
     "discover": "npx tsx src/discover-api.ts"
   },
   "dependencies": {
-    "playwright": "^1.58.2"
+    "playwright": "^1.59.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
