@@ -241,6 +241,11 @@ export function MemberDashboard({
                         <div className="flex items-center gap-3">
                           <StatusDot status={r.Status} colorMap={joiningStatusColors} />
                           <span className="font-medium text-sm">{r.Item}</span>
+                          {(r.Item === 'Criminal Record Check' || r.Item === 'Internal Check') && (
+                            <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium">
+                              30d deadline
+                            </span>
+                          )}
                         </div>
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60">{r.Status}</span>
                       </div>
