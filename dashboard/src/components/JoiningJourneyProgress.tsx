@@ -28,6 +28,12 @@ const JOURNEY_STEPS: ReadonlyArray<{ item: string; abbr: string }> = [
   { item: 'Welcome Conversation', abbr: 'Welcome' },
 ];
 
+const KNOWN_JOURNEY_ITEMS = new Set([
+  ...JOURNEY_STEPS.map(s => s.item),
+  'Growing Roots',
+  'Core Learning',
+]);
+
 type ItemStatus = 'complete' | 'incomplete' | 'valid' | 'not-started' | 'expiring' | 'expired' | 'in-progress';
 
 function StatusChip({ status, label, deadline30 = false }: { status: ItemStatus; label: string; deadline30?: boolean }) {
@@ -264,6 +270,15 @@ export function JoiningJourneyProgress({
                     {member.outstandingItems.has('Core Learning') && (
                       <StatusChip status="incomplete" label="Core Learning" />
                     )}
+
+                    {/* Catch-all: any outstanding item not covered by the known categories above */}
+                    {Array.from(member.outstandingItems)
+                      .filter(item => !KNOWN_JOURNEY_ITEMS.has(item))
+                      .sort((a, b) => a.localeCompare(b))
+                      .map(item => (
+                        <StatusChip key={item} status="incomplete" label={item} />
+                      ))
+                    }
                   </div>
                 </div>
               </div>

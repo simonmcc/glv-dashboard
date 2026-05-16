@@ -128,4 +128,19 @@ describe('JoiningJourneyProgress', () => {
     render(<JoiningJourneyProgress {...defaultProps} />);
     expect(screen.getByText(/2 members in joining journey/)).toBeInTheDocument();
   });
+
+  it('renders chips for unknown outstanding items not in JOURNEY_STEPS or known categories', () => {
+    const records: JoiningJourneyRecord[] = [
+      { 'First name': 'Eve', 'Last name': 'Smith', 'Membership number': '33333', Item: 'Declaration', Status: 'Incomplete' },
+      { 'First name': 'Eve', 'Last name': 'Smith', 'Membership number': '33333', Item: 'dataProtectionTrainingComplete', Status: 'Incomplete' },
+      { 'First name': 'Eve', 'Last name': 'Smith', 'Membership number': '33333', Item: 'managerDisclosureCheck', Status: 'Incomplete' },
+      { 'First name': 'Eve', 'Last name': 'Smith', 'Membership number': '33333', Item: 'updateMemberProfile', Status: 'Incomplete' },
+    ];
+    render(<JoiningJourneyProgress joiningJourneyRecords={records} learningRecords={[]} isLoading={false} />);
+    expect(screen.getByText(/dataProtectionTrainingComplete/)).toBeInTheDocument();
+    expect(screen.getByText(/managerDisclosureCheck/)).toBeInTheDocument();
+    expect(screen.getByText(/updateMemberProfile/)).toBeInTheDocument();
+    // Known step is still rendered
+    expect(screen.getByText(/Decl\./)).toBeInTheDocument();
+  });
 });
