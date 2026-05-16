@@ -264,6 +264,25 @@ describe('MemberDashboard', () => {
     expect(section.textContent).toContain('Expiring');
   });
 
+  it('shows 30d deadline badge for Criminal Record Check and Internal Check journey items', () => {
+    const crcProps = {
+      ...defaultProps,
+      joiningJourneyRecords: [
+        { 'First name': 'Alice', 'Last name': 'Johnson', 'Membership number': '12345678', Item: 'Criminal Record Check', Status: 'Incomplete' },
+        { 'First name': 'Alice', 'Last name': 'Johnson', 'Membership number': '12345678', Item: 'Internal Check', Status: 'Incomplete' },
+        { 'First name': 'Alice', 'Last name': 'Johnson', 'Membership number': '12345678', Item: 'References', Status: 'Incomplete' },
+      ] as JoiningJourneyRecord[],
+    };
+    render(<MemberDashboard {...crcProps} />);
+    const section = screen.getByTestId('joining-journey-section');
+    const badgeCount = (section.textContent?.match(/30d deadline/g) ?? []).length;
+    // CRC + Internal Check get the badge; References does not
+    expect(badgeCount).toBe(2);
+    expect(section.textContent).toContain('Criminal Record Check');
+    expect(section.textContent).toContain('Internal Check');
+    expect(section.textContent).toContain('References');
+  });
+
   it('calls onBack when Escape is pressed', () => {
     const onBack = vi.fn();
     render(<MemberDashboard {...defaultProps} onBack={onBack} />);

@@ -2,8 +2,10 @@
  * Joining Journey Progress Component
  *
  * Group-level overview: one row per member currently in their joining journey,
- * showing which steps are outstanding. Growing Roots is expanded to individual
- * module-level status derived from learningRecords.
+ * showing which steps are outstanding. Chips are grouped into the three Scouts
+ * Joining Journey categories: "Within 30 days", "Welcome & Checks", and
+ * "Growing Roots". Growing Roots is expanded to individual module-level status
+ * derived from learningRecords.
  */
 
 import { useMemo, useState } from 'react';
@@ -19,9 +21,9 @@ interface JoiningJourneyProgressProps {
 }
 
 // The discrete journey steps tracked by InProgressActionDashboardView
-const JOURNEY_STEPS: ReadonlyArray<{ item: string; abbr: string }> = [
-  { item: 'Criminal Record Check', abbr: 'CRC' },
-  { item: 'Internal Check', abbr: 'Int. Check' },
+const JOURNEY_STEPS: ReadonlyArray<{ item: string; abbr: string; deadlineDays?: number }> = [
+  { item: 'Criminal Record Check', abbr: 'CRC', deadlineDays: 30 },
+  { item: 'Internal Check', abbr: 'Int. Check', deadlineDays: 30 },
   { item: 'References', abbr: 'Ref.' },
   { item: 'Declaration', abbr: 'Decl.' },
   { item: 'Trustee Eligibility Check', abbr: 'Trustee' },
@@ -33,6 +35,11 @@ const KNOWN_JOURNEY_ITEMS = new Set([
   'Growing Roots',
   'Core Learning',
 ]);
+
+// Derived from GROWING_ROOTS_MODULES so deadlineDays is the single source of truth
+const GR_30DAY_MODULES = new Set(
+  GROWING_ROOTS_MODULES.filter(m => m.deadlineDays === 30).map(m => m.name),
+);
 
 type ItemStatus = 'complete' | 'incomplete' | 'valid' | 'not-started' | 'expiring' | 'expired' | 'in-progress';
 
@@ -59,7 +66,7 @@ function StatusChip({ status, label, deadline30 = false }: { status: ItemStatus;
 
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${colorClass[status]}`}>
-      {icon[status]} {label}{deadline30 && <span className="text-[10px] opacity-70 ml-0.5">30d</span>}
+      {icon[status]} {label}{deadline30 && <span className="text-[10px] text-orange-600 font-medium ml-0.5">30d</span>}
     </span>
   );
 }
@@ -85,7 +92,6 @@ export function JoiningJourneyProgress({
 
   // Build per-member view: group outstanding items by member
   const members = useMemo(() => {
-    // Index outstanding items per member
     const byMember = new Map<string, {
       membershipNumber: string;
       firstName: string;
@@ -214,7 +220,7 @@ export function JoiningJourneyProgress({
             const memberModules = learningByMember.get(member.membershipNumber);
             const growingRootsOutstanding = member.outstandingItems.has('Growing Roots');
 
-            // Compute outstanding GR module chips; if all are done show a fallback chip
+            // All outstanding GR module chips (not valid/complete)
             const outstandingGRChips = growingRootsOutstanding
               ? GROWING_ROOTS_MODULES.map(grModule => {
                   const rawStatus = memberModules?.get(grModule.name);
@@ -222,6 +228,41 @@ export function JoiningJourneyProgress({
                   return { ...grModule, status };
                 }).filter(m => m.status !== 'valid' && m.status !== 'complete')
               : [];
+
+            // Split GR chips into "Within 30 days" and "Growing Roots" groups
+            const gr30dChips = outstandingGRChips.filter(m => GR_30DAY_MODULES.has(m.name));
+            const grRemainingChips = outstandingGRChips.filter(m => !GR_30DAY_MODULES.has(m.name));
+            // Fallback chip: GR is outstanding but all modules are already done
+            const grFallbackNeeded = growingRootsOutstanding && outstandingGRChips.length === 0;
+
+            // Group 1: Within 30 days — steps with deadlineDays=30 + 30d GR modules
+            const within30dChips = [
+              ...JOURNEY_STEPS
+                .filter(s => s.deadlineDays === 30 && member.outstandingItems.has(s.item))
+                .map(s => <StatusChip key={s.item} status="incomplete" label={s.abbr} deadline30 />),
+              ...gr30dChips.map(m => (
+                <StatusChip key={m.name} status={m.status} label={m.name} deadline30 />
+              )),
+            ];
+
+            // Group 2: Welcome & Checks — steps with no deadline
+            const welcomeChips = JOURNEY_STEPS
+              .filter(s => s.deadlineDays == null && member.outstandingItems.has(s.item))
+              .map(s => <StatusChip key={s.item} status="incomplete" label={s.abbr} />);
+
+            // Group 3: Growing Roots — remaining modules (not in 30d group)
+            const growingRootsChips = [
+              ...grRemainingChips.map(m => (
+                <StatusChip key={m.name} status={m.status} label={m.name} deadline30={m.deadlineDays === 30} />
+              )),
+              ...(grFallbackNeeded ? [<StatusChip key="gr-fallback" status="incomplete" label="Growing Roots" />] : []),
+            ];
+
+            const chipGroups = [
+              { label: 'Within 30 days', chips: within30dChips },
+              { label: 'Welcome & Checks', chips: welcomeChips },
+              { label: 'Growing Roots', chips: growingRootsChips },
+            ].filter(g => g.chips.length > 0);
 
             return (
               <div key={member.membershipNumber} className="px-4 py-3">
@@ -241,34 +282,25 @@ export function JoiningJourneyProgress({
                     <div className="text-xs text-gray-400 font-mono">{member.membershipNumber}</div>
                   </div>
 
-                  {/* Outstanding chips */}
-                  <div className="flex flex-wrap gap-1.5 flex-1">
-                    {/* Admin/process steps */}
-                    {JOURNEY_STEPS.map(step => {
-                      if (!member.outstandingItems.has(step.item)) return null;
-                      return (
-                        <StatusChip key={step.item} status="incomplete" label={step.abbr} />
-                      );
-                    })}
+                  {/* Outstanding chips grouped by Joining Journey category */}
+                  <div className="flex flex-col gap-1.5 flex-1">
+                    {chipGroups.map(group => (
+                      <div key={group.label} className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] text-gray-400 uppercase tracking-wide font-medium w-[90px] shrink-0">
+                          {group.label}
+                        </span>
+                        {group.chips}
+                      </div>
+                    ))}
 
-                    {/* Growing Roots — expanded to individual module chips */}
-                    {growingRootsOutstanding && (
-                      outstandingGRChips.length > 0
-                        ? outstandingGRChips.map(grModule => (
-                            <StatusChip
-                              key={grModule.name}
-                              status={grModule.status}
-                              label={grModule.name}
-                              deadline30={grModule.deadlineDays === 30}
-                            />
-                          ))
-                        // Fallback: all modules are done but GR is still marked outstanding in the journey
-                        : <StatusChip status="incomplete" label="Growing Roots" />
-                    )}
-
-                    {/* Core Learning (if outstanding, shown as-is — individual modules unknown) */}
+                    {/* Core Learning (ungrouped — individual modules not exposed by API) */}
                     {member.outstandingItems.has('Core Learning') && (
-                      <StatusChip status="incomplete" label="Core Learning" />
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] text-gray-400 uppercase tracking-wide font-medium w-[90px] shrink-0">
+                          Core Learning
+                        </span>
+                        <StatusChip status="incomplete" label="Core Learning" />
+                      </div>
                     )}
 
                     {/* Catch-all: any outstanding item not covered by the known categories above */}

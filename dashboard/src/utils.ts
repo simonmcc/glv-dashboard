@@ -20,6 +20,8 @@ export const GROWING_ROOTS_MODULES: ReadonlyArray<{ name: string; deadlineDays: 
   { name: 'Creating Inclusion', deadlineDays: null },
   { name: 'Data Protection in Scouts', deadlineDays: null },
   { name: 'Delivering a Great Programme', deadlineDays: null },
+  { name: 'Leading Scout Volunteers', deadlineDays: null },
+  { name: 'Being a Trustee', deadlineDays: null },
 ];
 
 /** Returns true if the module title matches a known Growing Roots module */
