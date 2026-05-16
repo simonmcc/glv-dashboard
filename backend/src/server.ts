@@ -10,7 +10,7 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
-import { authenticate, checkLearningByMembershipNumbers, type ProgressCallback } from './auth-service.js';
+import { authenticate, checkLearningByMembershipNumbers, TokenExpiredError, type ProgressCallback } from './auth-service.js';
 import { forwardTraces } from './traces-proxy.js';
 import { log, logError, logDebug } from './logger.js';
 
@@ -376,6 +376,9 @@ app.post('/api/check-learning', async (req, res) => {
     const result = await checkLearningByMembershipNumbers(token, membershipNumbers);
     return res.json(result);
   } catch (error) {
+    if (error instanceof TokenExpiredError) {
+      return res.status(401).json({ success: false, error: 'Token expired' });
+    }
     logError('[Learning] Error:', error);
     return res.status(500).json({
       success: false,

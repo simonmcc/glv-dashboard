@@ -67,6 +67,13 @@ export interface LearningResult {
   error?: string;
 }
 
+export class TokenExpiredError extends Error {
+  constructor() {
+    super('Token expired');
+    this.name = 'TokenExpiredError';
+  }
+}
+
 async function handleCookieConsent(page: Page): Promise<void> {
   const cookieSelectors = [
     'button:has-text("Accept All")',
@@ -235,6 +242,19 @@ const API_BASE = 'https://tsa-memportal-prod-fun01.azurewebsites.net/api';
 // as a hang and moving on.  Covers cold-start latency (~5-10 s) with headroom.
 const AZURE_REQUEST_TIMEOUT_MS = 15_000;
 
+async function parseJsonOrThrowOnTokenExpiry(response: Response): Promise<unknown> {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    const contentType = response.headers.get('content-type') ?? '';
+    if (response.redirected || contentType.includes('text/html') || text.trimStart().startsWith('<')) {
+      throw new TokenExpiredError();
+    }
+    throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`);
+  }
+}
+
 async function searchMemberByNumber(
   token: string,
   membershipNumber: string
@@ -267,7 +287,8 @@ async function searchMemberByNumber(
         }),
       });
 
-      const data = await response.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = (await parseJsonOrThrowOnTokenExpiry(response)) as any;
       if (data.data && data.data.length > 0) {
         const member = data.data[0];
         // Use PreferredName if available, otherwise fall back to firstname
@@ -288,6 +309,9 @@ async function searchMemberByNumber(
     } catch (error) {
       span.recordException(error as Error);
       span.setStatus({ code: SpanStatusCode.ERROR });
+      if (error instanceof TokenExpiredError) {
+        throw error;
+      }
       // Distinguish timeout/abort errors from genuine "not found" so callers
       // don't misclassify transient Azure Function cold-starts as missing members.
       if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
@@ -325,7 +349,7 @@ async function getLearningForContact(
         }),
       });
 
-      const data = await response.json();
+      const data = await parseJsonOrThrowOnTokenExpiry(response);
 
       if (!Array.isArray(data)) {
         log(`[API] Unexpected response for learning: ${JSON.stringify(data).substring(0, 200)}`);
@@ -334,7 +358,7 @@ async function getLearningForContact(
         return [];
       }
 
-      const modules = data.map((m: Record<string, unknown>) => ({
+      const modules = (data as Record<string, unknown>[]).map((m) => ({
         title: String(m.title || ''),
         expiryDate: m.expiryDate ? String(m.expiryDate) : null,
         currentLevel: String(m.currentLevel || ''),
@@ -345,6 +369,9 @@ async function getLearningForContact(
     } catch (error) {
       span.recordException(error as Error);
       span.setStatus({ code: SpanStatusCode.ERROR });
+      if (error instanceof TokenExpiredError) {
+        throw error;
+      }
       if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
         logError(
           `[API] GetLmsDetailsAsync timed out for ${contactId} after ${AZURE_REQUEST_TIMEOUT_MS}ms:`,

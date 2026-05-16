@@ -5,15 +5,20 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 
 // Mock the auth-service module before importing the server
-vi.mock('./auth-service.js', () => ({
-  authenticate: vi.fn(),
-  checkLearningByMembershipNumbers: vi.fn(),
-}));
+vi.mock('./auth-service.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./auth-service.js')>();
+  return {
+    ...actual,
+    authenticate: vi.fn(),
+    checkLearningByMembershipNumbers: vi.fn(),
+  };
+});
 
 // Import mocked functions
 import {
   authenticate,
   checkLearningByMembershipNumbers,
+  TokenExpiredError,
 } from './auth-service.js';
 import type { ProgressCallback } from './auth-service.js';
 
@@ -153,7 +158,10 @@ function createTestApp() {
     try {
       const result = await checkLearningByMembershipNumbers(token, membershipNumbers);
       return res.json(result);
-    } catch {
+    } catch (error) {
+      if (error instanceof TokenExpiredError) {
+        return res.status(401).json({ success: false, error: 'Token expired' });
+      }
       return res.status(500).json({
         success: false,
         error: 'Failed to check learning',
@@ -490,6 +498,17 @@ describe('Backend Server', () => {
 
       expect(response.status).toBe(200);
       expect(checkLearningByMembershipNumbers).toHaveBeenCalledWith('test-token', ['111', '222']);
+    });
+
+    it('should return 401 when checkLearningByMembershipNumbers throws TokenExpiredError', async () => {
+      vi.mocked(checkLearningByMembershipNumbers).mockRejectedValue(new TokenExpiredError());
+
+      const response = await request(app)
+        .post('/api/check-learning')
+        .send({ token: 'expired-token', membershipNumbers: ['111'] });
+
+      expect(response.status).toBe(401);
+      expect(response.body).toEqual({ success: false, error: 'Token expired' });
     });
   });
 
