@@ -36,8 +36,10 @@ const KNOWN_JOURNEY_ITEMS = new Set([
   'Core Learning',
 ]);
 
-// GR module names that belong in the "Within 30 days" group
-const GR_30DAY_MODULES = new Set(['Safeguarding', 'Safety']);
+// Derived from GROWING_ROOTS_MODULES so deadlineDays is the single source of truth
+const GR_30DAY_MODULES = new Set(
+  GROWING_ROOTS_MODULES.filter(m => m.deadlineDays === 30).map(m => m.name),
+);
 
 type ItemStatus = 'complete' | 'incomplete' | 'valid' | 'not-started' | 'expiring' | 'expired' | 'in-progress';
 
@@ -64,7 +66,7 @@ function StatusChip({ status, label, deadline30 = false }: { status: ItemStatus;
 
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${colorClass[status]}`}>
-      {icon[status]} {label}{deadline30 && <span className="text-[10px] opacity-70 ml-0.5">30d</span>}
+      {icon[status]} {label}{deadline30 && <span className="text-[10px] text-orange-600 font-medium ml-0.5">30d</span>}
     </span>
   );
 }
@@ -233,28 +235,20 @@ export function JoiningJourneyProgress({
             // Fallback chip: GR is outstanding but all modules are already done
             const grFallbackNeeded = growingRootsOutstanding && outstandingGRChips.length === 0;
 
-            // Group 1: Within 30 days — CRC, Internal Check + Safeguarding, Safety
-            const within30dSteps = ['Criminal Record Check', 'Internal Check'];
+            // Group 1: Within 30 days — steps with deadlineDays=30 + 30d GR modules
             const within30dChips = [
-              ...within30dSteps
-                .filter(item => member.outstandingItems.has(item))
-                .map(item => {
-                  const step = JOURNEY_STEPS.find(s => s.item === item)!;
-                  return <StatusChip key={item} status="incomplete" label={step.abbr} deadline30 />;
-                }),
+              ...JOURNEY_STEPS
+                .filter(s => s.deadlineDays === 30 && member.outstandingItems.has(s.item))
+                .map(s => <StatusChip key={s.item} status="incomplete" label={s.abbr} deadline30 />),
               ...gr30dChips.map(m => (
                 <StatusChip key={m.name} status={m.status} label={m.name} deadline30 />
               )),
             ];
 
-            // Group 2: Welcome & Checks — Welcome Conversation, References, Trustee, Declaration
-            const welcomeSteps = ['Welcome Conversation', 'References', 'Trustee Eligibility Check', 'Declaration'];
-            const welcomeChips = welcomeSteps
-              .filter(item => member.outstandingItems.has(item))
-              .map(item => {
-                const step = JOURNEY_STEPS.find(s => s.item === item)!;
-                return <StatusChip key={item} status="incomplete" label={step.abbr} />;
-              });
+            // Group 2: Welcome & Checks — steps with no deadline
+            const welcomeChips = JOURNEY_STEPS
+              .filter(s => s.deadlineDays == null && member.outstandingItems.has(s.item))
+              .map(s => <StatusChip key={s.item} status="incomplete" label={s.abbr} />);
 
             // Group 3: Growing Roots — remaining modules (not in 30d group)
             const growingRootsChips = [

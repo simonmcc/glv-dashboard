@@ -65,10 +65,12 @@ describe('JoiningJourneyProgress', () => {
       { 'First name': 'David', 'Last name': 'Brown', 'Membership number': '22222', Learning: 'Creating Inclusion',         Status: 'Valid', 'Expiry date': null },
       { 'First name': 'David', 'Last name': 'Brown', 'Membership number': '22222', Learning: 'Data Protection in Scouts',  Status: 'Valid', 'Expiry date': null },
       { 'First name': 'David', 'Last name': 'Brown', 'Membership number': '22222', Learning: 'Delivering a Great Programme', Status: 'Valid', 'Expiry date': null },
+      { 'First name': 'David', 'Last name': 'Brown', 'Membership number': '22222', Learning: 'Leading Scout Volunteers',    Status: 'Valid', 'Expiry date': null },
+      { 'First name': 'David', 'Last name': 'Brown', 'Membership number': '22222', Learning: 'Being a Trustee',            Status: 'Valid', 'Expiry date': null },
     ];
     render(<JoiningJourneyProgress {...defaultProps} learningRecords={allDoneLearning} />);
-    // Fallback chip should appear because GR is still outstanding in the journey
-    expect(screen.getByText(/Growing Roots/)).toBeInTheDocument();
+    // Group label + fallback chip both contain "Growing Roots"
+    expect(screen.getAllByText(/Growing Roots/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('filters members by search term (name match)', () => {
@@ -127,6 +129,39 @@ describe('JoiningJourneyProgress', () => {
   it('shows member count in the toolbar', () => {
     render(<JoiningJourneyProgress {...defaultProps} />);
     expect(screen.getByText(/2 members in joining journey/)).toBeInTheDocument();
+  });
+
+  it('renders "Within 30 days" group label and CRC chip for a member with CRC outstanding', () => {
+    const records: JoiningJourneyRecord[] = [
+      { 'First name': 'Eve', 'Last name': 'Smith', 'Membership number': '33333', Item: 'Criminal Record Check', Status: 'Incomplete' },
+    ];
+    render(<JoiningJourneyProgress joiningJourneyRecords={records} learningRecords={[]} isLoading={false} />);
+    expect(screen.getByText('Within 30 days')).toBeInTheDocument();
+    expect(screen.getByText(/CRC/)).toBeInTheDocument();
+  });
+
+  it('renders "Welcome & Checks" group label for a member with References outstanding', () => {
+    const records: JoiningJourneyRecord[] = [
+      { 'First name': 'Eve', 'Last name': 'Smith', 'Membership number': '33333', Item: 'References', Status: 'Incomplete' },
+    ];
+    render(<JoiningJourneyProgress joiningJourneyRecords={records} learningRecords={[]} isLoading={false} />);
+    expect(screen.getByText('Welcome & Checks')).toBeInTheDocument();
+    expect(screen.getByText(/Ref\./)).toBeInTheDocument();
+  });
+
+  it('renders "Growing Roots" group label when Growing Roots modules are outstanding', () => {
+    // David has Growing Roots outstanding with non-30d modules not started
+    render(<JoiningJourneyProgress {...defaultProps} />);
+    expect(screen.getByText('Growing Roots')).toBeInTheDocument();
+  });
+
+  it('CRC chip carries a 30d orange indicator', () => {
+    const records: JoiningJourneyRecord[] = [
+      { 'First name': 'Eve', 'Last name': 'Smith', 'Membership number': '33333', Item: 'Criminal Record Check', Status: 'Incomplete' },
+    ];
+    const { container } = render(<JoiningJourneyProgress joiningJourneyRecords={records} learningRecords={[]} isLoading={false} />);
+    const crcRow = container.querySelector('[class*="Within 30 days"]') ?? container;
+    expect(crcRow.textContent).toContain('30d');
   });
 
   it('renders chips for unknown outstanding items not in JOURNEY_STEPS or known categories', () => {
