@@ -69,8 +69,8 @@ describe('JoiningJourneyProgress', () => {
       { 'First name': 'David', 'Last name': 'Brown', 'Membership number': '22222', Learning: 'Being a Trustee',            Status: 'Valid', 'Expiry date': null },
     ];
     render(<JoiningJourneyProgress {...defaultProps} learningRecords={allDoneLearning} />);
-    // Group label + fallback chip both contain "Growing Roots"
-    expect(screen.getAllByText(/Growing Roots/).length).toBeGreaterThanOrEqual(1);
+    // Exactly 2 matches: the "Growing Roots" group label + the fallback chip (group label alone = 1)
+    expect(screen.getAllByText(/Growing Roots/).length).toBe(2);
   });
 
   it('filters members by search term (name match)', () => {
@@ -159,9 +159,10 @@ describe('JoiningJourneyProgress', () => {
     const records: JoiningJourneyRecord[] = [
       { 'First name': 'Eve', 'Last name': 'Smith', 'Membership number': '33333', Item: 'Criminal Record Check', Status: 'Incomplete' },
     ];
-    const { container } = render(<JoiningJourneyProgress joiningJourneyRecords={records} learningRecords={[]} isLoading={false} />);
-    const crcRow = container.querySelector('[class*="Within 30 days"]') ?? container;
-    expect(crcRow.textContent).toContain('30d');
+    render(<JoiningJourneyProgress joiningJourneyRecords={records} learningRecords={[]} isLoading={false} />);
+    // The CRC chip span contains both the label and the nested 30d indicator
+    const crcChip = screen.getByText(/CRC/);
+    expect(crcChip.textContent).toContain('30d');
   });
 
   it('renders chips for unknown outstanding items not in JOURNEY_STEPS or known categories', () => {
