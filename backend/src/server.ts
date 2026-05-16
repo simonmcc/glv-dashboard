@@ -311,6 +311,16 @@ app.post('/api/proxy', async (req, res) => {
           data = JSON.parse(text);
         } catch {
           logError('[Proxy] Failed to parse response as JSON');
+          // Azure B2C redirects to an HTML login page when the token is expired.
+          // fetch follows the redirect and returns 200 with HTML, which fails JSON.parse.
+          // Detect this by checking Content-Type or whether the body starts with HTML so
+          // the frontend receives 401 and triggers re-authentication instead of a generic error.
+          const contentType = response.headers.get('content-type') ?? '';
+          if (contentType.includes('text/html') || text.trimStart().startsWith('<')) {
+            log('[Proxy] HTML response from upstream — treating as token expiry (401)');
+            proxySpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Token expired (HTML redirect)' });
+            return res.status(401).json({ success: false, error: 'Token expired' });
+          }
           proxySpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Invalid JSON response from API' });
           return res.status(500).json({ success: false, error: 'Invalid JSON response from API' });
         }
