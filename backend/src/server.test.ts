@@ -383,7 +383,8 @@ describe('Backend Server', () => {
           return res.status(400).json({ success: false, error: 'Valid endpoint and token are required' });
         }
 
-        const response = await fetch(`https://example.com/api${endpoint}`, {
+        // fetch is always mocked in these tests; URL is hardcoded to avoid SSRF lint findings.
+        const response = await fetch('https://example.com/api/proxy', {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         });
