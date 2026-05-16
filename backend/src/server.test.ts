@@ -369,6 +369,104 @@ describe('Backend Server', () => {
     });
   });
 
+  describe('POST /api/proxy — HTML redirect detection', () => {
+    // A minimal proxy handler that mirrors the fetch + HTML-detection logic from server.ts.
+    // We can't import the real server (it calls app.listen()), so we replicate the
+    // relevant branch here and keep it in sync with server.ts.
+    function createFetchProxyApp() {
+      const app = express();
+      app.use(express.json());
+
+      app.post('/api/proxy', async (req, res) => {
+        const { endpoint, token } = req.body;
+        if (!endpoint || !token) {
+          return res.status(400).json({ success: false, error: 'Valid endpoint and token are required' });
+        }
+
+        const response = await fetch(`https://example.com/api${endpoint}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (response.status === 401) {
+          return res.status(401).json({ success: false, error: 'Token expired' });
+        }
+
+        const text = await response.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          const contentType = response.headers.get('content-type') ?? '';
+          if (response.redirected && (contentType.includes('text/html') || text.trimStart().startsWith('<'))) {
+            return res.status(401).json({ success: false, error: 'Token expired' });
+          }
+          return res.status(500).json({ success: false, error: 'Invalid JSON response from API' });
+        }
+
+        return res.json(data);
+      });
+
+      return app;
+    }
+
+    function mockFetchResponse(body: string, opts: { status?: number; redirected?: boolean; contentType?: string } = {}) {
+      const { status = 200, redirected = false, contentType = 'application/json' } = opts;
+      const headers = new Headers({ 'content-type': contentType });
+      const response = new Response(body, { status, headers });
+      Object.defineProperty(response, 'redirected', { value: redirected });
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+    }
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('returns 401 when upstream returns JSON 401', async () => {
+      mockFetchResponse('{"error":"Unauthorized"}', { status: 401 });
+      const app = createFetchProxyApp();
+      const res = await request(app).post('/api/proxy').send({ endpoint: '/test', token: 'tok' });
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBe('Token expired');
+    });
+
+    it('returns 401 when upstream redirects to HTML login page', async () => {
+      mockFetchResponse('<!DOCTYPE html><html><body>Login</body></html>', {
+        status: 200, redirected: true, contentType: 'text/html; charset=utf-8',
+      });
+      const app = createFetchProxyApp();
+      const res = await request(app).post('/api/proxy').send({ endpoint: '/test', token: 'tok' });
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBe('Token expired');
+    });
+
+    it('returns 500 for non-JSON non-redirect HTML (genuine upstream error page)', async () => {
+      mockFetchResponse('<html><body>Internal Server Error</body></html>', {
+        status: 500, redirected: false, contentType: 'text/html',
+      });
+      const app = createFetchProxyApp();
+      const res = await request(app).post('/api/proxy').send({ endpoint: '/test', token: 'tok' });
+      expect(res.status).toBe(500);
+      expect(res.body.error).toBe('Invalid JSON response from API');
+    });
+
+    it('returns 500 for non-JSON non-HTML upstream response', async () => {
+      mockFetchResponse('plain text error', { status: 200, redirected: false, contentType: 'text/plain' });
+      const app = createFetchProxyApp();
+      const res = await request(app).post('/api/proxy').send({ endpoint: '/test', token: 'tok' });
+      expect(res.status).toBe(500);
+      expect(res.body.error).toBe('Invalid JSON response from API');
+    });
+
+    it('forwards JSON response on success', async () => {
+      mockFetchResponse(JSON.stringify({ data: [{ id: 1 }], count: 1 }));
+      const app = createFetchProxyApp();
+      const res = await request(app).post('/api/proxy').send({ endpoint: '/test', token: 'tok' });
+      expect(res.status).toBe(200);
+      expect(res.body.data).toHaveLength(1);
+    });
+  });
+
   describe('POST /api/check-learning', () => {
     it('should return 400 if required fields are missing', async () => {
       const response = await request(app)

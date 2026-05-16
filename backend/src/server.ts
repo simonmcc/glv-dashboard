@@ -316,8 +316,8 @@ app.post('/api/proxy', async (req, res) => {
           // Detect this by checking Content-Type or whether the body starts with HTML so
           // the frontend receives 401 and triggers re-authentication instead of a generic error.
           const contentType = response.headers.get('content-type') ?? '';
-          if (contentType.includes('text/html') || text.trimStart().startsWith('<')) {
-            log('[Proxy] HTML response from upstream — treating as token expiry (401)');
+          if (response.redirected && (contentType.includes('text/html') || text.trimStart().startsWith('<'))) {
+            log('[Proxy] HTML response from upstream redirect — treating as token expiry (401)');
             proxySpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Token expired (HTML redirect)' });
             return res.status(401).json({ success: false, error: 'Token expired' });
           }
