@@ -304,13 +304,18 @@ export function JoiningJourneyProgress({
                     )}
 
                     {/* Catch-all: any outstanding item not covered by the known categories above */}
-                    {Array.from(member.outstandingItems)
-                      .filter(item => !KNOWN_JOURNEY_ITEMS.has(item))
-                      .sort((a, b) => a.localeCompare(b))
-                      .map(item => (
-                        <StatusChip key={item} status="incomplete" label={item} />
-                      ))
-                    }
+                    {Array.from(member.outstandingItems).filter(item => !KNOWN_JOURNEY_ITEMS.has(item)).length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] text-gray-400 uppercase tracking-wide font-medium w-[90px] shrink-0" />
+                        {Array.from(member.outstandingItems)
+                          .filter(item => !KNOWN_JOURNEY_ITEMS.has(item))
+                          .sort((a, b) => a.localeCompare(b))
+                          .map(item => (
+                            <StatusChip key={item} status="incomplete" label={item} />
+                          ))
+                        }
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
