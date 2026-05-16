@@ -256,6 +256,9 @@ export class ScoutsApiClient {
       'managerTrusteeCheck': 'Trustee Eligibility Check',
       'growingRoots': 'Growing Roots',
       'coreLearning': 'Core Learning',
+      'dataProtectionTrainingComplete': 'Data Protection',
+      'managerDisclosureCheck': 'Criminal Record/Disclosure Check',
+      'updateMemberProfile': 'Confirm Member Profile',
     };
 
     // Filter for Outstanding items only (incomplete onboarding actions)
