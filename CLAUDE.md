@@ -157,9 +157,11 @@ No custom metrics are exported. Cloud Run built-in metrics (request count, laten
    **Recommended worktree workflow**
    ```bash
    # 1. From the default worktree (must be on main, coordination only):
+   #    Fetch first so the branch starts from the latest remote state.
    #    Create the branch AND worktree in one step — do NOT run `git switch -c` first,
    #    as that checks the branch out in the default worktree and blocks `git worktree add`.
-   git worktree add ../glv-TICKET-123 -b feature/TICKET-123
+   git fetch origin
+   git worktree add ../glv-TICKET-123 -b feature/TICKET-123 origin/main
 
    # 2. Do all coding, npm installs, and dev server runs from the worktree
    cd ../glv-TICKET-123
