@@ -264,6 +264,18 @@ export function JoiningJourneyProgress({
                     {member.outstandingItems.has('Core Learning') && (
                       <StatusChip status="incomplete" label="Core Learning" />
                     )}
+
+                    {/* Catch-all: any outstanding item not covered by the known categories above */}
+                    {Array.from(member.outstandingItems)
+                      .filter(item =>
+                        !JOURNEY_STEPS.some(s => s.item === item) &&
+                        item !== 'Growing Roots' &&
+                        item !== 'Core Learning'
+                      )
+                      .map(item => (
+                        <StatusChip key={item} status="incomplete" label={item} />
+                      ))
+                    }
                   </div>
                 </div>
               </div>
