@@ -57,6 +57,11 @@ function createTestApp() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Version info
+  app.get('/version', (_req, res) => {
+    res.json({ version: process.env.APP_VERSION || 'dev' });
+  });
+
   // Authentication endpoint
   app.post('/auth/login', async (req, res) => {
     const { username, password } = req.body;
@@ -191,6 +196,23 @@ describe('Backend Server', () => {
       expect(response.status).toBe(200);
       expect(response.body.status).toBe('ok');
       expect(response.body.timestamp).toBeDefined();
+    });
+  });
+
+  describe('GET /version', () => {
+    it('should return dev when APP_VERSION is not set', async () => {
+      delete process.env.APP_VERSION;
+      const response = await request(app).get('/version');
+      expect(response.status).toBe(200);
+      expect(response.body.version).toBe('dev');
+    });
+
+    it('should return APP_VERSION when set', async () => {
+      process.env.APP_VERSION = 'abc1234';
+      const response = await request(app).get('/version');
+      expect(response.status).toBe(200);
+      expect(response.body.version).toBe('abc1234');
+      delete process.env.APP_VERSION;
     });
   });
 

@@ -1,3 +1,11 @@
+/**
+ * Version Footer Component
+ *
+ * Displays the frontend git version (linked to GitHub), the backend proxy
+ * version fetched from GET /version, and an inline reload button when a
+ * PWA service-worker update is waiting.
+ */
+
 import { useState, useEffect } from 'react';
 
 interface VersionFooterProps {
@@ -6,11 +14,13 @@ interface VersionFooterProps {
 }
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
 
 export function VersionFooter({ updateAvailable, onUpdate }: VersionFooterProps) {
   const [backendVersion, setBackendVersion] = useState<string | null>(null);
 
   useEffect(() => {
+    if (MOCK_MODE) return;
     fetch(`${BACKEND_URL}/version`)
       .then(r => r.json())
       .then((d: { version?: string }) => setBackendVersion(d.version ?? null))
