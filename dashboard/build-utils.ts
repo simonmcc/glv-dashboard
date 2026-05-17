@@ -3,6 +3,11 @@ import { execSync } from 'child_process';
 const REPO_URL = 'https://github.com/simonmcc/glv-dashboard';
 
 export function getGitVersion(): string {
+  // BUILD_SHA is injected by CI with the actual branch/commit SHA from github.sha /
+  // github.event.pull_request.head.sha.  Without it, actions/checkout on a PR event
+  // gives us the merge-commit SHA, which differs from what GitHub's UI shows.
+  const injected = process.env.BUILD_SHA;
+  if (injected) return injected.substring(0, 7);
   try {
     return execSync('git describe --tags --always', { encoding: 'utf8' }).trim();
   } catch {

@@ -132,6 +132,11 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Version info (unauthenticated — safe to expose, just a git SHA)
+app.get('/version', (_req, res) => {
+  res.json({ version: process.env.APP_VERSION || 'dev' });
+});
+
 // Authentication endpoint
 app.post('/auth/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body;

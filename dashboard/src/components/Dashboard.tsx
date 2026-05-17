@@ -29,6 +29,7 @@ import { LazySection } from './LazySection';
 import type { LoadState } from './LazySection';
 import { MemberDashboard } from './MemberDashboard';
 import { SyncStatus } from './SyncStatus';
+import { VersionFooter } from './VersionFooter';
 import { readCache, writeCache, readLastSync } from '../db';
 
 interface DashboardProps {
@@ -39,6 +40,8 @@ interface DashboardProps {
   onLogout: () => void;
   onTokenExpired: () => void;
   backgroundAuth?: { message: string; isError?: boolean };
+  updateAvailable?: boolean;
+  onUpdate?: () => void;
 }
 
 // Section state for lazy loading
@@ -48,7 +51,7 @@ interface SectionState<T> {
   error: string | null;
 }
 
-export function Dashboard({ token, contactId, username, isOnline, onLogout, onTokenExpired, backgroundAuth }: DashboardProps) {
+export function Dashboard({ token, contactId, username, isOnline, onLogout, onTokenExpired, backgroundAuth, updateAvailable, onUpdate }: DashboardProps) {
   // Primary data (loaded immediately - always visible at top)
   const [records, setRecords] = useState<LearningRecord[]>([]);
   const [summary, setSummary] = useState<ComplianceSummary | null>(null);
@@ -802,15 +805,10 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
 
       {/* Footer */}
       <footer className="max-w-7xl mx-auto px-4 py-6 text-center text-sm text-gray-500">
-        Data fetched directly from the Scouts membership portal. Cached locally for offline access.{' '}
-        <a
-          href={__APP_URL__}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-gray-700"
-        >
-          simonmcc/glv-dashboard@{__APP_VERSION__}
-        </a>
+        Data fetched directly from the Scouts membership portal. Cached locally for offline access.
+        <div className="mt-1">
+          <VersionFooter updateAvailable={updateAvailable} onUpdate={onUpdate} />
+        </div>
       </footer>
     </div>
   );
