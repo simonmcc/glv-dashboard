@@ -354,6 +354,10 @@ export class ScoutsApiClient {
         signal,
       });
 
+      if (response.status === 401) {
+        throw new Error('TOKEN_EXPIRED');
+      }
+
       if (!response.ok) {
         const text = await response.text();
         return { success: false, error: `HTTP ${response.status}: ${text}` };
@@ -363,6 +367,7 @@ export class ScoutsApiClient {
       console.log('[API] Check learning result:', result);
       return result;
     } catch (err) {
+      if ((err as Error).message === 'TOKEN_EXPIRED') throw err;
       console.error('[API] Check learning error:', err);
       return { success: false, error: String(err) };
     }
