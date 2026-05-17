@@ -23,25 +23,11 @@ function loadAuthState(): AuthState {
   return { status: 'unauthenticated' };
 }
 
-function UpdateToast() {
-  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
-
-  if (!needRefresh) return null;
-
-  return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-gray-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg">
-      <span>A new version is available.</span>
-      <button
-        onClick={() => updateServiceWorker(true)}
-        className="bg-purple-500 hover:bg-purple-400 text-white px-3 py-1 rounded font-medium transition-colors"
-      >
-        Reload
-      </button>
-    </div>
-  );
-}
-
 function App() {
+  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
+  const updateAvailable = needRefresh;
+  const onUpdate = useCallback(() => updateServiceWorker(true), [updateServiceWorker]);
+
   const [authState, setAuthState] = useState<AuthState>(loadAuthState);
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
 
@@ -116,20 +102,19 @@ function App() {
     authState.status === 'error'
   ) {
     return (
-      <>
-        <UpdateToast />
-        <AuthFlow
-          authState={authState}
-          onAuthStart={handleAuthStart}
-          onAuthComplete={handleAuthComplete}
-          onAuthError={handleAuthError}
-          onStartBackgroundAuth={handleStartBackgroundAuth}
-          onBackgroundAuthProgress={handleBackgroundAuthProgress}
-          onBackgroundAuthComplete={handleBackgroundAuthComplete}
-          onBackgroundAuthError={handleBackgroundAuthError}
-          mockMode={MOCK_MODE}
-        />
-      </>
+      <AuthFlow
+        authState={authState}
+        onAuthStart={handleAuthStart}
+        onAuthComplete={handleAuthComplete}
+        onAuthError={handleAuthError}
+        onStartBackgroundAuth={handleStartBackgroundAuth}
+        onBackgroundAuthProgress={handleBackgroundAuthProgress}
+        onBackgroundAuthComplete={handleBackgroundAuthComplete}
+        onBackgroundAuthError={handleBackgroundAuthError}
+        mockMode={MOCK_MODE}
+        updateAvailable={updateAvailable}
+        onUpdate={onUpdate}
+      />
     );
   }
 
@@ -140,18 +125,17 @@ function App() {
     : undefined;
 
   return (
-    <>
-      <UpdateToast />
-      <Dashboard
-        token={token}
-        contactId={authState.contactId}
-        username={authState.username}
-        isOnline={isOnline}
-        onLogout={handleLogout}
-        onTokenExpired={handleTokenExpired}
-        backgroundAuth={backgroundAuth}
-      />
-    </>
+    <Dashboard
+      token={token}
+      contactId={authState.contactId}
+      username={authState.username}
+      isOnline={isOnline}
+      onLogout={handleLogout}
+      onTokenExpired={handleTokenExpired}
+      backgroundAuth={backgroundAuth}
+      updateAvailable={updateAvailable}
+      onUpdate={onUpdate}
+    />
   );
 }
 

@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
 import type { AuthState } from '../types';
 import { hashPassword, saveCredentials, loadCredentials } from '../session';
+import { VersionFooter } from './VersionFooter';
 
 const tracer = trace.getTracer('glv-dashboard', '1.0.0');
 
@@ -23,6 +24,8 @@ interface AuthFlowProps {
   onBackgroundAuthComplete: (token: string, contactId: string, username?: string) => void;
   onBackgroundAuthError: (message: string) => void;
   mockMode?: boolean;
+  updateAvailable?: boolean;
+  onUpdate?: () => void;
 }
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
@@ -74,6 +77,8 @@ export function AuthFlow({
   onBackgroundAuthComplete,
   onBackgroundAuthError,
   mockMode = false,
+  updateAvailable,
+  onUpdate,
 }: AuthFlowProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -303,6 +308,9 @@ export function AuthFlow({
           <br />
           Data is fetched directly from the Scouts API.
         </p>
+        <div className="mt-3">
+          <VersionFooter updateAvailable={updateAvailable} onUpdate={onUpdate} />
+        </div>
       </div>
     </div>
   );
