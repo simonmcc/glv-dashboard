@@ -216,12 +216,13 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       } catch (err) {
         span.recordException(err as Error);
         span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        if ((err as Error).message === 'TOKEN_EXPIRED') { onTokenExpired(); return; }
         setJoiningJourney(s => ({ ...s, state: 'error', error: (err as Error).message }));
       } finally {
         span.end();
       }
     });
-  }, [client, contactId]);
+  }, [client, contactId, onTokenExpired]);
 
   const loadDisclosures = useCallback(async () => {
     setDisclosures(s => ({ ...s, state: 'loading', error: null }));
@@ -242,12 +243,13 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       } catch (err) {
         span.recordException(err as Error);
         span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        if ((err as Error).message === 'TOKEN_EXPIRED') { onTokenExpired(); return; }
         setDisclosures(s => ({ ...s, state: 'error', error: (err as Error).message }));
       } finally {
         span.end();
       }
     });
-  }, [client, contactId]);
+  }, [client, contactId, onTokenExpired]);
 
   const loadSuspensions = useCallback(async () => {
     setSuspensions(s => ({ ...s, state: 'loading', error: null }));
@@ -264,12 +266,13 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       } catch (err) {
         span.recordException(err as Error);
         span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        if ((err as Error).message === 'TOKEN_EXPIRED') { onTokenExpired(); return; }
         setSuspensions(s => ({ ...s, state: 'error', error: (err as Error).message }));
       } finally {
         span.end();
       }
     });
-  }, [client, contactId]);
+  }, [client, contactId, onTokenExpired]);
 
   const loadTeamReviews = useCallback(async () => {
     setTeamReviews(s => ({ ...s, state: 'loading', error: null }));
@@ -286,12 +289,13 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       } catch (err) {
         span.recordException(err as Error);
         span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        if ((err as Error).message === 'TOKEN_EXPIRED') { onTokenExpired(); return; }
         setTeamReviews(s => ({ ...s, state: 'error', error: (err as Error).message }));
       } finally {
         span.end();
       }
     });
-  }, [client, contactId]);
+  }, [client, contactId, onTokenExpired]);
 
   const loadPermits = useCallback(async () => {
     setPermits(s => ({ ...s, state: 'loading', error: null }));
@@ -308,12 +312,13 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       } catch (err) {
         span.recordException(err as Error);
         span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        if ((err as Error).message === 'TOKEN_EXPIRED') { onTokenExpired(); return; }
         setPermits(s => ({ ...s, state: 'error', error: (err as Error).message }));
       } finally {
         span.end();
       }
     });
-  }, [client, contactId]);
+  }, [client, contactId, onTokenExpired]);
 
   const loadAwards = useCallback(async () => {
     setAwards(s => ({ ...s, state: 'loading', error: null }));
@@ -330,12 +335,13 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       } catch (err) {
         span.recordException(err as Error);
         span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        if ((err as Error).message === 'TOKEN_EXPIRED') { onTokenExpired(); return; }
         setAwards(s => ({ ...s, state: 'error', error: (err as Error).message }));
       } finally {
         span.end();
       }
     });
-  }, [client, contactId]);
+  }, [client, contactId, onTokenExpired]);
 
   // Refresh all data — preserve existing data while fetching (stale-while-revalidate).
   // Sections with data go to 'loading' (children still rendered) rather than 'idle' (skeleton).
