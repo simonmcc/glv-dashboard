@@ -11,12 +11,20 @@ interface TeamReviewsTableProps {
   records: TeamReviewRecord[];
   isLoading: boolean;
   searchTerm?: string;
+  memberNameMap?: Map<string, string>;
+}
+
+function resolveName(record: TeamReviewRecord, map?: Map<string, string>): string {
+  const fromRecord = [record['First name'], record['Last name']].filter(Boolean).join(' ').trim();
+  if (fromRecord) return fromRecord;
+  if (record['Team leader']?.trim()) return record['Team leader'];
+  return map?.get(record['Membership number']) ?? record['Membership number'];
 }
 
 type SortField = 'leader' | 'date' | 'overdue';
 type SortOrder = 'asc' | 'desc';
 
-export function TeamReviewsTable({ records, isLoading, searchTerm = '' }: TeamReviewsTableProps) {
+export function TeamReviewsTable({ records, isLoading, searchTerm = '', memberNameMap }: TeamReviewsTableProps) {
   const [sortField, setSortField] = useState<SortField>('overdue');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [filterOverdue, setFilterOverdue] = useState(false);
@@ -34,7 +42,7 @@ export function TeamReviewsTable({ records, isLoading, searchTerm = '' }: TeamRe
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(r =>
-        (r['Team leader'] || '').toLowerCase().includes(term) ||
+        resolveName(r, memberNameMap).toLowerCase().includes(term) ||
         (r['Role'] || '').toLowerCase().includes(term) ||
         r['Membership number'].includes(term)
       );
@@ -44,7 +52,7 @@ export function TeamReviewsTable({ records, isLoading, searchTerm = '' }: TeamRe
       let comparison = 0;
       switch (sortField) {
         case 'leader':
-          comparison = (a['Team leader'] || '').localeCompare(b['Team leader'] || '');
+          comparison = resolveName(a, memberNameMap).localeCompare(resolveName(b, memberNameMap));
           break;
         case 'date': {
           const aDate = a['Scheduled review date'] ? new Date(a['Scheduled review date']).getTime() : Infinity;
@@ -63,7 +71,7 @@ export function TeamReviewsTable({ records, isLoading, searchTerm = '' }: TeamRe
     });
 
     return result;
-  }, [records, filterOverdue, searchTerm, sortField, sortOrder]);
+  }, [records, filterOverdue, searchTerm, sortField, sortOrder, memberNameMap]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -177,7 +185,7 @@ export function TeamReviewsTable({ records, isLoading, searchTerm = '' }: TeamRe
                   <tr key={`${record['Membership number']}-${index}`} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">
-                        {record['Team leader']}
+                        {resolveName(record, memberNameMap)}
                       </div>
                     </td>
                     <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">

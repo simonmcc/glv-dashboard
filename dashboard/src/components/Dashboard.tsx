@@ -23,6 +23,7 @@ import { JoiningJourneyProgress } from './JoiningJourneyProgress';
 import { DisclosureTable } from './DisclosureTable';
 import { SuspensionsTable } from './SuspensionsTable';
 import { TeamReviewsTable } from './TeamReviewsTable';
+import { TeamStructure } from './TeamStructure';
 import { PermitsTable } from './PermitsTable';
 import { AwardsTable } from './AwardsTable';
 import { LazySection } from './LazySection';
@@ -64,8 +65,14 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   // Per-member view
   const [selectedMember, setSelectedMember] = useState<{ membershipNumber: string; name: string } | null>(null);
 
-  // Joining Journey view toggle
+  // Training & Onboarding section tab
+  const [trainingTab, setTrainingTab] = useState<'onboarding' | 'training'>('onboarding');
+
+  // Joining Journey inner view toggle
   const [joiningJourneyView, setJoiningJourneyView] = useState<'progress' | 'items'>('progress');
+
+  // Team Directory view toggle
+  const [teamDirView, setTeamDirView] = useState<'directory' | 'structure'>('directory');
 
   // Collapsed state for lower-priority sections
   const [teamReviewsCollapsed, setTeamReviewsCollapsed] = useState(true);
@@ -531,6 +538,14 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
     return permits.data.filter(r => isExpiringSoon(r['Permit expiry date'])).length;
   }, [permits.data]);
 
+  const memberNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of records) {
+      map.set(r['Membership number'], `${r['First name']} ${r['Last name']}`.trim());
+    }
+    return map;
+  }, [records]);
+
   if (selectedMember) {
     return (
       <MemberDashboard
@@ -650,44 +665,103 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           />
         </section>
 
-        {/* Joining Journey - Lazy loaded */}
-        <LazySection
-          ref={joiningJourneyRef}
-          title="Joining Journey"
-          state={joiningJourney.state}
-          error={joiningJourney.error}
-          onRetry={() => { triggeredSections.current.delete('joiningJourney'); loadJoiningJourney(); }}
-          headerExtra={
-            joiningJourney.state === 'loaded' && joiningJourney.data.length > 0 ? (
+        {/* Training & Onboarding - merged section */}
+        <section ref={joiningJourneyRef} id="section-learning">
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Training &amp; Onboarding</h2>
+            {trainingTab === 'training' && primaryLoading && (
+              <span className="text-sm text-purple-600 animate-pulse flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Loading...
+              </span>
+            )}
+            {trainingTab === 'onboarding' && joiningJourney.state === 'loading' && (
+              <span className="text-sm text-purple-600 animate-pulse flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Loading...
+              </span>
+            )}
+            <div className="ml-auto flex items-center gap-3">
+              {trainingTab === 'onboarding' && joiningJourney.state === 'loaded' && joiningJourney.data.length > 0 && (
+                <div className="flex gap-1 rounded-lg overflow-hidden border border-gray-200 text-sm">
+                  <button
+                    onClick={() => setJoiningJourneyView('progress')}
+                    className={`px-3 py-1 ${joiningJourneyView === 'progress' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    By Member
+                  </button>
+                  <button
+                    onClick={() => setJoiningJourneyView('items')}
+                    className={`px-3 py-1 ${joiningJourneyView === 'items' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    All Tasks
+                  </button>
+                </div>
+              )}
               <div className="flex gap-1 rounded-lg overflow-hidden border border-gray-200 text-sm">
                 <button
-                  onClick={() => setJoiningJourneyView('progress')}
-                  className={`px-3 py-1 ${joiningJourneyView === 'progress' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  onClick={() => setTrainingTab('onboarding')}
+                  className={`px-3 py-1 ${trainingTab === 'onboarding' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
                 >
-                  Progress
+                  Onboarding
                 </button>
                 <button
-                  onClick={() => setJoiningJourneyView('items')}
-                  className={`px-3 py-1 ${joiningJourneyView === 'items' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  onClick={() => setTrainingTab('training')}
+                  className={`px-3 py-1 ${trainingTab === 'training' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
                 >
-                  All Items
+                  Training Records
                 </button>
               </div>
-            ) : undefined
-          }
-        >
-          {joiningJourneyView === 'progress' ? (
-            <JoiningJourneyProgress
-              joiningJourneyRecords={joiningJourney.data}
-              learningRecords={records}
-              isLoading={joiningJourney.state === 'loading'}
-              onMemberSelect={handleMemberSelect}
-              searchTerm={searchTerm}
-            />
-          ) : (
-            <JoiningJourneyTable records={joiningJourney.data} isLoading={joiningJourney.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
+            </div>
+          </div>
+
+          {trainingTab === 'training' && (
+            <ComplianceTable records={records} isLoading={primaryLoading && records.length === 0} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
           )}
-        </LazySection>
+
+          {trainingTab === 'onboarding' && (
+            <>
+              {joiningJourney.state === 'error' && (
+                <div className="bg-white rounded-lg shadow-sm border p-6">
+                  <div className="text-red-600 mb-2">Failed to load: {joiningJourney.error}</div>
+                  <button
+                    onClick={() => { triggeredSections.current.delete('joiningJourney'); loadJoiningJourney(); }}
+                    className="text-sm text-purple-600 hover:text-purple-800 underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+              {joiningJourney.state === 'idle' && (
+                <div className="bg-white rounded-lg shadow-sm border">
+                  <div className="p-4 border-b"><div className="h-6 bg-gray-200 rounded w-48 animate-pulse"></div></div>
+                  <div className="p-4 space-y-3">
+                    {[...Array(3)].map((_, i) => (<div key={i} className="h-12 bg-gray-100 rounded animate-pulse"></div>))}
+                  </div>
+                </div>
+              )}
+              {(joiningJourney.state === 'loading' || joiningJourney.state === 'loaded') && (
+                joiningJourneyView === 'progress' ? (
+                  <JoiningJourneyProgress
+                    joiningJourneyRecords={joiningJourney.data}
+                    learningRecords={records}
+                    isLoading={joiningJourney.state === 'loading'}
+                    onMemberSelect={handleMemberSelect}
+                    searchTerm={searchTerm}
+                  />
+                ) : (
+                  <JoiningJourneyTable records={joiningJourney.data} isLoading={joiningJourney.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
+                )
+              )}
+            </>
+          )}
+        </section>
 
         {/* Disclosure Compliance - Lazy loaded */}
         <LazySection
@@ -718,23 +792,6 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           <SuspensionsTable records={suspensions.data} isLoading={suspensions.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
         </LazySection>
 
-        {/* Learning Compliance Table */}
-        <section id="section-learning">
-          <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Learning Records</h2>
-            {primaryLoading && (
-              <span className="text-sm text-purple-600 animate-pulse flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Loading...
-              </span>
-            )}
-          </div>
-          <ComplianceTable records={records} isLoading={primaryLoading && records.length === 0} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
-        </section>
-
         {/* Team Reviews - Lazy loaded, collapsed by default */}
         <LazySection
           ref={teamReviewsRef}
@@ -755,8 +812,30 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
               loadTeamReviews();
             }
           }}
+          headerExtra={
+            teamReviews.state === 'loaded' && teamReviews.data.length > 0 ? (
+              <div className="flex gap-1 rounded-lg overflow-hidden border border-gray-200 text-sm">
+                <button
+                  onClick={() => setTeamDirView('directory')}
+                  className={`px-3 py-1 ${teamDirView === 'directory' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                >
+                  Directory
+                </button>
+                <button
+                  onClick={() => setTeamDirView('structure')}
+                  className={`px-3 py-1 ${teamDirView === 'structure' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                >
+                  Structure
+                </button>
+              </div>
+            ) : undefined
+          }
         >
-          <TeamReviewsTable records={teamReviews.data} isLoading={teamReviews.state === 'loading'} searchTerm={searchTerm} />
+          {teamDirView === 'directory' ? (
+            <TeamReviewsTable records={teamReviews.data} isLoading={teamReviews.state === 'loading'} searchTerm={searchTerm} memberNameMap={memberNameMap} />
+          ) : (
+            <TeamStructure records={teamReviews.data} isLoading={teamReviews.state === 'loading'} memberNameMap={memberNameMap} searchTerm={searchTerm} />
+          )}
         </LazySection>
 
         {/* Permits - Lazy loaded, collapsed by default */}
