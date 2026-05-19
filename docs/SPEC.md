@@ -58,8 +58,8 @@ The membership.scouts.org.uk site is a Single Page Application (SPA) driven by b
 ### Discovery Process
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Playwright Script                                               │
-│                                                                  │
+│  Playwright Script                                              │
+│                                                                 │
 │  1. Launch browser with request interception enabled            │
 │  2. Navigate to membership.scouts.org.uk                        │
 │  3. Complete B2C login flow                                     │
@@ -169,31 +169,31 @@ The discovery phase will produce `docs/API.md` containing:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                          Browser                                 │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  React SPA (S3 + CloudFront)                            │   │
-│  │  - Login form                                            │   │
-│  │  - Dashboard UI                                          │   │
-│  │  - Client-side caching (sessionStorage)                  │   │
-│  │  - Filtering/sorting (all client-side)                   │   │
-│  └─────────────────────────────────────────────────────────┘   │
+│                          Browser                                │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  React SPA (S3 + CloudFront)                            │    │
+│  │  - Login form                                           │    │
+│  │  - Dashboard UI                                         │    │
+│  │  - Client-side caching (sessionStorage)                 │    │
+│  │  - Filtering/sorting (all client-side)                  │    │
+│  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               │ HTTPS POST (credentials)
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      AWS API Gateway                             │
+│                      AWS API Gateway                            │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      AWS Lambda (Container Image)                │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │  1. Playwright authenticates with B2C                    │   │
-│  │  2. Extracts auth token/session                          │   │
-│  │  3. Calls Scouts APIs directly (discovered endpoints)    │   │
-│  │  4. Transforms & returns structured JSON                 │   │
-│  └─────────────────────────────────────────────────────────┘   │
+│                      AWS Lambda (Container Image)               │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  1. Playwright authenticates with B2C                   │    │
+│  │  2. Extracts auth token/session                         │    │
+│  │  3. Calls Scouts APIs directly (discovered endpoints)   │    │
+│  │  4. Transforms & returns structured JSON                │    │
+│  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
                               │
           ┌───────────────────┴───────────────────┐
