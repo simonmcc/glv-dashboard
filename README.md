@@ -13,12 +13,29 @@ glv-dashboard/
 
 ## Prerequisites
 
-- Node.js 20+
-- npm
+- [nvm](https://github.com/nvm-sh/nvm) (recommended) or Node.js 22+
+- npm (included with Node.js)
 
 ## Development Setup
 
-### 1. Install dependencies
+### 1. Set up Node.js
+
+The required Node version is pinned in `.nvmrc`. With nvm:
+
+```bash
+# Install nvm (if not already installed)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+
+# Load nvm into the current shell (or open a new terminal and skip this step)
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+# Install and activate the correct Node version
+nvm install   # reads .nvmrc
+nvm use       # activates it in the current shell
+```
+
+### 2. Install dependencies
 
 ```bash
 # Install backend dependencies
@@ -30,7 +47,7 @@ cd ../dashboard
 npm install
 ```
 
-### 2. Start the backend
+### 3. Start the backend
 
 The backend provides authentication and API proxy services.
 
@@ -41,7 +58,7 @@ npm run dev
 
 This starts the backend on `http://localhost:3001` with hot-reload.
 
-### 3. Start the dashboard
+### 4. Start the dashboard
 
 In a separate terminal:
 
