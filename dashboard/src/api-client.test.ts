@@ -142,6 +142,82 @@ describe('ScoutsApiClient', () => {
     });
   });
 
+  describe('deduplicateRecords', () => {
+    const client = new ScoutsApiClient('test-token');
+    // Access private method for testing
+    const dedup = (records: LearningRecord[]) =>
+      (client as unknown as { deduplicateRecords: (r: LearningRecord[]) => LearningRecord[] }).deduplicateRecords(records);
+
+    const base = (overrides: Partial<LearningRecord>): LearningRecord => ({
+      'First name': 'Alice',
+      'Last name': 'Smith',
+      'Membership number': '111',
+      'Learning': 'Safeguarding',
+      'Status': 'Valid',
+      'Expiry date': '2027-01-01',
+      'Start date': null,
+      ...overrides,
+    });
+
+    it('passes a single record through unchanged', () => {
+      const record = base({ 'Status': 'Not Started', 'Expiry date': null });
+      expect(dedup([record])).toEqual([record]);
+    });
+
+    it('keeps "Not Started" over "Valid" for the same member+learning', () => {
+      const valid = base({ 'Status': 'Valid', 'Start date': '2023-01-01' });
+      const notStarted = base({ 'Status': 'Not Started', 'Expiry date': null, 'Start date': null });
+      const result = dedup([valid, notStarted]);
+      expect(result).toHaveLength(1);
+      expect(result[0].Status).toBe('Not Started');
+    });
+
+    it('keeps "Not Started" regardless of insertion order', () => {
+      const notStarted = base({ 'Status': 'Not Started', 'Expiry date': null, 'Start date': null });
+      const valid = base({ 'Status': 'Valid', 'Start date': '2023-01-01' });
+      const result = dedup([notStarted, valid]);
+      expect(result).toHaveLength(1);
+      expect(result[0].Status).toBe('Not Started');
+    });
+
+    it('preserves the earliest start date when taking a worse status record', () => {
+      // Valid record has an earlier start date; Not Started has a later one.
+      // The result should be "Not Started" status with the earlier start date.
+      const valid = base({ 'Status': 'Valid', 'Start date': '2022-06-01' });
+      const notStarted = base({ 'Status': 'Not Started', 'Expiry date': null, 'Start date': '2023-01-01' });
+      const result = dedup([valid, notStarted]);
+      expect(result).toHaveLength(1);
+      expect(result[0].Status).toBe('Not Started');
+      expect(result[0]['Start date']).toBe(new Date('2022-06-01').toISOString());
+    });
+
+    it('keeps "Expired" over "Valid"', () => {
+      const valid = base({ 'Status': 'Valid' });
+      const expired = base({ 'Status': 'Expired', 'Expiry date': '2020-01-01' });
+      const result = dedup([valid, expired]);
+      expect(result[0].Status).toBe('Expired');
+    });
+
+    it('keeps distinct records for different members', () => {
+      const alice = base({ 'Membership number': '111', 'Status': 'Valid' });
+      const bob = base({ 'Membership number': '222', 'Status': 'Not Started', 'Expiry date': null });
+      expect(dedup([alice, bob])).toHaveLength(2);
+    });
+
+    it('keeps distinct records for different learning modules', () => {
+      const safety = base({ 'Learning': 'Safety', 'Status': 'Valid' });
+      const gdpr = base({ 'Learning': 'GDPR', 'Status': 'Not Started', 'Expiry date': null });
+      expect(dedup([safety, gdpr])).toHaveLength(2);
+    });
+
+    it('uses earliest start date as tiebreaker when status is equal', () => {
+      const older = base({ 'Status': 'Expired', 'Start date': '2021-01-01' });
+      const newer = base({ 'Status': 'Expired', 'Start date': '2023-06-01' });
+      const result = dedup([newer, older]);
+      expect(result[0]['Start date']).toBe('2021-01-01');
+    });
+  });
+
   describe('computeDisclosureSummary', () => {
     it('should compute summary for empty records', () => {
       const client = new ScoutsApiClient('test-token');
