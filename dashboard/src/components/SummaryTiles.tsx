@@ -1,10 +1,5 @@
-/**
- * Summary Tiles Component
- *
- * Displays compliance summary statistics in a grid of tiles.
- */
-
 import type { ComplianceSummary } from '../types';
+import { GROWING_ROOTS_MODULES, FIRST_RESPONSE_MODULE } from '../utils';
 
 interface SummaryTilesProps {
   summary: ComplianceSummary | null;
@@ -117,28 +112,42 @@ function LoadingTile() {
   );
 }
 
+const WITHIN_30_DAYS = GROWING_ROOTS_MODULES.filter(m => m.deadlineDays === 30).map(m => m.name);
+const GROWING_ROOTS = GROWING_ROOTS_MODULES.filter(m => m.deadlineDays === null).map(m => m.name);
+
+const TILE_GROUPS: ReadonlyArray<{
+  label: string;
+  modules: readonly string[];
+  color: TileProps['color'];
+}> = [
+  { label: 'Within 30 days',        modules: WITHIN_30_DAYS,          color: 'purple' },
+  { label: 'Growing Roots Learning', modules: GROWING_ROOTS,           color: 'green'  },
+  { label: 'First Response',         modules: [FIRST_RESPONSE_MODULE], color: 'blue'   },
+];
+
 export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, permitExpiringSoon = 0 }: SummaryTilesProps) {
   if (isLoading || !summary) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <LoadingTile />
-        <LoadingTile />
-        <LoadingTile />
-        <LoadingTile />
+      <div className="space-y-6">
+        <div>
+          <div className="h-3 bg-gray-200 rounded w-24 mb-2 animate-pulse" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <LoadingTile />
+            <LoadingTile />
+          </div>
+        </div>
+        <div>
+          <div className="h-3 bg-gray-200 rounded w-36 mb-2 animate-pulse" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <LoadingTile />
+            <LoadingTile />
+            <LoadingTile />
+            <LoadingTile />
+          </div>
+        </div>
       </div>
     );
   }
-
-  const learningTypes = Object.entries(summary.byLearningType);
-  const colors: TileProps['color'][] = ['purple', 'blue', 'green', 'orange'];
-
-  // Map learning types to display names
-  const displayNames: Record<string, string> = {
-    'SafeGuarding': 'Safeguarding',
-    'Safety': 'Safety',
-    'FirstAid': 'First Aid',
-    'DataProtection': 'GDPR',
-  };
 
   return (
     <div>
@@ -189,19 +198,36 @@ export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, p
         )}
       </div>
 
-      {/* Learning type tiles */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {learningTypes.map(([type, stats], index) => (
-          <Tile
-            key={type}
-            title={displayNames[type] || type}
-            total={stats.total}
-            compliant={stats.compliant}
-            expiring={stats.expiring}
-            expired={stats.expired}
-            color={colors[index % colors.length]}
-          />
-        ))}
+      {/* Grouped learning type tiles */}
+      <div className="space-y-6">
+        {TILE_GROUPS.map(group => {
+          const tilesInGroup = group.modules
+            .map(name => ({ name, stats: summary.byLearningType[name] }))
+            .filter(({ stats }) => stats !== undefined);
+
+          if (tilesInGroup.length === 0) return null;
+
+          return (
+            <div key={group.label}>
+              <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+                {group.label}
+              </h3>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {tilesInGroup.map(({ name, stats }) => (
+                  <Tile
+                    key={name}
+                    title={name}
+                    total={stats.total}
+                    compliant={stats.compliant}
+                    expiring={stats.expiring}
+                    expired={stats.expired}
+                    color={group.color}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
