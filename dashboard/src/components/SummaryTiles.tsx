@@ -6,6 +6,7 @@ interface SummaryTilesProps {
   isLoading: boolean;
   disclosureExpiringSoon?: number;
   permitExpiringSoon?: number;
+  onTileClick?: (learningType: string) => void;
 }
 
 interface TileProps {
@@ -15,6 +16,7 @@ interface TileProps {
   expiring: number;
   expired: number;
   color: 'purple' | 'blue' | 'green' | 'orange';
+  onClick?: () => void;
 }
 
 const colorClasses = {
@@ -52,12 +54,18 @@ const colorClasses = {
   },
 };
 
-function Tile({ title, total, compliant, expiring, expired, color }: TileProps) {
+function Tile({ title, total, compliant, expiring, expired, color, onClick }: TileProps) {
   const colors = colorClasses[color];
   const compliancePercent = total > 0 ? Math.round((compliant / total) * 100) : 0;
 
   return (
-    <div className={`${colors.bg} ${colors.border} border rounded-lg p-4`}>
+    <div
+      className={`${colors.bg} ${colors.border} border rounded-lg p-4 ${onClick ? 'cursor-pointer hover:shadow-md hover:ring-2 hover:ring-purple-300 transition-shadow' : ''}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
+    >
       <h3 className={`font-semibold ${colors.title} mb-3`}>{title}</h3>
 
       <div className="flex items-end justify-between mb-3">
@@ -125,7 +133,7 @@ const TILE_GROUPS: ReadonlyArray<{
   { label: 'First Response',         modules: [FIRST_RESPONSE_MODULE], color: 'blue'   },
 ];
 
-export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, permitExpiringSoon = 0 }: SummaryTilesProps) {
+export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, permitExpiringSoon = 0, onTileClick }: SummaryTilesProps) {
   if (isLoading || !summary) {
     return (
       <div className="space-y-6">
@@ -231,7 +239,7 @@ export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, p
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     {within30Tiles.map(({ name, stats }) => (
-                      <Tile key={name} title={name} total={stats.total} compliant={stats.compliant} expiring={stats.expiring} expired={stats.expired} color={within30.color} />
+                      <Tile key={name} title={name} total={stats.total} compliant={stats.compliant} expiring={stats.expiring} expired={stats.expired} color={within30.color} onClick={onTileClick ? () => onTileClick(name) : undefined} />
                     ))}
                   </div>
                 </div>
@@ -243,7 +251,7 @@ export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, p
                   </h3>
                   <div className="grid grid-cols-1 gap-4">
                     {firstResponseTiles.map(({ name, stats }) => (
-                      <Tile key={name} title={name} total={stats.total} compliant={stats.compliant} expiring={stats.expiring} expired={stats.expired} color={firstResponse.color} />
+                      <Tile key={name} title={name} total={stats.total} compliant={stats.compliant} expiring={stats.expiring} expired={stats.expired} color={firstResponse.color} onClick={onTileClick ? () => onTileClick(name) : undefined} />
                     ))}
                   </div>
                 </div>
@@ -266,7 +274,7 @@ export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, p
               </h3>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {tiles.map(({ name, stats }) => (
-                  <Tile key={name} title={name} total={stats.total} compliant={stats.compliant} expiring={stats.expiring} expired={stats.expired} color={gr.color} />
+                  <Tile key={name} title={name} total={stats.total} compliant={stats.compliant} expiring={stats.expiring} expired={stats.expired} color={gr.color} onClick={onTileClick ? () => onTileClick(name) : undefined} />
                 ))}
               </div>
             </div>

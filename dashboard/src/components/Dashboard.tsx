@@ -68,6 +68,9 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   // Training & Onboarding section tab
   const [trainingTab, setTrainingTab] = useState<'onboarding' | 'training'>('onboarding');
 
+  // Deep-link state: set when a compliance tile is clicked to pre-filter the training table
+  const [tileDeepLink, setTileDeepLink] = useState<{ learning: string; key: number } | null>(null);
+
   // Joining Journey inner view toggle
   const [joiningJourneyView, setJoiningJourneyView] = useState<'progress' | 'items'>('progress');
 
@@ -379,6 +382,12 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   }, [token]);
 
   // Handle member selection - load all lazy sections that are still idle
+  const handleTileClick = useCallback((learningType: string) => {
+    setTrainingTab('training');
+    setTileDeepLink(prev => ({ learning: learningType, key: (prev?.key ?? 0) + 1 }));
+    joiningJourneyRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
   const handleMemberSelect = useCallback((membershipNumber: string, name: string) => {
     setSelectedMember({ membershipNumber, name });
     // Don't trigger network loads while background auth is still in progress (no token yet)
@@ -662,6 +671,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
             isLoading={primaryLoading && !summary}
             disclosureExpiringSoon={disclosures.data.summary?.expiringSoon ?? 0}
             permitExpiringSoon={permitExpiringSoon}
+            onTileClick={handleTileClick}
           />
         </section>
 
@@ -722,7 +732,17 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           </div>
 
           {trainingTab === 'training' && (
-            <ComplianceTable records={records} isLoading={primaryLoading && records.length === 0} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
+            <ComplianceTable
+              key={tileDeepLink?.key ?? 0}
+              records={records}
+              isLoading={primaryLoading && records.length === 0}
+              onMemberSelect={handleMemberSelect}
+              searchTerm={searchTerm}
+              initialLearning={tileDeepLink?.learning}
+              initialSortField={tileDeepLink ? 'status' : undefined}
+              initialSortOrder={tileDeepLink ? 'asc' : undefined}
+              initialFilterExpiringOrNotStarted={tileDeepLink ? false : undefined}
+            />
           )}
 
           {trainingTab === 'onboarding' && (
