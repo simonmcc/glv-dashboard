@@ -12,6 +12,10 @@ interface ComplianceTableProps {
   isLoading: boolean;
   onMemberSelect?: (membershipNumber: string, name: string) => void;
   searchTerm?: string;
+  initialLearning?: string;
+  initialSortField?: SortField;
+  initialSortOrder?: SortOrder;
+  initialFilterExpiringOrNotStarted?: boolean;
 }
 
 type SortField = 'name' | 'learning' | 'status' | 'expiry';
@@ -26,14 +30,23 @@ const statusColors: Record<string, string> = {
   'Not Started': 'bg-gray-100 text-gray-800',
 };
 
-export function ComplianceTable({ records, isLoading, onMemberSelect, searchTerm = '' }: ComplianceTableProps) {
-  const [sortField, setSortField] = useState<SortField>('expiry');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+export function ComplianceTable({
+  records,
+  isLoading,
+  onMemberSelect,
+  searchTerm = '',
+  initialLearning = 'all',
+  initialSortField = 'expiry',
+  initialSortOrder = 'asc',
+  initialFilterExpiringOrNotStarted = true,
+}: ComplianceTableProps) {
+  const [sortField, setSortField] = useState<SortField>(initialSortField);
+  const [sortOrder, setSortOrder] = useState<SortOrder>(initialSortOrder);
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterLearning, setFilterLearning] = useState<string>('all');
+  const [filterLearning, setFilterLearning] = useState<string>(initialLearning);
   const [filterOverdue, setFilterOverdue] = useState(false);
   const [filterNoExpiry, setFilterNoExpiry] = useState(false);
-  const [filterExpiringOrNotStarted, setFilterExpiringOrNotStarted] = useState(true);
+  const [filterExpiringOrNotStarted, setFilterExpiringOrNotStarted] = useState(initialFilterExpiringOrNotStarted);
 
   // Get unique values for filters
   const statuses = useMemo(() => {
