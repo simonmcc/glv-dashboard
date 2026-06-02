@@ -129,11 +129,19 @@ export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, p
   if (isLoading || !summary) {
     return (
       <div className="space-y-6">
-        <div>
-          <div className="h-3 bg-gray-200 rounded w-24 mb-2 animate-pulse" />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <LoadingTile />
-            <LoadingTile />
+        <div className="flex gap-6 items-start">
+          <div className="flex-[2] min-w-0">
+            <div className="h-3 bg-gray-200 rounded w-24 mb-2 animate-pulse" />
+            <div className="grid grid-cols-2 gap-4">
+              <LoadingTile />
+              <LoadingTile />
+            </div>
+          </div>
+          <div className="flex-[1] min-w-0">
+            <div className="h-3 bg-gray-200 rounded w-28 mb-2 animate-pulse" />
+            <div className="grid grid-cols-1 gap-4">
+              <LoadingTile />
+            </div>
           </div>
         </div>
         <div>
@@ -200,34 +208,71 @@ export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, p
 
       {/* Grouped learning type tiles */}
       <div className="space-y-6">
-        {TILE_GROUPS.map(group => {
-          const tilesInGroup = group.modules
+
+        {/* Top row: Within 30 days + First Response side by side */}
+        {(() => {
+          const within30 = TILE_GROUPS[0];
+          const firstResponse = TILE_GROUPS[2];
+          const within30Tiles = within30.modules
+            .map(name => ({ name, stats: summary.byLearningType[name] }))
+            .filter(({ stats }) => stats !== undefined);
+          const firstResponseTiles = firstResponse.modules
             .map(name => ({ name, stats: summary.byLearningType[name] }))
             .filter(({ stats }) => stats !== undefined);
 
-          if (tilesInGroup.length === 0) return null;
+          if (within30Tiles.length === 0 && firstResponseTiles.length === 0) return null;
 
           return (
-            <div key={group.label}>
+            <div className="flex gap-6 items-start">
+              {within30Tiles.length > 0 && (
+                <div className="flex-[2] min-w-0">
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+                    {within30.label}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {within30Tiles.map(({ name, stats }) => (
+                      <Tile key={name} title={name} total={stats.total} compliant={stats.compliant} expiring={stats.expiring} expired={stats.expired} color={within30.color} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {firstResponseTiles.length > 0 && (
+                <div className="flex-[1] min-w-0">
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+                    {firstResponse.label}
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    {firstResponseTiles.map(({ name, stats }) => (
+                      <Tile key={name} title={name} total={stats.total} compliant={stats.compliant} expiring={stats.expiring} expired={stats.expired} color={firstResponse.color} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Growing Roots Learning — full width */}
+        {(() => {
+          const gr = TILE_GROUPS[1];
+          const tiles = gr.modules
+            .map(name => ({ name, stats: summary.byLearningType[name] }))
+            .filter(({ stats }) => stats !== undefined);
+          if (tiles.length === 0) return null;
+          return (
+            <div>
               <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
-                {group.label}
+                {gr.label}
               </h3>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {tilesInGroup.map(({ name, stats }) => (
-                  <Tile
-                    key={name}
-                    title={name}
-                    total={stats.total}
-                    compliant={stats.compliant}
-                    expiring={stats.expiring}
-                    expired={stats.expired}
-                    color={group.color}
-                  />
+                {tiles.map(({ name, stats }) => (
+                  <Tile key={name} title={name} total={stats.total} compliant={stats.compliant} expiring={stats.expiring} expired={stats.expired} color={gr.color} />
                 ))}
               </div>
             </div>
           );
-        })}
+        })()}
+
       </div>
     </div>
   );
