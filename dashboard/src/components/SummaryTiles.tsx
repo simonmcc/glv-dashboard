@@ -1,3 +1,11 @@
+/**
+ * Summary Tiles Component
+ *
+ * Displays compliance summary statistics grouped by Joining Journey category:
+ * "Within 30 days", "Growing Roots Learning", "First Response", and a
+ * catch-all "Other" group for any unexpected module types.
+ */
+
 import type { ComplianceSummary } from '../types';
 import { GROWING_ROOTS_MODULES, FIRST_RESPONSE_MODULE } from '../utils';
 
@@ -64,7 +72,7 @@ function Tile({ title, total, compliant, expiring, expired, color, onClick }: Ti
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
     >
       <h3 className={`font-semibold ${colors.title} mb-3`}>{title}</h3>
 
@@ -132,6 +140,8 @@ const TILE_GROUPS: ReadonlyArray<{
   { label: 'Growing Roots Learning', modules: GROWING_ROOTS,           color: 'green'  },
   { label: 'First Response',         modules: [FIRST_RESPONSE_MODULE], color: 'blue'   },
 ];
+
+const KNOWN_MODULES = new Set(TILE_GROUPS.flatMap(g => g.modules));
 
 export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, permitExpiringSoon = 0, onTileClick }: SummaryTilesProps) {
   if (isLoading || !summary) {
@@ -275,6 +285,26 @@ export function SummaryTiles({ summary, isLoading, disclosureExpiringSoon = 0, p
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {tiles.map(({ name, stats }) => (
                   <Tile key={name} title={name} total={stats.total} compliant={stats.compliant} expiring={stats.expiring} expired={stats.expired} color={gr.color} onClick={onTileClick ? () => onTileClick(name) : undefined} />
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Other — catch-all for any module types not in the known groups */}
+        {(() => {
+          const tiles = Object.entries(summary.byLearningType)
+            .filter(([name]) => !KNOWN_MODULES.has(name))
+            .map(([name, stats]) => ({ name, stats }));
+          if (tiles.length === 0) return null;
+          return (
+            <div>
+              <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+                Other
+              </h3>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {tiles.map(({ name, stats }) => (
+                  <Tile key={name} title={name} total={stats.total} compliant={stats.compliant} expiring={stats.expiring} expired={stats.expired} color="orange" onClick={onTileClick ? () => onTileClick(name) : undefined} />
                 ))}
               </div>
             </div>
