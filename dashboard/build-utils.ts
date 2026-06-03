@@ -6,12 +6,15 @@ export function getGitVersion(): string {
   // BUILD_SHA is injected by CI with the actual branch/commit SHA from github.sha /
   // github.event.pull_request.head.sha.  Without it, actions/checkout on a PR event
   // gives us the merge-commit SHA, which differs from what GitHub's UI shows.
-  const injected = process.env.BUILD_SHA;
-  if (injected) return injected.substring(0, 7);
+  const injectedSha = process.env.BUILD_SHA;
   try {
-    return execSync('git describe --tags --always', { encoding: 'utf8' }).trim();
+    const sha = injectedSha
+      ? injectedSha.substring(0, 7)
+      : execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+    const date = execSync('git log -1 --format=%cd --date=format:%Y%m%d', { encoding: 'utf8' }).trim();
+    return `${date}-${sha}`;
   } catch {
-    return 'unknown';
+    return injectedSha ? injectedSha.substring(0, 7) : 'unknown';
   }
 }
 

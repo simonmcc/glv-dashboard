@@ -35,32 +35,24 @@ steps:
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'backend-deploy'
     waitFor: ['backend-push']
-    entrypoint: gcloud
+    entrypoint: bash
     args:
-      - 'run'
-      - 'deploy'
-      - 'glv-backend'
-      - '--image'
-      - 'gcr.io/$PROJECT_ID/glv-backend:$BUILD_ID'
-      - '--region'
-      - '${_REGION}'
-      - '--platform'
-      - 'managed'
-      - '--allow-unauthenticated'
-      - '--memory'
-      - '1Gi'
-      - '--cpu'
-      - '1'
-      - '--timeout'
-      - '300'
-      - '--concurrency'
-      - '10'
-      - '--min-instances'
-      - '0'
-      - '--max-instances'
-      - '3'
-      - '--set-env-vars'
-      - 'CORS_ORIGIN=${_DASHBOARD_URL},OTEL_ENABLED=true,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,APP_VERSION=$COMMIT_SHA'
+      - '-c'
+      - |
+        DATE=$(git log -1 --format=%cd --date=format:%Y%m%d)
+        APP_VERSION="${DATE}-$(echo $COMMIT_SHA | cut -c1-7)"
+        gcloud run deploy glv-backend \
+          --image gcr.io/$PROJECT_ID/glv-backend:$BUILD_ID \
+          --region ${_REGION} \
+          --platform managed \
+          --allow-unauthenticated \
+          --memory 1Gi \
+          --cpu 1 \
+          --timeout 300 \
+          --concurrency 10 \
+          --min-instances 0 \
+          --max-instances 3 \
+          --set-env-vars "CORS_ORIGIN=${_DASHBOARD_URL},OTEL_ENABLED=true,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,APP_VERSION=${APP_VERSION}"
 
 substitutions:
   _REGION: europe-west1
