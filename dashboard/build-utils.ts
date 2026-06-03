@@ -11,7 +11,10 @@ export function getGitVersion(): string {
     const sha = injectedSha
       ? injectedSha.substring(0, 7)
       : execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
-    const date = execSync('git log -1 --format=%cd --date=format:%Y%m%d', { encoding: 'utf8' }).trim();
+    // Use the injected SHA as the ref so the date matches the displayed commit,
+    // not the merge-commit that actions/checkout leaves as HEAD on PR builds.
+    const ref = injectedSha ?? 'HEAD';
+    const date = execSync(`TZ=UTC git log -1 --format=%cd --date=format:%Y%m%d ${ref}`, { encoding: 'utf8' }).trim();
     return `${date}-${sha}`;
   } catch {
     return injectedSha ? injectedSha.substring(0, 7) : 'unknown';

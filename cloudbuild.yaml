@@ -39,7 +39,7 @@ steps:
     args:
       - '-c'
       - |
-        DATE=$(git log -1 --format=%cd --date=format:%Y%m%d)
+        DATE=$(TZ=UTC git log -1 --format=%cd --date=format:%Y%m%d 2>/dev/null || date -u +%Y%m%d)
         APP_VERSION="${DATE}-$(echo $COMMIT_SHA | cut -c1-7)"
         gcloud run deploy glv-backend \
           --image gcr.io/$PROJECT_ID/glv-backend:$BUILD_ID \

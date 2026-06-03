@@ -1,3 +1,9 @@
+/**
+ * Displays the frontend git version (linked to GitHub), the backend proxy
+ * version fetched from GET /version, an inline reload button when a PWA
+ * service-worker update is waiting, and a manual "Check for updates" trigger.
+ */
+
 import { useState, useEffect } from 'react';
 
 interface VersionFooterProps {
