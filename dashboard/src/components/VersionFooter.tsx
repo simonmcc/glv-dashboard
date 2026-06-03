@@ -1,9 +1,7 @@
 /**
- * Version Footer Component
- *
  * Displays the frontend git version (linked to GitHub), the backend proxy
- * version fetched from GET /version, and an inline reload button when a
- * PWA service-worker update is waiting.
+ * version fetched from GET /version, an inline reload button when a PWA
+ * service-worker update is waiting, and a manual "Check for updates" trigger.
  */
 
 import { useState, useEffect } from 'react';
@@ -16,8 +14,12 @@ interface VersionFooterProps {
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
 
+// Truncate legacy full-SHA versions; pass through YYYYMMDD-sha7 and 'dev' as-is
+const shortVersion = (v: string) => (v.length > 16 ? v.substring(0, 7) : v);
+
 export function VersionFooter({ updateAvailable, onUpdate }: VersionFooterProps) {
   const [backendVersion, setBackendVersion] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     if (MOCK_MODE) return;
@@ -27,7 +29,16 @@ export function VersionFooter({ updateAvailable, onUpdate }: VersionFooterProps)
       .catch(() => {});
   }, []);
 
-  const shortVersion = (v: string) => (v.length > 12 ? v.substring(0, 7) : v);
+  const checkForUpdates = async () => {
+    if (!('serviceWorker' in navigator)) return;
+    setChecking(true);
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) await reg.update();
+    } finally {
+      setChecking(false);
+    }
+  };
 
   return (
     <p className="text-center text-xs text-gray-500">
@@ -42,16 +53,22 @@ export function VersionFooter({ updateAvailable, onUpdate }: VersionFooterProps)
       {backendVersion && (
         <span> · proxy@{shortVersion(backendVersion)}</span>
       )}
-      {updateAvailable && onUpdate && (
-        <>
-          {' · '}
-          <button
-            onClick={onUpdate}
-            className="underline text-purple-600 hover:text-purple-800"
-          >
-            Update available — reload
-          </button>
-        </>
+      {' · '}
+      {updateAvailable && onUpdate ? (
+        <button
+          onClick={onUpdate}
+          className="underline text-purple-600 hover:text-purple-800"
+        >
+          Update available — reload
+        </button>
+      ) : (
+        <button
+          onClick={checkForUpdates}
+          disabled={checking}
+          className="underline hover:text-gray-700 disabled:no-underline disabled:cursor-default"
+        >
+          {checking ? 'Checking…' : 'Check for updates'}
+        </button>
       )}
     </p>
   );

@@ -37,6 +37,9 @@ jobs:
       - name: Configure Docker for GCR
         run: gcloud auth configure-docker
 
+      - name: Compute app version
+        run: echo "APP_VERSION=$(TZ=UTC git log -1 --format=%cd --date=format:%Y%m%d)-${GITHUB_SHA:0:7}" >> $GITHUB_ENV
+
       - name: Build and push Docker image
         working-directory: backend
         run: |
@@ -58,4 +61,4 @@ jobs:
             --concurrency 10 \
             --min-instances 0 \
             --max-instances 3 \
-            --set-env-vars "CORS_ORIGIN=https://glv-dashboard.web.app,OTEL_ENABLED=true,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,APP_VERSION=${{ github.sha }}"
+            --set-env-vars "CORS_ORIGIN=https://glv-dashboard.web.app,OTEL_ENABLED=true,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,APP_VERSION=${APP_VERSION}"
