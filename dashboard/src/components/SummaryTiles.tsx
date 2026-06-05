@@ -78,7 +78,7 @@ function Tile({ title, total, compliant, expiring, expired, color, onClick }: Ti
 
       <div className="flex items-end justify-between mb-3">
         <div className="text-3xl font-bold text-gray-900">{compliancePercent}%</div>
-        <div className="text-sm text-gray-500">compliant</div>
+        <div className="hidden sm:block text-sm text-gray-500">compliant</div>
       </div>
 
       <div className="space-y-1 text-sm">
@@ -87,7 +87,7 @@ function Tile({ title, total, compliant, expiring, expired, color, onClick }: Ti
           <span className="font-medium">{total}</span>
         </div>
         <div className="flex justify-between">
-          <span className={colors.compliant}>Valid/In Progress</span>
+          <span className={colors.compliant}>Valid<span className="hidden sm:inline">/In Progress</span></span>
           <span className={`font-medium ${colors.compliant}`}>{compliant}</span>
         </div>
         {expiring > 0 && (
@@ -97,7 +97,7 @@ function Tile({ title, total, compliant, expiring, expired, color, onClick }: Ti
           </div>
         )}
         <div className="flex justify-between">
-          <span className={colors.expired}>Expired/Not Started</span>
+          <span className={colors.expired}>Expired<span className="hidden sm:inline">/Not Started</span></span>
           <span className={`font-medium ${colors.expired}`}>{expired}</span>
         </div>
       </div>
