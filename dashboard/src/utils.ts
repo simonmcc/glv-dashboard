@@ -25,13 +25,13 @@ export const GROWING_ROOTS_MODULES: ReadonlyArray<{
   { name: "Safety", deadlineDays: 30, synthesizeIfMissing: true },
   {
     name: "Who We Are and What We Do",
-    deadlineDays: null,
+    deadlineDays: 180,
     synthesizeIfMissing: true,
   },
-  { name: "Creating Inclusion", deadlineDays: null, synthesizeIfMissing: true },
+  { name: "Creating Inclusion", deadlineDays: 180, synthesizeIfMissing: true },
   {
     name: "Data Protection in Scouts",
-    deadlineDays: null,
+    deadlineDays: 180,
     synthesizeIfMissing: true,
   },
   { name: "Delivering a Great Programme", deadlineDays: null },
