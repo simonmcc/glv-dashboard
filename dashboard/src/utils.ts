@@ -23,10 +23,22 @@ export const GROWING_ROOTS_MODULES: ReadonlyArray<{
 }> = [
   { name: "Safeguarding", deadlineDays: 30, synthesizeIfMissing: true },
   { name: "Safety", deadlineDays: 30, synthesizeIfMissing: true },
-  { name: "Who We Are and What We Do", deadlineDays: null },
-  { name: "Creating Inclusion", deadlineDays: null },
-  { name: "Data Protection in Scouts", deadlineDays: null },
-  { name: "Delivering a Great Programme", deadlineDays: null },
+  {
+    name: "Who We Are and What We Do",
+    deadlineDays: null,
+    synthesizeIfMissing: true,
+  },
+  { name: "Creating Inclusion", deadlineDays: null, synthesizeIfMissing: true },
+  {
+    name: "Data Protection in Scouts",
+    deadlineDays: null,
+    synthesizeIfMissing: true,
+  },
+  {
+    name: "Delivering a Great Programme",
+    deadlineDays: null,
+    synthesizeIfMissing: true,
+  },
   { name: "Leading Scout Volunteers", deadlineDays: null },
   { name: "Being a Trustee", deadlineDays: null },
 ];

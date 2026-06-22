@@ -145,8 +145,9 @@ describe("transformLearningResults", () => {
     const result = transformLearningResults(members, fixedNow);
 
     // Safety Training (with expiry) + synthesised First Response
-    // + synthesised Safety + synthesised Safeguarding (both missing from modules) = 4 records
-    expect(result).toHaveLength(4);
+    // + synthesised Safety + Safeguarding + Who We Are + Creating Inclusion
+    // + Data Protection + Delivering a Great Programme = 8 records
+    expect(result).toHaveLength(8);
     const safetyRecord = result.find(
       (r) => r["Learning"] === "Safety Training",
     );
@@ -232,10 +233,10 @@ describe("transformLearningResults", () => {
 
     const result = transformLearningResults(members, fixedNow);
 
-    // Alice: Module A + Module B + synthesised First Response + synthesised Safety + synthesised Safeguarding = 5
-    // Bob:   Module C + synthesised First Response + synthesised Safety + synthesised Safeguarding = 4
-    expect(result.filter((r) => r["First name"] === "Alice")).toHaveLength(5);
-    expect(result.filter((r) => r["First name"] === "Bob")).toHaveLength(4);
+    // Alice: Module A + Module B + synthesised (First Response + Safety + Safeguarding + Who We Are + Creating Inclusion + Data Protection + Delivering a Great Programme) = 9
+    // Bob:   Module C + synthesised (same 7) = 8
+    expect(result.filter((r) => r["First name"] === "Alice")).toHaveLength(9);
+    expect(result.filter((r) => r["First name"] === "Bob")).toHaveLength(8);
     expect(result.find((r) => r["Learning"] === "Module B")?.Status).toBe(
       "Expired",
     );
@@ -499,7 +500,7 @@ describe("transformLearningResults – First Response", () => {
     );
   });
 
-  it("should synthesise Safety and Safeguarding as Not Started when modules is empty", () => {
+  it("should synthesise all mandatory modules as Not Started when modules is empty", () => {
     const members: MemberLearningResult[] = [
       {
         membershipNumber: "777",
@@ -512,20 +513,31 @@ describe("transformLearningResults – First Response", () => {
 
     const result = transformLearningResults(members, fixedNow);
 
-    // First Response + Safeguarding + Safety all synthesised as Not Started = 3 records
-    expect(result).toHaveLength(3);
-    const fr = result.find((r) => r["Learning"] === FIRST_RESPONSE_MODULE);
-    expect(fr).toBeDefined();
-    expect(fr!["Status"]).toBe("Not Started");
+    // First Response + Safeguarding + Safety + Who We Are + Creating Inclusion
+    // + Data Protection + Delivering a Great Programme = 7 synthesised records
+    // (Leading Scout Volunteers and Being a Trustee are role-specific — not synthesised)
+    expect(result).toHaveLength(7);
 
-    const safeguarding = result.find((r) => r["Learning"] === "Safeguarding");
-    expect(safeguarding).toBeDefined();
-    expect(safeguarding!["Status"]).toBe("Not Started");
-    expect(safeguarding!["Expiry date"]).toBeNull();
+    for (const learning of [
+      FIRST_RESPONSE_MODULE,
+      "Safeguarding",
+      "Safety",
+      "Who We Are and What We Do",
+      "Creating Inclusion",
+      "Data Protection in Scouts",
+      "Delivering a Great Programme",
+    ]) {
+      const record = result.find((r) => r["Learning"] === learning);
+      expect(record, `expected ${learning} to be synthesised`).toBeDefined();
+      expect(record!["Status"]).toBe("Not Started");
+      expect(record!["Expiry date"]).toBeNull();
+    }
 
-    const safety = result.find((r) => r["Learning"] === "Safety");
-    expect(safety).toBeDefined();
-    expect(safety!["Status"]).toBe("Not Started");
-    expect(safety!["Expiry date"]).toBeNull();
+    expect(
+      result.find((r) => r["Learning"] === "Leading Scout Volunteers"),
+    ).toBeUndefined();
+    expect(
+      result.find((r) => r["Learning"] === "Being a Trustee"),
+    ).toBeUndefined();
   });
 });
