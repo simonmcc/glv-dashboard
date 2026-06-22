@@ -120,9 +120,9 @@ export function isExpiringSoon(
  * - First Response is always included regardless of expiry (required within 1 year of joining).
  *   If a member has no First Response module at all, a "Not Started" record is synthesised.
  * - Growing Roots modules present in the member's LMS data are included regardless of expiry.
- *   Modules flagged synthesizeIfMissing (Safeguarding, Safety) also get a "Not Started" record
- *   synthesised when absent — GetLmsDetailsAsync can return an empty module list for members
- *   the portal considers non-compliant, which would otherwise leave them invisible in tiles.
+ *   Modules with synthesizeIfMissing=true also get a "Not Started" record synthesised when absent
+ *   — GetLmsDetailsAsync can return an empty module list for members the portal considers
+ *   non-compliant, which would otherwise leave them invisible in tiles.
  * - All other modules without an expiry date are excluded.
  *
  * @param memberStartDates Optional map of membership number → earliest role start date,
@@ -184,7 +184,7 @@ export function transformLearningResults(
       });
     }
 
-    // Synthesise "Not Started" for mandatory modules (Safeguarding, Safety) absent from
+    // Synthesise "Not Started" for modules with synthesizeIfMissing=true absent from
     // GetLmsDetailsAsync data — the LMS endpoint can return an empty array for members the
     // portal flags as non-compliant, which would otherwise hide them from compliance tiles.
     for (const grModule of GROWING_ROOTS_MODULES) {

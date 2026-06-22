@@ -184,7 +184,7 @@ describe("transformLearningResults", () => {
 
     // 'One-time Training' is excluded (no expiry, not First Response or Growing Roots)
     // 'Renewable Training' is included (has expiry)
-    // 'First Response' is synthesised; Growing Roots modules are NOT synthesised
+    // 'First Response' is synthesised; mandatory GR modules (synthesizeIfMissing=true) are also synthesised
     expect(
       result.find((r) => r["Learning"] === "Renewable Training"),
     ).toBeDefined();
@@ -408,10 +408,10 @@ describe("transformLearningResults – First Response", () => {
     // GetLmsDetailsAsync return an empty module array, making them invisible in compliance tiles.
     const members: MemberLearningResult[] = [
       {
-        membershipNumber: "2000069651",
+        membershipNumber: "2000000001",
         contactId: "some-contact-id",
-        firstName: "Callum",
-        lastName: "McConville",
+        firstName: "Test",
+        lastName: "User",
         modules: [],
       },
     ];
@@ -419,17 +419,17 @@ describe("transformLearningResults – First Response", () => {
     const result = transformLearningResults(members, fixedNow);
 
     expect(result.find((r) => r["Learning"] === "Safeguarding")).toMatchObject({
-      "Membership number": "2000069651",
+      "Membership number": "2000000001",
       Status: "Not Started",
     });
     expect(result.find((r) => r["Learning"] === "Safety")).toMatchObject({
-      "Membership number": "2000069651",
+      "Membership number": "2000000001",
       Status: "Not Started",
     });
     expect(
       result.find((r) => r["Learning"] === FIRST_RESPONSE_MODULE),
     ).toMatchObject({
-      "Membership number": "2000069651",
+      "Membership number": "2000000001",
       Status: "Not Started",
     });
   });
