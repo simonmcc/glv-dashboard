@@ -335,9 +335,9 @@ export function MemberDashboard({
                                 <span className="text-sm text-gray-800">
                                   {grModule.name}
                                 </span>
-                                {grModule.deadlineDays !== null && (
+                                {grModule.deadlineDays === 30 && (
                                   <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium">
-                                    {grModule.deadlineDays}d deadline
+                                    30d deadline
                                   </span>
                                 )}
                               </div>
