@@ -146,8 +146,8 @@ describe("transformLearningResults", () => {
 
     // Safety Training (with expiry) + synthesised First Response
     // + synthesised Safety + Safeguarding + Who We Are + Creating Inclusion
-    // + Data Protection + Delivering a Great Programme = 8 records
-    expect(result).toHaveLength(8);
+    // + Data Protection in Scouts = 7 records
+    expect(result).toHaveLength(7);
     const safetyRecord = result.find(
       (r) => r["Learning"] === "Safety Training",
     );
@@ -233,10 +233,10 @@ describe("transformLearningResults", () => {
 
     const result = transformLearningResults(members, fixedNow);
 
-    // Alice: Module A + Module B + synthesised (First Response + Safety + Safeguarding + Who We Are + Creating Inclusion + Data Protection + Delivering a Great Programme) = 9
-    // Bob:   Module C + synthesised (same 7) = 8
-    expect(result.filter((r) => r["First name"] === "Alice")).toHaveLength(9);
-    expect(result.filter((r) => r["First name"] === "Bob")).toHaveLength(8);
+    // Alice: Module A + Module B + synthesised (First Response + Safety + Safeguarding + Who We Are + Creating Inclusion + Data Protection in Scouts) = 8
+    // Bob:   Module C + synthesised (same 6) = 7
+    expect(result.filter((r) => r["First name"] === "Alice")).toHaveLength(8);
+    expect(result.filter((r) => r["First name"] === "Bob")).toHaveLength(7);
     expect(result.find((r) => r["Learning"] === "Module B")?.Status).toBe(
       "Expired",
     );
@@ -514,9 +514,9 @@ describe("transformLearningResults – First Response", () => {
     const result = transformLearningResults(members, fixedNow);
 
     // First Response + Safeguarding + Safety + Who We Are + Creating Inclusion
-    // + Data Protection + Delivering a Great Programme = 7 synthesised records
-    // (Leading Scout Volunteers and Being a Trustee are role-specific — not synthesised)
-    expect(result).toHaveLength(7);
+    // + Data Protection in Scouts = 6 synthesised records
+    // (Leading Scout Volunteers, Being a Trustee, Delivering a Great Programme are role-specific — not synthesised)
+    expect(result).toHaveLength(6);
 
     for (const learning of [
       FIRST_RESPONSE_MODULE,
@@ -525,7 +525,6 @@ describe("transformLearningResults – First Response", () => {
       "Who We Are and What We Do",
       "Creating Inclusion",
       "Data Protection in Scouts",
-      "Delivering a Great Programme",
     ]) {
       const record = result.find((r) => r["Learning"] === learning);
       expect(record, `expected ${learning} to be synthesised`).toBeDefined();
@@ -538,6 +537,9 @@ describe("transformLearningResults – First Response", () => {
     ).toBeUndefined();
     expect(
       result.find((r) => r["Learning"] === "Being a Trustee"),
+    ).toBeUndefined();
+    expect(
+      result.find((r) => r["Learning"] === "Delivering a Great Programme"),
     ).toBeUndefined();
   });
 });

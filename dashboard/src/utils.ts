@@ -34,11 +34,7 @@ export const GROWING_ROOTS_MODULES: ReadonlyArray<{
     deadlineDays: null,
     synthesizeIfMissing: true,
   },
-  {
-    name: "Delivering a Great Programme",
-    deadlineDays: null,
-    synthesizeIfMissing: true,
-  },
+  { name: "Delivering a Great Programme", deadlineDays: null },
   { name: "Leading Scout Volunteers", deadlineDays: null },
   { name: "Being a Trustee", deadlineDays: null },
 ];
