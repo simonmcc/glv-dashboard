@@ -113,6 +113,35 @@ export function isExpiringSoon(
 }
 
 /**
+ * Compute deadline information for a Growing Roots module based on the member's role start date
+ * and the module's configured deadline window.
+ */
+export function getDeadlineInfo(
+  startDateStr: string | null | undefined,
+  deadlineDays: number | null,
+): { deadlineDate: Date | null; daysRemaining: number | null; isOverdue: boolean } {
+  if (!startDateStr || deadlineDays === null) {
+    return { deadlineDate: null, daysRemaining: null, isOverdue: false };
+  }
+  try {
+    const startDate = new Date(startDateStr);
+    if (isNaN(startDate.getTime())) {
+      return { deadlineDate: null, daysRemaining: null, isOverdue: false };
+    }
+    const deadlineDate = new Date(
+      startDate.getTime() + deadlineDays * 24 * 60 * 60 * 1000,
+    );
+    const now = new Date();
+    const daysRemaining = Math.ceil(
+      (deadlineDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000),
+    );
+    return { deadlineDate, daysRemaining, isOverdue: deadlineDate < now };
+  } catch {
+    return { deadlineDate: null, daysRemaining: null, isOverdue: false };
+  }
+}
+
+/**
  * Transform MemberLearningResult[] from GetLmsDetailsAsync into LearningRecord[] format.
  *
  * Inclusion rules:
@@ -168,6 +197,14 @@ export function transformLearningResults(
           memberStartDates.get(member.membershipNumber) ?? null;
       }
 
+      // Attach start date to Growing Roots modules with a deadline so the
+      // MemberDashboard can compute when the module must be completed
+      const grConfig = GROWING_ROOTS_MODULES.find((m) => m.name === module.title);
+      if (grConfig && grConfig.deadlineDays !== null && memberStartDates) {
+        record["Start date"] =
+          memberStartDates.get(member.membershipNumber) ?? null;
+      }
+
       records.push(record);
     }
 
@@ -191,14 +228,19 @@ export function transformLearningResults(
       if (!grModule.synthesizeIfMissing) continue;
       const hasModule = member.modules.some((m) => m.title === grModule.name);
       if (!hasModule) {
-        records.push({
+        const synthRecord: LearningRecord = {
           "First name": member.firstName,
           "Last name": member.lastName,
           "Membership number": member.membershipNumber,
           Learning: grModule.name,
           Status: "Not Started",
           "Expiry date": null,
-        });
+        };
+        if (grModule.deadlineDays !== null && memberStartDates) {
+          synthRecord["Start date"] =
+            memberStartDates.get(member.membershipNumber) ?? null;
+        }
+        records.push(synthRecord);
       }
     }
   }

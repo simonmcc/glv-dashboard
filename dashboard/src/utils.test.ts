@@ -4,6 +4,7 @@ import {
   computeModuleStatus,
   transformLearningResults,
   isExpiringSoon,
+  getDeadlineInfo,
   FIRST_RESPONSE_MODULE,
 } from "./utils";
 import type { MemberLearningResult } from "./types";
@@ -541,5 +542,143 @@ describe("transformLearningResults – First Response", () => {
     expect(
       result.find((r) => r["Learning"] === "Delivering a Great Programme"),
     ).toBeUndefined();
+  });
+});
+
+describe("getDeadlineInfo", () => {
+  it("returns null result when startDateStr is null", () => {
+    expect(getDeadlineInfo(null, 30)).toEqual({
+      deadlineDate: null,
+      daysRemaining: null,
+      isOverdue: false,
+    });
+  });
+
+  it("returns null result when startDateStr is undefined", () => {
+    expect(getDeadlineInfo(undefined, 30)).toEqual({
+      deadlineDate: null,
+      daysRemaining: null,
+      isOverdue: false,
+    });
+  });
+
+  it("returns null result when deadlineDays is null", () => {
+    expect(getDeadlineInfo("2025-01-01", null)).toEqual({
+      deadlineDate: null,
+      daysRemaining: null,
+      isOverdue: false,
+    });
+  });
+
+  it("returns null result for an invalid date string", () => {
+    expect(getDeadlineInfo("not-a-date", 30)).toEqual({
+      deadlineDate: null,
+      daysRemaining: null,
+      isOverdue: false,
+    });
+  });
+
+  it("computes deadline as startDate + deadlineDays", () => {
+    const { deadlineDate } = getDeadlineInfo("2025-01-01", 30);
+    expect(deadlineDate).toBeInstanceOf(Date);
+    // 2025-01-01 + 30 days = 2025-01-31
+    expect(deadlineDate!.getFullYear()).toBe(2025);
+    expect(deadlineDate!.getMonth()).toBe(0); // January
+    expect(deadlineDate!.getDate()).toBe(31);
+  });
+
+  it("returns isOverdue true when deadline is in the past", () => {
+    // Start 60 days ago, 30d deadline → deadline was 30 days ago
+    const startDate = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    const { isOverdue, daysRemaining } = getDeadlineInfo(startDate, 30);
+    expect(isOverdue).toBe(true);
+    expect(daysRemaining).toBeLessThan(0);
+  });
+
+  it("returns isOverdue false with positive daysRemaining when deadline is in the future", () => {
+    // Start 10 days ago, 30d deadline → ~20 days remaining
+    const startDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    const { isOverdue, daysRemaining } = getDeadlineInfo(startDate, 30);
+    expect(isOverdue).toBe(false);
+    expect(daysRemaining).toBeGreaterThan(0);
+    expect(daysRemaining).toBeLessThanOrEqual(21);
+  });
+
+  it("handles 180-day deadline correctly", () => {
+    // Start 90 days ago, 180d deadline → ~90 days remaining
+    const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { isOverdue, daysRemaining } = getDeadlineInfo(startDate, 180);
+    expect(isOverdue).toBe(false);
+    expect(daysRemaining).toBeGreaterThan(80);
+    expect(daysRemaining).toBeLessThanOrEqual(91);
+  });
+});
+
+describe("transformLearningResults – Growing Roots start dates", () => {
+  const fixedNow = new Date("2025-01-15T12:00:00Z");
+
+  it("attaches start date to a GR module with deadlineDays when memberStartDates is provided", () => {
+    const members: MemberLearningResult[] = [
+      {
+        membershipNumber: "111",
+        contactId: "c1",
+        firstName: "Alice",
+        lastName: "Smith",
+        modules: [{ title: "Safeguarding", expiryDate: null, currentLevel: "Not started" }],
+      },
+    ];
+    const startDates = new Map([["111", "2024-12-01"]]);
+    const result = transformLearningResults(members, fixedNow, startDates);
+    const record = result.find((r) => r.Learning === "Safeguarding");
+    expect(record!["Start date"]).toBe("2024-12-01");
+  });
+
+  it("does not attach start date to a GR module with deadlineDays: null", () => {
+    const members: MemberLearningResult[] = [
+      {
+        membershipNumber: "222",
+        contactId: "c2",
+        firstName: "Bob",
+        lastName: "Jones",
+        modules: [{ title: "Delivering a Great Programme", expiryDate: null, currentLevel: "Not started" }],
+      },
+    ];
+    const startDates = new Map([["222", "2024-12-01"]]);
+    const result = transformLearningResults(members, fixedNow, startDates);
+    const record = result.find((r) => r.Learning === "Delivering a Great Programme");
+    expect(record!["Start date"]).toBeUndefined();
+  });
+
+  it("attaches start date to a synthesised Not Started GR record with a deadline", () => {
+    // Member has no Safeguarding module → gets synthesised as Not Started
+    const members: MemberLearningResult[] = [
+      {
+        membershipNumber: "333",
+        contactId: "c3",
+        firstName: "Carol",
+        lastName: "Davis",
+        modules: [],
+      },
+    ];
+    const startDates = new Map([["333", "2024-11-01"]]);
+    const result = transformLearningResults(members, fixedNow, startDates);
+    const record = result.find((r) => r.Learning === "Safeguarding");
+    expect(record!.Status).toBe("Not Started");
+    expect(record!["Start date"]).toBe("2024-11-01");
+  });
+
+  it("does not attach start date when memberStartDates is absent", () => {
+    const members: MemberLearningResult[] = [
+      {
+        membershipNumber: "444",
+        contactId: "c4",
+        firstName: "Dave",
+        lastName: "Lee",
+        modules: [{ title: "Safety", expiryDate: null, currentLevel: "Not started" }],
+      },
+    ];
+    const result = transformLearningResults(members, fixedNow);
+    const record = result.find((r) => r.Learning === "Safety");
+    expect(record!["Start date"]).toBeUndefined();
   });
 });

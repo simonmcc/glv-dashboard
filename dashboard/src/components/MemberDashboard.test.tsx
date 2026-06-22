@@ -456,22 +456,97 @@ describe("MemberDashboard – Growing Roots expansion", () => {
     expect(notStartedCount).toBeGreaterThanOrEqual(4);
   });
 
-  it("shows deadline badge for Safeguarding and Safety sub-rows", () => {
+  it("shows 30d deadline fallback badge only for incomplete 30d modules without a start date", () => {
     render(<MemberDashboard {...grProps} />);
     const section = screen.getByTestId("joining-journey-section");
-    // Both Safeguarding and Safety have deadlineDays=30 → "30d deadline" badge
-    const badgeCount = (section.textContent?.match(/30d deadline/g) ?? [])
-      .length;
-    expect(badgeCount).toBe(2);
+    // Safeguarding is Valid → no badge; Safety is Not Started with no start date → "30d deadline" fallback
+    const badgeCount = (section.textContent?.match(/30d deadline/g) ?? []).length;
+    expect(badgeCount).toBe(1);
   });
 
-  it("does not show deadline badge for other GR modules", () => {
+  it("shows 180d deadline fallback badge for incomplete 180d modules without a start date", () => {
     render(<MemberDashboard {...grProps} />);
     const section = screen.getByTestId("joining-journey-section");
-    // Only 2 deadline badges (Safeguarding + Safety)
-    const badgeCount = (section.textContent?.match(/30d deadline/g) ?? [])
-      .length;
-    expect(badgeCount).toBe(2);
+    // Creating Inclusion is In-Progress with no start date → "180d deadline" fallback
+    expect(section.textContent).toContain("180d deadline");
+  });
+
+  it("does not show any deadline badge for Valid modules", () => {
+    render(<MemberDashboard {...grProps} />);
+    const section = screen.getByTestId("joining-journey-section");
+    // Safeguarding is Valid → no deadline badge at all
+    // (count all deadline-related text — "30d deadline" appears once for Safety only)
+    expect(section.textContent).not.toContain("Overdue");
+    expect(section.textContent).not.toMatch(/Due in \d+d/);
+  });
+
+  it("shows 'Due in Nd' badge when start date makes deadline imminent", () => {
+    const startDate = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0];
+    const propsWithStartDate = {
+      ...grProps,
+      learningRecords: [
+        {
+          "First name": "Alice",
+          "Last name": "Johnson",
+          "Membership number": "12345678",
+          Learning: "Safety",
+          Status: "Not Started" as const,
+          "Expiry date": null,
+          "Start date": startDate,
+        },
+      ] as import("../types").LearningRecord[],
+    };
+    render(<MemberDashboard {...propsWithStartDate} />);
+    const section = screen.getByTestId("joining-journey-section");
+    expect(section.textContent).toMatch(/Due in \d+d/);
+  });
+
+  it("shows 'Overdue' badge when the deadline has passed", () => {
+    const startDate = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0];
+    const propsOverdue = {
+      ...grProps,
+      learningRecords: [
+        {
+          "First name": "Alice",
+          "Last name": "Johnson",
+          "Membership number": "12345678",
+          Learning: "Safety",
+          Status: "Not Started" as const,
+          "Expiry date": null,
+          "Start date": startDate,
+        },
+      ] as import("../types").LearningRecord[],
+    };
+    render(<MemberDashboard {...propsOverdue} />);
+    const section = screen.getByTestId("joining-journey-section");
+    expect(section.textContent).toContain("Overdue");
+  });
+
+  it("shows 'Due by [date]' badge when deadline is more than 30 days away", () => {
+    const startDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0];
+    const propsDueBy = {
+      ...grProps,
+      learningRecords: [
+        {
+          "First name": "Alice",
+          "Last name": "Johnson",
+          "Membership number": "12345678",
+          Learning: "Who We Are and What We Do",
+          Status: "Not Started" as const,
+          "Expiry date": null,
+          "Start date": startDate,
+        },
+      ] as import("../types").LearningRecord[],
+    };
+    render(<MemberDashboard {...propsDueBy} />);
+    const section = screen.getByTestId("joining-journey-section");
+    expect(section.textContent).toMatch(/Due by/);
   });
 
   it("does not expand Growing Roots when Growing Roots is not in the joining journey", () => {

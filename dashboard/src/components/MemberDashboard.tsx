@@ -17,7 +17,7 @@ import type {
   AwardRecord,
 } from "../types";
 import type { LoadState } from "./LazySection";
-import { GROWING_ROOTS_MODULES } from "../utils";
+import { GROWING_ROOTS_MODULES, getDeadlineInfo } from "../utils";
 
 interface MemberDashboardProps {
   membershipNumber: string;
@@ -322,6 +322,52 @@ export function MemberDashboard({
                           const colorClass =
                             learningStatusColors[status] ||
                             "bg-white border-gray-200";
+
+                          const isIncomplete =
+                            status === "Not Started" || status === "In-Progress";
+                          const deadlineInfo =
+                            grModule.deadlineDays !== null && isIncomplete
+                              ? getDeadlineInfo(
+                                  moduleRecord?.["Start date"],
+                                  grModule.deadlineDays,
+                                )
+                              : null;
+
+                          let deadlineBadge = null as React.ReactNode;
+                          if (grModule.deadlineDays !== null && isIncomplete) {
+                            if (!deadlineInfo || deadlineInfo.deadlineDate === null) {
+                              deadlineBadge = (
+                                <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium">
+                                  {grModule.deadlineDays}d deadline
+                                </span>
+                              );
+                            } else if (deadlineInfo.isOverdue) {
+                              deadlineBadge = (
+                                <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded font-medium">
+                                  Overdue
+                                </span>
+                              );
+                            } else if (
+                              deadlineInfo.daysRemaining !== null &&
+                              deadlineInfo.daysRemaining <= 30
+                            ) {
+                              deadlineBadge = (
+                                <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium">
+                                  Due in {deadlineInfo.daysRemaining}d
+                                </span>
+                              );
+                            } else {
+                              deadlineBadge = (
+                                <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">
+                                  Due by{" "}
+                                  {formatDate(
+                                    deadlineInfo.deadlineDate.toISOString(),
+                                  )}
+                                </span>
+                              );
+                            }
+                          }
+
                           return (
                             <div
                               key={grModule.name}
@@ -335,21 +381,23 @@ export function MemberDashboard({
                                 <span className="text-sm text-gray-800">
                                   {grModule.name}
                                 </span>
-                                {grModule.deadlineDays === 30 && (
-                                  <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium">
-                                    30d deadline
-                                  </span>
-                                )}
+                                {deadlineBadge}
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60">
                                   {status}
                                 </span>
-                                {moduleRecord?.["Expiry date"] && (
+                                {moduleRecord?.["Expiry date"] ? (
                                   <span className="text-xs text-gray-600 tabular-nums">
                                     {formatDate(moduleRecord["Expiry date"])}
                                   </span>
-                                )}
+                                ) : isIncomplete && deadlineInfo?.deadlineDate ? (
+                                  <span className="text-xs text-gray-500 tabular-nums">
+                                    {formatDate(
+                                      deadlineInfo.deadlineDate.toISOString(),
+                                    )}
+                                  </span>
+                                ) : null}
                               </div>
                             </div>
                           );
