@@ -170,42 +170,15 @@ describe("MemberDashboard", () => {
     expect(onBack).toHaveBeenCalledOnce();
   });
 
-  it("shows all Growing Roots modules in the growing-roots-section", () => {
+  it("only shows learning records for the selected member", () => {
     render(<MemberDashboard {...defaultProps} />);
 
-    const section = screen.getByTestId("growing-roots-section");
-    expect(section.textContent).toContain("Safeguarding");
+    const section = screen.getByTestId("learning-section");
+    // Alice's learning items should be visible
     expect(section.textContent).toContain("Safety");
-    expect(section.textContent).toContain("Who We Are and What We Do");
-    expect(section.textContent).toContain("Creating Inclusion");
-    expect(section.textContent).toContain("Data Protection in Scouts");
-    expect(section.textContent).toContain("Delivering a Great Programme");
-    expect(section.textContent).toContain("Leading Scout Volunteers");
-    expect(section.textContent).toContain("Being a Trustee");
-    // Bob's Expired status should not bleed in
+    expect(section.textContent).toContain("Safeguarding");
+    // Bob's records should not appear in the learning section
     expect(section.textContent).not.toContain("Expired");
-  });
-
-  it("shows status from learningRecords in growing-roots-section", () => {
-    render(<MemberDashboard {...defaultProps} />);
-
-    const section = screen.getByTestId("growing-roots-section");
-    // Alice: Safety=Valid, Safeguarding=Expiring
-    expect(section.textContent).toContain("Valid");
-    expect(section.textContent).toContain("Expiring");
-  });
-
-  it("shows deadline badges for Safety (30d) and core GR modules (180d)", () => {
-    render(<MemberDashboard {...defaultProps} />);
-
-    const section = screen.getByTestId("growing-roots-section");
-    const thirtyDayBadges = (section.textContent?.match(/30d deadline/g) ?? [])
-      .length;
-    expect(thirtyDayBadges).toBe(2); // Safeguarding + Safety
-    const oneEightyDayBadges = (
-      section.textContent?.match(/180d deadline/g) ?? []
-    ).length;
-    expect(oneEightyDayBadges).toBe(3); // Who We Are + Creating Inclusion + Data Protection
   });
 
   it("only shows joining journey records for the selected member", () => {
@@ -322,13 +295,20 @@ describe("MemberDashboard", () => {
     expect(screen.getByText(/Loading awards data/)).toBeInTheDocument();
   });
 
-  it("displays expiry dates in growing-roots-section", () => {
+  it("displays expiry dates for learning records", () => {
     render(<MemberDashboard {...defaultProps} />);
 
-    const section = screen.getByTestId("growing-roots-section");
-    // Alice's Safety expiry (1 Dec 2025) and Safeguarding expiry (15 Mar 2025)
-    expect(section.textContent).toContain("1 Dec 2025");
-    expect(section.textContent).toContain("15 Mar 2025");
+    // Alice's Safety expiry date should be formatted
+    expect(screen.getByText("1 Dec 2025")).toBeInTheDocument();
+    expect(screen.getByText("15 Mar 2025")).toBeInTheDocument();
+  });
+
+  it("displays status badges with correct text", () => {
+    render(<MemberDashboard {...defaultProps} />);
+
+    const section = screen.getByTestId("learning-section");
+    expect(section.textContent).toContain("Valid");
+    expect(section.textContent).toContain("Expiring");
   });
 
   it("shows 30d deadline badge for Criminal Record Check and Internal Check journey items", () => {

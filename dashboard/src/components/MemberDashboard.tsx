@@ -17,7 +17,7 @@ import type {
   AwardRecord,
 } from "../types";
 import type { LoadState } from "./LazySection";
-import { GROWING_ROOTS_MODULES, isGrowingRootsModule } from "../utils";
+import { GROWING_ROOTS_MODULES } from "../utils";
 
 interface MemberDashboardProps {
   membershipNumber: string;
@@ -183,9 +183,6 @@ export function MemberDashboard({
   const memberLearning = learningRecords.filter(
     (r) => r["Membership number"] === membershipNumber,
   );
-  const memberOtherLearning = memberLearning.filter(
-    (r) => !isGrowingRootsModule(r.Learning),
-  );
   const memberJoiningJourney = joiningJourneyRecords.filter(
     (r) => r["Membership number"] === membershipNumber,
   );
@@ -224,66 +221,21 @@ export function MemberDashboard({
 
       {/* Main Content */}
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
-        {/* Growing Roots */}
+        {/* Learning Records */}
         <section
           className="bg-white rounded-lg shadow-sm border"
-          data-testid="growing-roots-section"
+          data-testid="learning-section"
         >
           <h2 className="text-base font-semibold text-gray-900 px-4 py-3 border-b bg-gray-50 rounded-t-lg">
-            Growing Roots
+            Learning Records
           </h2>
           <div className="divide-y divide-gray-100">
-            {GROWING_ROOTS_MODULES.map((grModule) => {
-              const record = memberLearning.find(
-                (lr) => lr.Learning === grModule.name,
-              );
-              const status = record?.Status ?? "Not Started";
-              const colorClass =
-                learningStatusColors[status] || "bg-white border-gray-200";
-              return (
-                <div
-                  key={grModule.name}
-                  className={`flex items-center justify-between px-4 py-3 ${colorClass}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <StatusDot
-                      status={status}
-                      colorMap={learningStatusColors}
-                    />
-                    <span className="font-medium text-sm">{grModule.name}</span>
-                    {grModule.deadlineDays !== null && (
-                      <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium">
-                        {grModule.deadlineDays}d deadline
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60">
-                      {status}
-                    </span>
-                    {record?.["Expiry date"] && (
-                      <span className="text-xs text-gray-600 tabular-nums">
-                        {formatDate(record["Expiry date"])}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Other Learning (First Response and any expiring non-GR modules) */}
-        {memberOtherLearning.length > 0 && (
-          <section
-            className="bg-white rounded-lg shadow-sm border"
-            data-testid="learning-section"
-          >
-            <h2 className="text-base font-semibold text-gray-900 px-4 py-3 border-b bg-gray-50 rounded-t-lg">
-              Other Learning
-            </h2>
-            <div className="divide-y divide-gray-100">
-              {memberOtherLearning.map((r, i) => (
+            {memberLearning.length === 0 ? (
+              <div className="px-4">
+                <EmptySection label="learning records" />
+              </div>
+            ) : (
+              memberLearning.map((r, i) => (
                 <div
                   key={`${r.Learning}-${i}`}
                   className={`flex items-center justify-between px-4 py-3 ${learningStatusColors[r.Status] || "bg-white border-gray-200"}`}
@@ -310,10 +262,10 @@ export function MemberDashboard({
                     ) : null}
                   </div>
                 </div>
-              ))}
-            </div>
-          </section>
-        )}
+              ))
+            )}
+          </div>
+        </section>
 
         {/* Joining Journey */}
         <section
