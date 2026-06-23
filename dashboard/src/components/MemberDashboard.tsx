@@ -183,6 +183,16 @@ export function MemberDashboard({
   const memberLearning = learningRecords.filter(
     (r) => r["Membership number"] === membershipNumber,
   );
+
+  const growingRootsNames = new Set(GROWING_ROOTS_MODULES.map((m) => m.name));
+  const otherLearning = memberLearning.filter(
+    (r) => !growingRootsNames.has(r.Learning),
+  );
+  const growingRootsLearning = GROWING_ROOTS_MODULES.flatMap((m) => {
+    const record = memberLearning.find((r) => r.Learning === m.name);
+    return record ? [{ module: m, record }] : [];
+  });
+
   const memberJoiningJourney = joiningJourneyRecords.filter(
     (r) => r["Membership number"] === membershipNumber,
   );
@@ -235,34 +245,147 @@ export function MemberDashboard({
                 <EmptySection label="learning records" />
               </div>
             ) : (
-              memberLearning.map((r, i) => (
-                <div
-                  key={`${r.Learning}-${i}`}
-                  className={`flex items-center justify-between px-4 py-3 ${learningStatusColors[r.Status] || "bg-white border-gray-200"}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <StatusDot
-                      status={r.Status}
-                      colorMap={learningStatusColors}
-                    />
-                    <span className="font-medium text-sm">{r.Learning}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60">
-                      {r.Status}
-                    </span>
-                    {r["Expiry date"] ? (
-                      <span className="text-xs text-gray-600 tabular-nums">
-                        {formatDate(r["Expiry date"])}
+              <>
+                {otherLearning.map((r, i) => (
+                  <div
+                    key={`${r.Learning}-${i}`}
+                    className={`flex items-center justify-between px-4 py-3 ${learningStatusColors[r.Status] || "bg-white border-gray-200"}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <StatusDot
+                        status={r.Status}
+                        colorMap={learningStatusColors}
+                      />
+                      <span className="font-medium text-sm">{r.Learning}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60">
+                        {r.Status}
                       </span>
-                    ) : r["Start date"] ? (
-                      <span className="text-xs text-gray-400 italic">
-                        Started {formatDate(r["Start date"])}
-                      </span>
-                    ) : null}
+                      {r["Expiry date"] ? (
+                        <span className="text-xs text-gray-600 tabular-nums">
+                          {formatDate(r["Expiry date"])}
+                        </span>
+                      ) : r["Start date"] ? (
+                        <span className="text-xs text-gray-400 italic">
+                          Started {formatDate(r["Start date"])}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+                {growingRootsLearning.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Growing Roots
+                      </span>
+                    </div>
+                    {growingRootsLearning.map(
+                      ({ module: grModule, record: r }) => {
+                        const isIncomplete =
+                          r.Status === "Not Started" ||
+                          r.Status === "In-Progress";
+                        const deadlineInfo =
+                          grModule.deadlineDays !== null && isIncomplete
+                            ? getDeadlineInfo(
+                                r["Start date"],
+                                grModule.deadlineDays,
+                              )
+                            : null;
+
+                        let rowColor =
+                          learningStatusColors[r.Status] ||
+                          "bg-white border-gray-200";
+                        if (deadlineInfo?.deadlineDate) {
+                          if (deadlineInfo.isOverdue) {
+                            rowColor = "bg-red-100 text-red-800 border-red-200";
+                          } else if (
+                            deadlineInfo.daysRemaining !== null &&
+                            deadlineInfo.daysRemaining <= 30
+                          ) {
+                            rowColor =
+                              "bg-orange-100 text-orange-800 border-orange-200";
+                          } else if (
+                            deadlineInfo.daysRemaining !== null &&
+                            deadlineInfo.daysRemaining <= 90
+                          ) {
+                            rowColor =
+                              "bg-amber-100 text-amber-800 border-amber-200";
+                          }
+                        }
+
+                        let dueDateNode: React.ReactNode = null;
+                        if (r["Expiry date"]) {
+                          dueDateNode = (
+                            <span className="text-xs text-gray-600 tabular-nums">
+                              {formatDate(r["Expiry date"])}
+                            </span>
+                          );
+                        } else if (deadlineInfo?.deadlineDate) {
+                          const dateStr = formatDate(
+                            deadlineInfo.deadlineDate.toISOString(),
+                          );
+                          if (deadlineInfo.isOverdue) {
+                            dueDateNode = (
+                              <span className="text-xs text-red-700 tabular-nums font-medium">
+                                Due {dateStr}
+                              </span>
+                            );
+                          } else if (
+                            deadlineInfo.daysRemaining !== null &&
+                            deadlineInfo.daysRemaining <= 30
+                          ) {
+                            dueDateNode = (
+                              <span className="text-xs text-orange-700 tabular-nums font-medium">
+                                Due {dateStr}
+                              </span>
+                            );
+                          } else {
+                            dueDateNode = (
+                              <span className="text-xs text-amber-700 tabular-nums">
+                                Due {dateStr}
+                              </span>
+                            );
+                          }
+                        } else if (
+                          grModule.deadlineDays !== null &&
+                          isIncomplete
+                        ) {
+                          dueDateNode = (
+                            <span className="text-xs text-orange-600 tabular-nums">
+                              {grModule.deadlineDays}d deadline
+                            </span>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={r.Learning}
+                            className={`flex items-center justify-between px-4 py-3 ${rowColor}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <StatusDot
+                                status={r.Status}
+                                colorMap={learningStatusColors}
+                              />
+                              <span className="font-medium text-sm">
+                                {r.Learning}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60">
+                                {r.Status}
+                              </span>
+                              {dueDateNode}
+                            </div>
+                          </div>
+                        );
+                      },
+                    )}
+                  </>
+                )}
+              </>
             )}
           </div>
         </section>
@@ -324,7 +447,8 @@ export function MemberDashboard({
                             "bg-white border-gray-200";
 
                           const isIncomplete =
-                            status === "Not Started" || status === "In-Progress";
+                            status === "Not Started" ||
+                            status === "In-Progress";
                           const deadlineInfo =
                             grModule.deadlineDays !== null && isIncomplete
                               ? getDeadlineInfo(
@@ -335,7 +459,10 @@ export function MemberDashboard({
 
                           let deadlineBadge = null as React.ReactNode;
                           if (grModule.deadlineDays !== null && isIncomplete) {
-                            if (!deadlineInfo || deadlineInfo.deadlineDate === null) {
+                            if (
+                              !deadlineInfo ||
+                              deadlineInfo.deadlineDate === null
+                            ) {
                               deadlineBadge = (
                                 <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium">
                                   {grModule.deadlineDays}d deadline
@@ -391,7 +518,8 @@ export function MemberDashboard({
                                   <span className="text-xs text-gray-600 tabular-nums">
                                     {formatDate(moduleRecord["Expiry date"])}
                                   </span>
-                                ) : isIncomplete && deadlineInfo?.deadlineDate ? (
+                                ) : isIncomplete &&
+                                  deadlineInfo?.deadlineDate ? (
                                   <span className="text-xs text-gray-500 tabular-nums">
                                     {formatDate(
                                       deadlineInfo.deadlineDate.toISOString(),
