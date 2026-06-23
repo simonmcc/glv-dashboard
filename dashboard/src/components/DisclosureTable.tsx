@@ -4,9 +4,9 @@
  * Displays disclosure/PVG compliance records in a sortable, filterable table.
  */
 
-import { useState, useMemo } from 'react';
-import type { DisclosureRecord, DisclosureSummary } from '../types';
-import { isExpiringSoon } from '../utils';
+import { useState, useMemo } from "react";
+import type { DisclosureRecord, DisclosureSummary } from "../types";
+import { isExpiringSoon } from "../utils";
 
 interface DisclosureTableProps {
   records: DisclosureRecord[];
@@ -16,30 +16,36 @@ interface DisclosureTableProps {
   searchTerm?: string;
 }
 
-type SortField = 'name' | 'status' | 'expiry' | 'authority';
-type SortOrder = 'asc' | 'desc';
+type SortField = "name" | "status" | "expiry" | "authority";
+type SortOrder = "asc" | "desc";
 
 const statusColors: Record<string, string> = {
-  'Disclosure Valid': 'bg-green-100 text-green-800',
-  'Valid': 'bg-green-100 text-green-800',
-  'Disclosure Expired': 'bg-red-100 text-red-800',
-  'Expired': 'bg-red-100 text-red-800',
-  'Renewal Due': 'bg-orange-100 text-orange-800',
-  'Pending': 'bg-blue-100 text-blue-800',
-  'In Progress': 'bg-blue-100 text-blue-800',
+  "Disclosure Valid": "bg-green-100 text-green-800",
+  Valid: "bg-green-100 text-green-800",
+  "Disclosure Expired": "bg-red-100 text-red-800",
+  Expired: "bg-red-100 text-red-800",
+  "Renewal Due": "bg-orange-100 text-orange-800",
+  Pending: "bg-blue-100 text-blue-800",
+  "In Progress": "bg-blue-100 text-blue-800",
 };
 
-export function DisclosureTable({ records, summary, isLoading, onMemberSelect, searchTerm = '' }: DisclosureTableProps) {
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+export function DisclosureTable({
+  records,
+  summary,
+  isLoading,
+  onMemberSelect,
+  searchTerm = "",
+}: DisclosureTableProps) {
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterExpired, setFilterExpired] = useState(false);
   const [filterExpiringSoon, setFilterExpiringSoon] = useState(false);
 
   // Get unique statuses for filter
   const statuses = useMemo(() => {
-    const unique = new Set(records.map(r => r['Disclosure status']));
-    return ['all', ...Array.from(unique).sort()];
+    const unique = new Set(records.map((r) => r["Disclosure status"]));
+    return ["all", ...Array.from(unique).sort()];
   }, [records]);
 
   // Filter and sort records
@@ -49,11 +55,12 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
 
     // Apply expired filter
     if (filterExpired) {
-      result = result.filter(r => {
-        if (r['Disclosure status']?.toLowerCase().includes('expired')) return true;
-        if (r['Days since expiry'] && r['Days since expiry'] > 0) return true;
-        if (r['Disclosure expiry date']) {
-          return new Date(r['Disclosure expiry date']) < now;
+      result = result.filter((r) => {
+        if (r["Disclosure status"]?.toLowerCase().includes("expired"))
+          return true;
+        if (r["Days since expiry"] && r["Days since expiry"] > 0) return true;
+        if (r["Disclosure expiry date"]) {
+          return new Date(r["Disclosure expiry date"]) < now;
         }
         return false;
       });
@@ -61,21 +68,24 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
 
     // Apply expiring soon filter (90d threshold)
     if (filterExpiringSoon) {
-      result = result.filter(r => isExpiringSoon(r['Disclosure expiry date']));
+      result = result.filter((r) =>
+        isExpiringSoon(r["Disclosure expiry date"]),
+      );
     }
 
     // Apply status filter
-    if (filterStatus !== 'all') {
-      result = result.filter(r => r['Disclosure status'] === filterStatus);
+    if (filterStatus !== "all") {
+      result = result.filter((r) => r["Disclosure status"] === filterStatus);
     }
 
     // Apply search
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(r =>
-        r['First name'].toLowerCase().includes(term) ||
-        r['Last name'].toLowerCase().includes(term) ||
-        r['Membership number'].includes(term)
+      result = result.filter(
+        (r) =>
+          r["First name"].toLowerCase().includes(term) ||
+          r["Last name"].toLowerCase().includes(term) ||
+          r["Membership number"].includes(term),
       );
     }
 
@@ -83,42 +93,55 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
     result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case 'name':
-          comparison = `${a['Last name']} ${a['First name']}`.localeCompare(
-            `${b['Last name']} ${b['First name']}`
+        case "name":
+          comparison = `${a["Last name"]} ${a["First name"]}`.localeCompare(
+            `${b["Last name"]} ${b["First name"]}`,
           );
           break;
-        case 'status':
-          comparison = (a['Disclosure status'] || '').localeCompare(b['Disclosure status'] || '');
+        case "status":
+          comparison = (a["Disclosure status"] || "").localeCompare(
+            b["Disclosure status"] || "",
+          );
           break;
-        case 'expiry': {
-          const dateA = a['Disclosure expiry date'] || '';
-          const dateB = b['Disclosure expiry date'] || '';
+        case "expiry": {
+          const dateA = a["Disclosure expiry date"] || "";
+          const dateB = b["Disclosure expiry date"] || "";
           comparison = dateA.localeCompare(dateB);
           break;
         }
-        case 'authority':
-          comparison = (a['Disclosure authority'] || '').localeCompare(b['Disclosure authority'] || '');
+        case "authority":
+          comparison = (a["Disclosure authority"] || "").localeCompare(
+            b["Disclosure authority"] || "",
+          );
           break;
       }
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return sortOrder === "asc" ? comparison : -comparison;
     });
 
     return result;
-  }, [records, filterStatus, searchTerm, sortField, sortOrder, filterExpired, filterExpiringSoon]);
+  }, [
+    records,
+    filterStatus,
+    searchTerm,
+    sortField,
+    sortOrder,
+    filterExpired,
+    filterExpiringSoon,
+  ]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortOrder('asc');
+      setSortOrder("asc");
     }
   };
 
   const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
-    return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
+    if (sortField !== field)
+      return <span className="text-gray-300 ml-1">↕</span>;
+    return <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>;
   };
 
   if (isLoading) {
@@ -129,7 +152,10 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
         </div>
         <div className="p-4 space-y-3">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-100 rounded animate-pulse"></div>
+            <div
+              key={i}
+              className="h-12 bg-gray-100 rounded animate-pulse"
+            ></div>
           ))}
         </div>
       </div>
@@ -149,7 +175,8 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
           </div>
           {summary.expiringSoon > 0 && (
             <div className="text-sm text-orange-600">
-              <span className="font-medium">{summary.expiringSoon}</span> expiring soon
+              <span className="font-medium">{summary.expiringSoon}</span>{" "}
+              expiring soon
             </div>
           )}
           {summary.expired > 0 && (
@@ -168,20 +195,23 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
             onChange={(e) => setFilterStatus(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-purple-500"
           >
-            {statuses.map(status => (
+            {statuses.map((status) => (
               <option key={status} value={status}>
-                {status === 'all' ? 'All Statuses' : status}
+                {status === "all" ? "All Statuses" : status}
               </option>
             ))}
           </select>
 
           {summary && summary.expired > 0 && (
             <button
-              onClick={() => { setFilterExpired(!filterExpired); setFilterExpiringSoon(false); }}
+              onClick={() => {
+                setFilterExpired(!filterExpired);
+                setFilterExpiringSoon(false);
+              }}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 filterExpired
-                  ? 'bg-red-600 text-white'
-                  : 'bg-red-100 text-red-800 hover:bg-red-200'
+                  ? "bg-red-600 text-white"
+                  : "bg-red-100 text-red-800 hover:bg-red-200"
               }`}
             >
               Expired ({summary.expired})
@@ -190,11 +220,14 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
 
           {summary && summary.expiringSoon > 0 && (
             <button
-              onClick={() => { setFilterExpiringSoon(!filterExpiringSoon); setFilterExpired(false); }}
+              onClick={() => {
+                setFilterExpiringSoon(!filterExpiringSoon);
+                setFilterExpired(false);
+              }}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 filterExpiringSoon
-                  ? 'bg-orange-600 text-white'
-                  : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                  ? "bg-orange-600 text-white"
+                  : "bg-orange-100 text-orange-800 hover:bg-orange-200"
               }`}
             >
               Expiring Soon ({summary.expiringSoon})
@@ -214,7 +247,7 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
             <tr>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('name')}
+                onClick={() => handleSort("name")}
               >
                 Name {renderSortIcon("name")}
               </th>
@@ -223,19 +256,19 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('authority')}
+                onClick={() => handleSort("authority")}
               >
                 Authority {renderSortIcon("authority")}
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('status')}
+                onClick={() => handleSort("status")}
               >
                 Status {renderSortIcon("status")}
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('expiry')}
+                onClick={() => handleSort("expiry")}
               >
                 Expiry Date {renderSortIcon("expiry")}
               </th>
@@ -253,52 +286,81 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
               </tr>
             ) : (
               filteredRecords.map((record, index) => {
-                const disclosureExpiringSoon = isExpiringSoon(record['Disclosure expiry date']);
+                const disclosureExpiringSoon = isExpiringSoon(
+                  record["Disclosure expiry date"],
+                );
                 return (
-                <tr key={`${record['Membership number']}-${index}`} className={disclosureExpiringSoon ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-gray-50'}>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">
-                      {onMemberSelect ? (
-                        <button
-                          onClick={() => onMemberSelect(record['Membership number'], `${record['First name']} ${record['Last name']}`)}
-                          className="text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
-                        >
-                          {record['First name']} {record['Last name']}
-                        </button>
-                      ) : (
-                        `${record['First name']} ${record['Last name']}`
-                      )}
-                    </div>
-                    {record['Communication email'] && (
-                      <div className="text-sm text-gray-500">{record['Communication email']}</div>
-                    )}
-                  </td>
-                  <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
-                    {record['Membership number']}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-900">
-                    {record['Disclosure authority']}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[record['Disclosure status']] || 'bg-gray-100 text-gray-800'}`}>
-                      {record['Disclosure status']}
-                    </span>
-                    {record['Days since expiry'] && record['Days since expiry'] > 0 && (
-                      <div className="text-xs text-red-600 mt-1">
-                        {record['Days since expiry']} days overdue
+                  <tr
+                    key={`${record["Membership number"]}-${index}`}
+                    className={
+                      disclosureExpiringSoon
+                        ? "bg-amber-50 hover:bg-amber-100"
+                        : "hover:bg-gray-50"
+                    }
+                  >
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">
+                        {onMemberSelect ? (
+                          <button
+                            onClick={() =>
+                              onMemberSelect(
+                                record["Membership number"],
+                                `${record["First name"]} ${record["Last name"]}`,
+                              )
+                            }
+                            className="text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
+                          >
+                            {record["First name"]} {record["Last name"]}
+                          </button>
+                        ) : (
+                          `${record["First name"]} ${record["Last name"]}`
+                        )}
                       </div>
-                    )}
-                  </td>
-                  <td className={`px-4 py-3 text-sm font-medium ${disclosureExpiringSoon ? 'text-amber-700' : 'text-gray-600'}`}>
-                    {formatDate(record['Disclosure expiry date'])}
-                    {disclosureExpiringSoon && <span className="ml-1 text-xs text-amber-600">(expiring soon)</span>}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {record['Unit name'] && <div>{record['Unit name']}</div>}
-                    {record['Role name'] && <div className="text-gray-400">{record['Role name']}</div>}
-                    {!record['Unit name'] && !record['Role name'] && '-'}
-                  </td>
-                </tr>
+                      {record["Communication email"] && (
+                        <div className="text-sm text-gray-500">
+                          {record["Communication email"]}
+                        </div>
+                      )}
+                    </td>
+                    <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
+                      {record["Membership number"]}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      {record["Disclosure authority"]}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[record["Disclosure status"]] || "bg-gray-100 text-gray-800"}`}
+                      >
+                        {record["Disclosure status"]}
+                      </span>
+                      {record["Days since expiry"] &&
+                        record["Days since expiry"] > 0 && (
+                          <div className="text-xs text-red-600 mt-1">
+                            {record["Days since expiry"]} days overdue
+                          </div>
+                        )}
+                    </td>
+                    <td
+                      className={`px-4 py-3 text-sm font-medium ${disclosureExpiringSoon ? "text-amber-700" : "text-gray-600"}`}
+                    >
+                      {formatDate(record["Disclosure expiry date"])}
+                      {disclosureExpiringSoon && (
+                        <span className="ml-1 text-xs text-amber-600">
+                          (expiring soon)
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {record["Unit name"] && <div>{record["Unit name"]}</div>}
+                      {record["Role name"] && (
+                        <div className="text-gray-400">
+                          {record["Role name"]}
+                        </div>
+                      )}
+                      {!record["Unit name"] && !record["Role name"] && "-"}
+                    </td>
+                  </tr>
                 );
               })
             )}
@@ -310,13 +372,13 @@ export function DisclosureTable({ records, summary, isLoading, onMemberSelect, s
 }
 
 function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-';
+  if (!dateStr) return "-";
   try {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
+    return date.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
     });
   } catch {
     return dateStr;

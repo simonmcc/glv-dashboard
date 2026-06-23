@@ -4,8 +4,8 @@
  * Displays awards and recognitions.
  */
 
-import { useState, useMemo } from 'react';
-import type { AwardRecord } from '../types';
+import { useState, useMemo } from "react";
+import type { AwardRecord } from "../types";
 
 interface AwardsTableProps {
   records: AwardRecord[];
@@ -14,51 +14,59 @@ interface AwardsTableProps {
   searchTerm?: string;
 }
 
-type SortField = 'name' | 'accreditation' | 'role';
-type SortOrder = 'asc' | 'desc';
+type SortField = "name" | "accreditation" | "role";
+type SortOrder = "asc" | "desc";
 
-export function AwardsTable({ records, isLoading, onMemberSelect, searchTerm = '' }: AwardsTableProps) {
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
-  const [filterAccreditation, setFilterAccreditation] = useState<string>('all');
+export function AwardsTable({
+  records,
+  isLoading,
+  onMemberSelect,
+  searchTerm = "",
+}: AwardsTableProps) {
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [filterAccreditation, setFilterAccreditation] = useState<string>("all");
 
   const accreditations = useMemo(() => {
-    const unique = new Set(records.map(r => r['Accreditation']));
-    return ['all', ...Array.from(unique).filter(Boolean).sort()];
+    const unique = new Set(records.map((r) => r["Accreditation"]));
+    return ["all", ...Array.from(unique).filter(Boolean).sort()];
   }, [records]);
 
   const filteredRecords = useMemo(() => {
     let result = [...records];
 
-    if (filterAccreditation !== 'all') {
-      result = result.filter(r => r['Accreditation'] === filterAccreditation);
+    if (filterAccreditation !== "all") {
+      result = result.filter((r) => r["Accreditation"] === filterAccreditation);
     }
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(r =>
-        r['First name'].toLowerCase().includes(term) ||
-        r['Last name'].toLowerCase().includes(term) ||
-        r['Membership number'].includes(term) ||
-        (r['Accreditation'] || '').toLowerCase().includes(term)
+      result = result.filter(
+        (r) =>
+          r["First name"].toLowerCase().includes(term) ||
+          r["Last name"].toLowerCase().includes(term) ||
+          r["Membership number"].includes(term) ||
+          (r["Accreditation"] || "").toLowerCase().includes(term),
       );
     }
 
     result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case 'name':
-          comparison = `${a['Last name']} ${a['First name']}`.localeCompare(
-            `${b['Last name']} ${b['First name']}`
+        case "name":
+          comparison = `${a["Last name"]} ${a["First name"]}`.localeCompare(
+            `${b["Last name"]} ${b["First name"]}`,
           );
           break;
-        case 'accreditation':
-          comparison = (a['Accreditation'] || '').localeCompare(b['Accreditation'] || '');
+        case "accreditation":
+          comparison = (a["Accreditation"] || "").localeCompare(
+            b["Accreditation"] || "",
+          );
           break;
-        case 'role':
-          comparison = (a['Role'] || '').localeCompare(b['Role'] || '');
+        case "role":
+          comparison = (a["Role"] || "").localeCompare(b["Role"] || "");
           break;
       }
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return sortOrder === "asc" ? comparison : -comparison;
     });
 
     return result;
@@ -66,16 +74,17 @@ export function AwardsTable({ records, isLoading, onMemberSelect, searchTerm = '
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortOrder('asc');
+      setSortOrder("asc");
     }
   };
 
   const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
-    return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
+    if (sortField !== field)
+      return <span className="text-gray-300 ml-1">↕</span>;
+    return <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>;
   };
 
   if (isLoading) {
@@ -83,7 +92,10 @@ export function AwardsTable({ records, isLoading, onMemberSelect, searchTerm = '
       <div className="bg-white rounded-lg shadow-sm border">
         <div className="p-4 space-y-3">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-100 rounded animate-pulse"></div>
+            <div
+              key={i}
+              className="h-12 bg-gray-100 rounded animate-pulse"
+            ></div>
           ))}
         </div>
       </div>
@@ -107,9 +119,9 @@ export function AwardsTable({ records, isLoading, onMemberSelect, searchTerm = '
             onChange={(e) => setFilterAccreditation(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-purple-500"
           >
-            {accreditations.map(acc => (
+            {accreditations.map((acc) => (
               <option key={acc} value={acc}>
-                {acc === 'all' ? 'All Accreditations' : acc}
+                {acc === "all" ? "All Accreditations" : acc}
               </option>
             ))}
           </select>
@@ -125,7 +137,7 @@ export function AwardsTable({ records, isLoading, onMemberSelect, searchTerm = '
             <tr>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('name')}
+                onClick={() => handleSort("name")}
               >
                 Name {renderSortIcon("name")}
               </th>
@@ -134,13 +146,13 @@ export function AwardsTable({ records, isLoading, onMemberSelect, searchTerm = '
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('accreditation')}
+                onClick={() => handleSort("accreditation")}
               >
                 Accreditation {renderSortIcon("accreditation")}
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('role')}
+                onClick={() => handleSort("role")}
               >
                 Role {renderSortIcon("role")}
               </th>
@@ -158,39 +170,51 @@ export function AwardsTable({ records, isLoading, onMemberSelect, searchTerm = '
               </tr>
             ) : (
               filteredRecords.map((record, index) => (
-                <tr key={`${record['Membership number']}-${record['Accreditation']}-${index}`} className="hover:bg-gray-50">
+                <tr
+                  key={`${record["Membership number"]}-${record["Accreditation"]}-${index}`}
+                  className="hover:bg-gray-50"
+                >
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
                       {onMemberSelect ? (
                         <button
-                          onClick={() => onMemberSelect(record['Membership number'], `${record['First name']} ${record['Last name']}`)}
+                          onClick={() =>
+                            onMemberSelect(
+                              record["Membership number"],
+                              `${record["First name"]} ${record["Last name"]}`,
+                            )
+                          }
                           className="text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
                         >
-                          {record['First name']} {record['Last name']}
+                          {record["First name"]} {record["Last name"]}
                         </button>
                       ) : (
-                        `${record['First name']} ${record['Last name']}`
+                        `${record["First name"]} ${record["Last name"]}`
                       )}
                     </div>
-                    {record['Communication email'] && (
-                      <div className="text-sm text-gray-500">{record['Communication email']}</div>
+                    {record["Communication email"] && (
+                      <div className="text-sm text-gray-500">
+                        {record["Communication email"]}
+                      </div>
                     )}
                   </td>
                   <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
-                    {record['Membership number']}
+                    {record["Membership number"]}
                   </td>
                   <td className="px-4 py-3">
                     <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
-                      {record['Accreditation']}
+                      {record["Accreditation"]}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
-                    {record['Role']}
+                    {record["Role"]}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {record['Team'] && <div>{record['Team']}</div>}
-                    {record['Unit name'] && <div className="text-gray-400">{record['Unit name']}</div>}
-                    {!record['Team'] && !record['Unit name'] && '-'}
+                    {record["Team"] && <div>{record["Team"]}</div>}
+                    {record["Unit name"] && (
+                      <div className="text-gray-400">{record["Unit name"]}</div>
+                    )}
+                    {!record["Team"] && !record["Unit name"] && "-"}
                   </td>
                 </tr>
               ))

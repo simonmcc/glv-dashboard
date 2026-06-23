@@ -17,7 +17,7 @@ import type {
   ComplianceSummary,
   DisclosureSummary,
   MemberLearningResult,
-} from './types';
+} from "./types";
 
 import {
   mockLearningRecords,
@@ -28,17 +28,17 @@ import {
   mockPermitRecords,
   mockAwardRecords,
   mockMemberLearningResults,
-} from './mock-data';
+} from "./mock-data";
 
 // Simulate network delay for realistic feel
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const randomDelay = () => delay(3000 + Math.floor(Math.random() * 2000));
 
 export class MockScoutsApiClient {
-  private contactId = 'mock-contact-id';
+  private contactId = "mock-contact-id";
 
   async initialize(): Promise<void> {
-    console.log('[MockAPI] Initializing mock client');
+    console.log("[MockAPI] Initializing mock client");
     await delay(100);
   }
 
@@ -47,7 +47,7 @@ export class MockScoutsApiClient {
   }
 
   async getAllLearningCompliance(): Promise<ApiResponse<LearningRecord>> {
-    console.log('[MockAPI] Returning mock learning compliance data');
+    console.log("[MockAPI] Returning mock learning compliance data");
     await randomDelay();
     return {
       data: mockLearningRecords,
@@ -58,7 +58,7 @@ export class MockScoutsApiClient {
   }
 
   async getDisclosureCompliance(): Promise<ApiResponse<DisclosureRecord>> {
-    console.log('[MockAPI] Returning mock disclosure compliance data');
+    console.log("[MockAPI] Returning mock disclosure compliance data");
     await randomDelay();
     return {
       data: mockDisclosureRecords,
@@ -69,7 +69,7 @@ export class MockScoutsApiClient {
   }
 
   async getJoiningJourney(): Promise<ApiResponse<JoiningJourneyRecord>> {
-    console.log('[MockAPI] Returning mock joining journey data');
+    console.log("[MockAPI] Returning mock joining journey data");
     await randomDelay();
     return {
       data: mockJoiningJourneyRecords,
@@ -80,7 +80,7 @@ export class MockScoutsApiClient {
   }
 
   async getSuspensions(): Promise<ApiResponse<SuspensionRecord>> {
-    console.log('[MockAPI] Returning mock suspensions data');
+    console.log("[MockAPI] Returning mock suspensions data");
     await randomDelay();
     return {
       data: mockSuspensionRecords,
@@ -91,7 +91,7 @@ export class MockScoutsApiClient {
   }
 
   async getTeamReviews(): Promise<ApiResponse<TeamReviewRecord>> {
-    console.log('[MockAPI] Returning mock team reviews data');
+    console.log("[MockAPI] Returning mock team reviews data");
     await randomDelay();
     return {
       data: mockTeamReviewRecords,
@@ -102,7 +102,7 @@ export class MockScoutsApiClient {
   }
 
   async getPermits(): Promise<ApiResponse<PermitRecord>> {
-    console.log('[MockAPI] Returning mock permits data');
+    console.log("[MockAPI] Returning mock permits data");
     await randomDelay();
     return {
       data: mockPermitRecords,
@@ -113,7 +113,7 @@ export class MockScoutsApiClient {
   }
 
   async getAwards(): Promise<ApiResponse<AwardRecord>> {
-    console.log('[MockAPI] Returning mock awards data');
+    console.log("[MockAPI] Returning mock awards data");
     await randomDelay();
     return {
       data: mockAwardRecords,
@@ -123,50 +123,70 @@ export class MockScoutsApiClient {
     };
   }
 
-  async testTable(tableName: string): Promise<{ success: boolean; data?: unknown[]; error?: string }> {
+  async testTable(
+    tableName: string,
+  ): Promise<{ success: boolean; data?: unknown[]; error?: string }> {
     console.log(`[MockAPI] testTable called for: ${tableName}`);
     await delay(100);
     return { success: true, data: [] };
   }
 
   async checkLearningByMembershipNumbers(
-    membershipNumbers: string[]
-  ): Promise<{ success: boolean; members?: MemberLearningResult[]; error?: string }> {
-    console.log(`[MockAPI] checkLearningByMembershipNumbers called for ${membershipNumbers.length} members`);
+    membershipNumbers: string[],
+  ): Promise<{
+    success: boolean;
+    members?: MemberLearningResult[];
+    error?: string;
+  }> {
+    console.log(
+      `[MockAPI] checkLearningByMembershipNumbers called for ${membershipNumbers.length} members`,
+    );
     await randomDelay();
-    const members = mockMemberLearningResults.filter(m =>
-      membershipNumbers.includes(m.membershipNumber)
+    const members = mockMemberLearningResults.filter((m) =>
+      membershipNumbers.includes(m.membershipNumber),
     );
     return { success: true, members };
   }
 
   computeComplianceSummary(records: LearningRecord[]): ComplianceSummary {
-    const byLearningType: ComplianceSummary['byLearningType'] = {};
-    const byStatus: ComplianceSummary['byStatus'] = {};
+    const byLearningType: ComplianceSummary["byLearningType"] = {};
+    const byStatus: ComplianceSummary["byStatus"] = {};
 
     for (const record of records) {
-      const learning = record.Learning || 'Unknown';
-      const status = record.Status || 'Unknown';
+      const learning = record.Learning || "Unknown";
+      const status = record.Status || "Unknown";
 
       if (!byLearningType[learning]) {
-        byLearningType[learning] = { total: 0, compliant: 0, expiring: 0, expired: 0 };
+        byLearningType[learning] = {
+          total: 0,
+          compliant: 0,
+          expiring: 0,
+          expired: 0,
+        };
       }
 
       byLearningType[learning].total++;
 
-      if (status === 'Valid' || status === 'In-Progress') {
+      if (status === "Valid" || status === "In-Progress") {
         byLearningType[learning].compliant++;
-      } else if (status === 'Expiring' || status === 'Renewal Due' || status === 'Expiring Soon') {
+      } else if (
+        status === "Expiring" ||
+        status === "Renewal Due" ||
+        status === "Expiring Soon"
+      ) {
         byLearningType[learning].expiring++;
-      } else if (status === 'Expired' || status === 'Not Started') {
+      } else if (status === "Expired" || status === "Not Started") {
         byLearningType[learning].expired++;
       }
 
       byStatus[status] = (byStatus[status] || 0) + 1;
     }
 
-    const expiringSoon = records.filter(r =>
-      r.Status === 'Expiring' || r.Status === 'Renewal Due' || r.Status === 'Expiring Soon'
+    const expiringSoon = records.filter(
+      (r) =>
+        r.Status === "Expiring" ||
+        r.Status === "Renewal Due" ||
+        r.Status === "Expiring Soon",
     ).length;
 
     return {
@@ -184,16 +204,18 @@ export class MockScoutsApiClient {
     let valid = 0;
 
     const now = new Date();
-    const ninetyDaysFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const ninetyDaysFromNow = new Date(
+      now.getTime() + 90 * 24 * 60 * 60 * 1000,
+    );
 
     for (const record of records) {
-      const status = record['Disclosure status'] || 'Unknown';
+      const status = record["Disclosure status"] || "Unknown";
       byStatus[status] = (byStatus[status] || 0) + 1;
 
-      if (status.toLowerCase().includes('expired')) {
+      if (status.toLowerCase().includes("expired")) {
         expired++;
-      } else if (record['Disclosure expiry date']) {
-        const expiryDate = new Date(record['Disclosure expiry date']);
+      } else if (record["Disclosure expiry date"]) {
+        const expiryDate = new Date(record["Disclosure expiry date"]);
         if (expiryDate < now) {
           expired++;
         } else if (expiryDate < ninetyDaysFromNow) {

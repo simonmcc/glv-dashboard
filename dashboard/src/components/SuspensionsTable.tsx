@@ -4,8 +4,8 @@
  * Displays suspended member records.
  */
 
-import { useState, useMemo } from 'react';
-import type { SuspensionRecord } from '../types';
+import { useState, useMemo } from "react";
+import type { SuspensionRecord } from "../types";
 
 interface SuspensionsTableProps {
   records: SuspensionRecord[];
@@ -14,44 +14,54 @@ interface SuspensionsTableProps {
   searchTerm?: string;
 }
 
-type SortField = 'name' | 'date' | 'role';
-type SortOrder = 'asc' | 'desc';
+type SortField = "name" | "date" | "role";
+type SortOrder = "asc" | "desc";
 
-export function SuspensionsTable({ records, isLoading, onMemberSelect, searchTerm = '' }: SuspensionsTableProps) {
-  const [sortField, setSortField] = useState<SortField>('date');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+export function SuspensionsTable({
+  records,
+  isLoading,
+  onMemberSelect,
+  searchTerm = "",
+}: SuspensionsTableProps) {
+  const [sortField, setSortField] = useState<SortField>("date");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
   const filteredRecords = useMemo(() => {
     let result = [...records];
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(r =>
-        r['First name'].toLowerCase().includes(term) ||
-        r['Last name'].toLowerCase().includes(term) ||
-        r['Membership number'].includes(term)
+      result = result.filter(
+        (r) =>
+          r["First name"].toLowerCase().includes(term) ||
+          r["Last name"].toLowerCase().includes(term) ||
+          r["Membership number"].includes(term),
       );
     }
 
     result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case 'name':
-          comparison = `${a['Last name']} ${a['First name']}`.localeCompare(
-            `${b['Last name']} ${b['First name']}`
+        case "name":
+          comparison = `${a["Last name"]} ${a["First name"]}`.localeCompare(
+            `${b["Last name"]} ${b["First name"]}`,
           );
           break;
-        case 'date': {
-          const aDate = a['Suspension date'] ? new Date(a['Suspension date']).getTime() : 0;
-          const bDate = b['Suspension date'] ? new Date(b['Suspension date']).getTime() : 0;
+        case "date": {
+          const aDate = a["Suspension date"]
+            ? new Date(a["Suspension date"]).getTime()
+            : 0;
+          const bDate = b["Suspension date"]
+            ? new Date(b["Suspension date"]).getTime()
+            : 0;
           comparison = aDate - bDate;
           break;
         }
-        case 'role':
-          comparison = (a['Role'] || '').localeCompare(b['Role'] || '');
+        case "role":
+          comparison = (a["Role"] || "").localeCompare(b["Role"] || "");
           break;
       }
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return sortOrder === "asc" ? comparison : -comparison;
     });
 
     return result;
@@ -59,22 +69,27 @@ export function SuspensionsTable({ records, isLoading, onMemberSelect, searchTer
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortOrder('asc');
+      setSortOrder("asc");
     }
   };
 
   const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
-    return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
+    if (sortField !== field)
+      return <span className="text-gray-300 ml-1">↕</span>;
+    return <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>;
   };
 
   const formatDate = (dateStr: string | null | undefined) => {
-    if (!dateStr) return '-';
+    if (!dateStr) return "-";
     try {
-      return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      return new Date(dateStr).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
     } catch {
       return dateStr;
     }
@@ -85,7 +100,10 @@ export function SuspensionsTable({ records, isLoading, onMemberSelect, searchTer
       <div className="bg-white rounded-lg shadow-sm border">
         <div className="p-4 space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-100 rounded animate-pulse"></div>
+            <div
+              key={i}
+              className="h-12 bg-gray-100 rounded animate-pulse"
+            ></div>
           ))}
         </div>
       </div>
@@ -114,7 +132,7 @@ export function SuspensionsTable({ records, isLoading, onMemberSelect, searchTer
             <tr>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('name')}
+                onClick={() => handleSort("name")}
               >
                 Name {renderSortIcon("name")}
               </th>
@@ -123,7 +141,7 @@ export function SuspensionsTable({ records, isLoading, onMemberSelect, searchTer
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('role')}
+                onClick={() => handleSort("role")}
               >
                 Role {renderSortIcon("role")}
               </th>
@@ -132,7 +150,7 @@ export function SuspensionsTable({ records, isLoading, onMemberSelect, searchTer
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('date')}
+                onClick={() => handleSort("date")}
               >
                 Suspension Date {renderSortIcon("date")}
               </th>
@@ -150,36 +168,46 @@ export function SuspensionsTable({ records, isLoading, onMemberSelect, searchTer
               </tr>
             ) : (
               filteredRecords.map((record, index) => (
-                <tr key={`${record['Membership number']}-${index}`} className="hover:bg-gray-50">
+                <tr
+                  key={`${record["Membership number"]}-${index}`}
+                  className="hover:bg-gray-50"
+                >
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
                       {onMemberSelect ? (
                         <button
-                          onClick={() => onMemberSelect(record['Membership number'], `${record['First name']} ${record['Last name']}`)}
+                          onClick={() =>
+                            onMemberSelect(
+                              record["Membership number"],
+                              `${record["First name"]} ${record["Last name"]}`,
+                            )
+                          }
                           className="text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
                         >
-                          {record['First name']} {record['Last name']}
+                          {record["First name"]} {record["Last name"]}
                         </button>
                       ) : (
-                        `${record['First name']} ${record['Last name']}`
+                        `${record["First name"]} ${record["Last name"]}`
                       )}
                     </div>
                   </td>
                   <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
-                    {record['Membership number']}
+                    {record["Membership number"]}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
-                    {record['Role']}
+                    {record["Role"]}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {record['Team'] && <div>{record['Team']}</div>}
-                    {record['Unit name'] && <div className="text-gray-400">{record['Unit name']}</div>}
+                    {record["Team"] && <div>{record["Team"]}</div>}
+                    {record["Unit name"] && (
+                      <div className="text-gray-400">{record["Unit name"]}</div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {formatDate(record['Suspension date'])}
+                    {formatDate(record["Suspension date"])}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {record['Suspension reason'] || '-'}
+                    {record["Suspension reason"] || "-"}
                   </td>
                 </tr>
               ))

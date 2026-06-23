@@ -460,7 +460,8 @@ describe("MemberDashboard – Growing Roots expansion", () => {
     render(<MemberDashboard {...grProps} />);
     const section = screen.getByTestId("joining-journey-section");
     // Safeguarding is Valid → no badge; Safety is Not Started with no start date → "30d deadline" fallback
-    const badgeCount = (section.textContent?.match(/30d deadline/g) ?? []).length;
+    const badgeCount = (section.textContent?.match(/30d deadline/g) ?? [])
+      .length;
     expect(badgeCount).toBe(1);
   });
 

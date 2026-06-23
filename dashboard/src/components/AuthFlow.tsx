@@ -6,13 +6,13 @@
  * while authentication continues in the background.
  */
 
-import { useState } from 'react';
-import { trace, SpanStatusCode } from '@opentelemetry/api';
-import type { AuthState } from '../types';
-import { hashPassword, saveCredentials, loadCredentials } from '../session';
-import { VersionFooter } from './VersionFooter';
+import { useState } from "react";
+import { trace, SpanStatusCode } from "@opentelemetry/api";
+import type { AuthState } from "../types";
+import { hashPassword, saveCredentials, loadCredentials } from "../session";
+import { VersionFooter } from "./VersionFooter";
 
-const tracer = trace.getTracer('glv-dashboard', '1.0.0');
+const tracer = trace.getTracer("glv-dashboard", "1.0.0");
 
 interface AuthFlowProps {
   authState: AuthState;
@@ -21,38 +21,42 @@ interface AuthFlowProps {
   onAuthError: (message: string) => void;
   onStartBackgroundAuth: (contactId: string, username?: string) => void;
   onBackgroundAuthProgress: (message: string) => void;
-  onBackgroundAuthComplete: (token: string, contactId: string, username?: string) => void;
+  onBackgroundAuthComplete: (
+    token: string,
+    contactId: string,
+    username?: string,
+  ) => void;
   onBackgroundAuthError: (message: string) => void;
   mockMode?: boolean;
   updateAvailable?: boolean;
   onUpdate?: () => void;
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
 async function parseSSEStream(
   body: ReadableStream<Uint8Array>,
-  onEvent: (type: string, data: unknown) => void
+  onEvent: (type: string, data: unknown) => void,
 ): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
-  let buffer = '';
+  let buffer = "";
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
 
-    const parts = buffer.split('\n\n');
-    buffer = parts.pop() ?? '';
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() ?? "";
 
     for (const part of parts) {
-      let eventType = 'message';
-      let dataLine = '';
-      for (const line of part.split('\n')) {
-        if (line.startsWith('event: ')) {
+      let eventType = "message";
+      let dataLine = "";
+      for (const line of part.split("\n")) {
+        if (line.startsWith("event: ")) {
           eventType = line.slice(7).trim();
-        } else if (line.startsWith('data: ')) {
+        } else if (line.startsWith("data: ")) {
           dataLine = line.slice(6).trim();
         }
       }
@@ -80,27 +84,27 @@ export function AuthFlow({
   updateAvailable,
   onUpdate,
 }: AuthFlowProps) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [loginStep, setLoginStep] = useState('');
+  const [loginStep, setLoginStep] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!username || !password) {
-      onAuthError('Please enter your username and password');
+      onAuthError("Please enter your username and password");
       return;
     }
 
     setIsLoading(true);
-    setLoginStep('');
+    setLoginStep("");
 
     // In mock mode, authenticate immediately without calling the backend
     if (mockMode) {
       setTimeout(() => {
         setIsLoading(false);
-        onAuthComplete('mock-token', 'mock-contact', username);
+        onAuthComplete("mock-token", "mock-contact", username);
       }, 500);
       return;
     }
@@ -108,11 +112,15 @@ export function AuthFlow({
     // Check if we can use the fast-path (matching stored credential verifier).
     // Fall back to foreground auth if hashing fails (e.g. non-secure context).
     const stored = loadCredentials();
-    let passwordHash = '';
+    let passwordHash = "";
     let isFastPath = false;
     try {
       passwordHash = await hashPassword(password);
-      isFastPath = !!(stored && stored.username === username && stored.passwordHash === passwordHash);
+      isFastPath = !!(
+        stored &&
+        stored.username === username &&
+        stored.passwordHash === passwordHash
+      );
     } catch {
       // WebCrypto unavailable or failed — proceed with normal foreground auth
     }
@@ -124,19 +132,20 @@ export function AuthFlow({
       onAuthStart();
     }
 
-    await tracer.startActiveSpan('auth.login', async (span) => {
+    await tracer.startActiveSpan("auth.login", async (span) => {
       try {
         const response = await fetch(`${BACKEND_URL}/auth/login-stream`, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({ username, password }),
         });
 
         if (!response.ok || !response.body) {
           const result = await response.json().catch(() => ({}));
-          const msg = (result as { error?: string }).error || 'Authentication failed';
+          const msg =
+            (result as { error?: string }).error || "Authentication failed";
           span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
           if (isFastPath) {
             onBackgroundAuthError(msg);
@@ -149,19 +158,20 @@ export function AuthFlow({
         let terminated = false;
         await parseSSEStream(response.body, (type, data) => {
           const payload = data as Record<string, string>;
-          if (type === 'progress') {
-            const msg = payload.message || '';
+          if (type === "progress") {
+            const msg = payload.message || "";
             if (isFastPath) {
               onBackgroundAuthProgress(msg);
             } else {
               setLoginStep(msg);
             }
-          } else if (type === 'complete') {
+          } else if (type === "complete") {
             terminated = true;
             const token = payload.token;
-            const contactId = payload.contactId ?? '';
+            const contactId = payload.contactId ?? "";
             if (!token) {
-              const msg = 'Authentication failed: invalid response from authentication server';
+              const msg =
+                "Authentication failed: invalid response from authentication server";
               span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
               if (isFastPath) {
                 onBackgroundAuthError(msg);
@@ -178,9 +188,9 @@ export function AuthFlow({
             } else {
               onAuthComplete(token, contactId, username);
             }
-          } else if (type === 'error') {
+          } else if (type === "error") {
             terminated = true;
-            const msg = payload.error || 'Authentication failed';
+            const msg = payload.error || "Authentication failed";
             span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
             if (isFastPath) {
               onBackgroundAuthError(msg);
@@ -191,8 +201,11 @@ export function AuthFlow({
         });
 
         if (!terminated) {
-          span.setStatus({ code: SpanStatusCode.ERROR, message: 'Stream ended without completing' });
-          const msg = 'Authentication failed: connection closed unexpectedly';
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: "Stream ended without completing",
+          });
+          const msg = "Authentication failed: connection closed unexpectedly";
           if (isFastPath) {
             onBackgroundAuthError(msg);
           } else {
@@ -200,9 +213,13 @@ export function AuthFlow({
           }
         }
       } catch (err) {
-        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Connection failed' });
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: "Connection failed",
+        });
         span.recordException(err as Error);
-        const msg = 'Failed to connect to authentication server. Is the backend running?';
+        const msg =
+          "Failed to connect to authentication server. Is the backend running?";
         if (isFastPath) {
           onBackgroundAuthError(msg);
         } else {
@@ -211,12 +228,12 @@ export function AuthFlow({
       } finally {
         span.end();
         setIsLoading(false);
-        setLoginStep('');
+        setLoginStep("");
       }
     });
   };
 
-  if (authState.status === 'authenticated') {
+  if (authState.status === "authenticated") {
     return null;
   }
 
@@ -224,7 +241,9 @@ export function AuthFlow({
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">GLV Dashboard</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            GLV Dashboard
+          </h1>
           <p className="text-gray-600">Training Compliance Overview</p>
         </div>
 
@@ -232,11 +251,14 @@ export function AuthFlow({
           {mockMode && (
             <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded text-amber-800 text-sm">
               <p className="font-semibold">🔍 Preview Mode (Mock Data)</p>
-              <p className="mt-1">This is a PR preview using mock data. Sign in with any email and password.</p>
+              <p className="mt-1">
+                This is a PR preview using mock data. Sign in with any email and
+                password.
+              </p>
             </div>
           )}
 
-          {authState.status === 'error' && (
+          {authState.status === "error" && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
               {authState.message}
             </div>
@@ -244,7 +266,10 @@ export function AuthFlow({
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="username"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Email Address
               </label>
               <input
@@ -260,7 +285,10 @@ export function AuthFlow({
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Password
               </label>
               <input
@@ -286,15 +314,20 @@ export function AuthFlow({
                   Signing in...
                 </>
               ) : (
-                'Sign in with Scouts'
+                "Sign in with Scouts"
               )}
             </button>
           </form>
 
           {isLoading && (
             <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm">
-              <p className="font-medium">{loginStep || 'Authenticating with Scouts portal...'}</p>
-              <p className="text-xs mt-1">This may take 15-30 seconds as we securely log in on your behalf.</p>
+              <p className="font-medium">
+                {loginStep || "Authenticating with Scouts portal..."}
+              </p>
+              <p className="text-xs mt-1">
+                This may take 15-30 seconds as we securely log in on your
+                behalf.
+              </p>
             </div>
           )}
 
@@ -304,26 +337,34 @@ export function AuthFlow({
         </div>
 
         <p className="mt-4 text-center text-xs text-gray-500">
-          Your password is never stored. A secure hash is saved locally to enable instant access on return visits.
+          Your password is never stored. A secure hash is saved locally to
+          enable instant access on return visits.
           <br />
           Data is fetched directly from the Scouts API.
         </p>
         <div className="mt-3">
-          <VersionFooter updateAvailable={updateAvailable} onUpdate={onUpdate} />
+          <VersionFooter
+            updateAvailable={updateAvailable}
+            onUpdate={onUpdate}
+          />
         </div>
       </div>
     </div>
   );
 }
 
-function ManualTokenEntry({ onSubmit }: { onSubmit: (token: string, contactId: string) => void }) {
-  const [token, setToken] = useState('');
+function ManualTokenEntry({
+  onSubmit,
+}: {
+  onSubmit: (token: string, contactId: string) => void;
+}) {
+  const [token, setToken] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (token.trim()) {
-      onSubmit(token.trim(), '');
+      onSubmit(token.trim(), "");
     }
   };
 
@@ -341,7 +382,8 @@ function ManualTokenEntry({ onSubmit }: { onSubmit: (token: string, contactId: s
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <p className="text-xs text-gray-500">
-        If you have a Bearer token from the browser's developer tools, you can enter it here.
+        If you have a Bearer token from the browser's developer tools, you can
+        enter it here.
       </p>
       <textarea
         value={token}
