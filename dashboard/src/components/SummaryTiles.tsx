@@ -7,7 +7,7 @@
  */
 
 import type { ComplianceSummary } from "../types";
-import { GROWING_ROOTS_MODULES, FIRST_RESPONSE_MODULE } from "../utils";
+import { MODULE_CONFIG, FIRST_RESPONSE_MODULE } from "../utils";
 
 interface SummaryTilesProps {
   summary: ComplianceSummary | null;
@@ -152,12 +152,13 @@ function LoadingTile() {
   );
 }
 
-const WITHIN_30_DAYS = GROWING_ROOTS_MODULES.filter(
-  (m) => m.deadlineDays === 30,
-).map((m) => m.name);
-const GROWING_ROOTS = GROWING_ROOTS_MODULES.filter(
-  (m) => m.deadlineDays !== 30,
-).map((m) => m.name);
+const GR_MODULES = MODULE_CONFIG.filter((m) => m.group === "Growing Roots");
+const WITHIN_30_DAYS = GR_MODULES.filter((m) => m.deadlineDays === 30).map(
+  (m) => m.name,
+);
+const GROWING_ROOTS = GR_MODULES.filter((m) => m.deadlineDays !== 30).map(
+  (m) => m.name,
+);
 
 const TILE_GROUPS: ReadonlyArray<{
   label: string;

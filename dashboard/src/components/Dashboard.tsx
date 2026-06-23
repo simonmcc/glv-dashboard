@@ -6,32 +6,43 @@
  * Caches all fetched data in IndexedDB for offline access.
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { trace, SpanStatusCode } from '@opentelemetry/api';
-import { ScoutsApiClient } from '../api-client';
-import { MockScoutsApiClient } from '../mock-api-client';
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { trace, SpanStatusCode } from "@opentelemetry/api";
+import { ScoutsApiClient } from "../api-client";
+import { MockScoutsApiClient } from "../mock-api-client";
 
-const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === 'true';
+const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === "true";
 
-const tracer = trace.getTracer('glv-dashboard', '1.0.0');
-import { transformLearningResults, isExpiringSoon } from '../utils';
-import type { LearningRecord, ComplianceSummary, JoiningJourneyRecord, DisclosureRecord, DisclosureSummary, SuspensionRecord, TeamReviewRecord, PermitRecord, AwardRecord } from '../types';
-import { SummaryTiles } from './SummaryTiles';
-import { ComplianceTable } from './ComplianceTable';
-import { JoiningJourneyTable } from './JoiningJourneyTable';
-import { JoiningJourneyProgress } from './JoiningJourneyProgress';
-import { DisclosureTable } from './DisclosureTable';
-import { SuspensionsTable } from './SuspensionsTable';
-import { TeamReviewsTable } from './TeamReviewsTable';
-import { TeamStructure } from './TeamStructure';
-import { PermitsTable } from './PermitsTable';
-import { AwardsTable } from './AwardsTable';
-import { LazySection } from './LazySection';
-import type { LoadState } from './LazySection';
-import { MemberDashboard } from './MemberDashboard';
-import { SyncStatus } from './SyncStatus';
-import { VersionFooter } from './VersionFooter';
-import { readCache, writeCache, readLastSync } from '../db';
+const tracer = trace.getTracer("glv-dashboard", "1.0.0");
+import { transformLearningResults, isExpiringSoon } from "../utils";
+import type {
+  LearningRecord,
+  ComplianceSummary,
+  JoiningJourneyRecord,
+  DisclosureRecord,
+  DisclosureSummary,
+  SuspensionRecord,
+  TeamReviewRecord,
+  PermitRecord,
+  AwardRecord,
+} from "../types";
+import { SummaryTiles } from "./SummaryTiles";
+import { ComplianceTable } from "./ComplianceTable";
+import { JoiningJourneyTable } from "./JoiningJourneyTable";
+import { JoiningJourneyProgress } from "./JoiningJourneyProgress";
+import { DisclosureTable } from "./DisclosureTable";
+import { SuspensionsTable } from "./SuspensionsTable";
+import { TeamReviewsTable } from "./TeamReviewsTable";
+import { TeamStructure } from "./TeamStructure";
+import { PermitsTable } from "./PermitsTable";
+import { AwardsTable } from "./AwardsTable";
+import { LazySection } from "./LazySection";
+import type { LoadState } from "./LazySection";
+import { MemberDashboard } from "./MemberDashboard";
+import { ModuleRulesPage } from "./ModuleRulesPage";
+import { SyncStatus } from "./SyncStatus";
+import { VersionFooter } from "./VersionFooter";
+import { readCache, writeCache, readLastSync } from "../db";
 
 interface DashboardProps {
   token: string | null;
@@ -52,7 +63,17 @@ interface SectionState<T> {
   error: string | null;
 }
 
-export function Dashboard({ token, contactId, username, isOnline, onLogout, onTokenExpired, backgroundAuth, updateAvailable, onUpdate }: DashboardProps) {
+export function Dashboard({
+  token,
+  contactId,
+  username,
+  isOnline,
+  onLogout,
+  onTokenExpired,
+  backgroundAuth,
+  updateAvailable,
+  onUpdate,
+}: DashboardProps) {
   // Primary data (loaded immediately - always visible at top)
   const [records, setRecords] = useState<LearningRecord[]>([]);
   const [summary, setSummary] = useState<ComplianceSummary | null>(null);
@@ -60,22 +81,36 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   const [primaryError, setPrimaryError] = useState<string | null>(null);
 
   // Global search term shared across all sections
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Per-member view
-  const [selectedMember, setSelectedMember] = useState<{ membershipNumber: string; name: string } | null>(null);
+  const [selectedMember, setSelectedMember] = useState<{
+    membershipNumber: string;
+    name: string;
+  } | null>(null);
+
+  const [showModuleRules, setShowModuleRules] = useState(false);
 
   // Training & Onboarding section tab
-  const [trainingTab, setTrainingTab] = useState<'onboarding' | 'training'>('onboarding');
+  const [trainingTab, setTrainingTab] = useState<"onboarding" | "training">(
+    "onboarding",
+  );
 
   // Deep-link state: set when a compliance tile is clicked to pre-filter the training table
-  const [tileDeepLink, setTileDeepLink] = useState<{ learning: string; key: number } | null>(null);
+  const [tileDeepLink, setTileDeepLink] = useState<{
+    learning: string;
+    key: number;
+  } | null>(null);
 
   // Joining Journey inner view toggle
-  const [joiningJourneyView, setJoiningJourneyView] = useState<'progress' | 'items'>('progress');
+  const [joiningJourneyView, setJoiningJourneyView] = useState<
+    "progress" | "items"
+  >("progress");
 
   // Team Directory view toggle
-  const [teamDirView, setTeamDirView] = useState<'directory' | 'structure'>('directory');
+  const [teamDirView, setTeamDirView] = useState<"directory" | "structure">(
+    "directory",
+  );
 
   // Collapsed state for lower-priority sections
   const [teamReviewsCollapsed, setTeamReviewsCollapsed] = useState(true);
@@ -83,12 +118,31 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   const [awardsCollapsed, setAwardsCollapsed] = useState(true);
 
   // Lazy-loaded sections
-  const [joiningJourney, setJoiningJourney] = useState<SectionState<JoiningJourneyRecord[]>>({ state: 'idle', data: [], error: null });
-  const [disclosures, setDisclosures] = useState<SectionState<{ records: DisclosureRecord[]; summary: DisclosureSummary | null }>>({ state: 'idle', data: { records: [], summary: null }, error: null });
-  const [suspensions, setSuspensions] = useState<SectionState<SuspensionRecord[]>>({ state: 'idle', data: [], error: null });
-  const [teamReviews, setTeamReviews] = useState<SectionState<TeamReviewRecord[]>>({ state: 'idle', data: [], error: null });
-  const [permits, setPermits] = useState<SectionState<PermitRecord[]>>({ state: 'idle', data: [], error: null });
-  const [awards, setAwards] = useState<SectionState<AwardRecord[]>>({ state: 'idle', data: [], error: null });
+  const [joiningJourney, setJoiningJourney] = useState<
+    SectionState<JoiningJourneyRecord[]>
+  >({ state: "idle", data: [], error: null });
+  const [disclosures, setDisclosures] = useState<
+    SectionState<{
+      records: DisclosureRecord[];
+      summary: DisclosureSummary | null;
+    }>
+  >({ state: "idle", data: { records: [], summary: null }, error: null });
+  const [suspensions, setSuspensions] = useState<
+    SectionState<SuspensionRecord[]>
+  >({ state: "idle", data: [], error: null });
+  const [teamReviews, setTeamReviews] = useState<
+    SectionState<TeamReviewRecord[]>
+  >({ state: "idle", data: [], error: null });
+  const [permits, setPermits] = useState<SectionState<PermitRecord[]>>({
+    state: "idle",
+    data: [],
+    error: null,
+  });
+  const [awards, setAwards] = useState<SectionState<AwardRecord[]>>({
+    state: "idle",
+    data: [],
+    error: null,
+  });
 
   const [lastSync, setLastSync] = useState<number | null>(null);
   const [, setCacheUpdatedAt] = useState<number | null>(null);
@@ -107,12 +161,12 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   // Memoize the API client (use mock client in mock mode)
   const client = useMemo(() => {
     if (MOCK_MODE) {
-      console.log('[Dashboard] Using mock API client');
+      console.log("[Dashboard] Using mock API client");
       return new MockScoutsApiClient();
     }
     // When token is null (background-auth state), create client with empty token —
     // network calls are guarded by the token null-check in fetchPrimaryData.
-    const c = new ScoutsApiClient(token ?? '');
+    const c = new ScoutsApiClient(token ?? "");
     if (contactId) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (c as any).contactId = contactId;
@@ -123,210 +177,306 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   // Primary data fetch (learning records + summary)
   // Accepts an AbortSignal so the useEffect cleanup can cancel the in-flight request
   // when React StrictMode double-mounts the component in development.
-  const fetchPrimaryData = useCallback(async (signal?: AbortSignal) => {
-    return tracer.startActiveSpan('dashboard.fetchPrimaryData', async (span) => {
-      // Skip network fetch when we don't have a valid token yet (background-auth state)
-      if (!token && !MOCK_MODE) {
-        span.end();
-        return;
-      }
-
-      setPrimaryLoading(true);
-      setPrimaryError(null);
-
-      try {
-        // Initialize client if no contactId
-        if (!contactId) {
-          await client.initialize();
-        }
-
-        // Expose debug helpers
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).apiClient = client;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).testTable = (tableName: string) => client.testTable(tableName);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).checkLearning = (membershipNumbers: string[]) =>
-          client.checkLearningByMembershipNumbers(membershipNumbers);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).testJoiningJourney = () => client.getJoiningJourney(50);
-
-        // Get member list
-        const memberListResponse = await client.getAllLearningCompliance(1000, signal);
-        if (memberListResponse.error) {
-          throw new Error(memberListResponse.error);
-        }
-
-        // Extract unique membership numbers
-        const uniqueMembershipNumbers = [...new Set(
-          (memberListResponse.data || []).map(r => r['Membership number'])
-        )];
-        span.setAttribute('records.learning_compliance', memberListResponse.data?.length ?? 0);
-        span.setAttribute('records.members_checked', uniqueMembershipNumbers.length);
-
-        // Fetch learning details
-        const learningResult = await client.checkLearningByMembershipNumbers(uniqueMembershipNumbers, signal);
-        if (!learningResult.success || !learningResult.members) {
-          throw new Error(learningResult.error || 'Failed to fetch learning details');
-        }
-
-        // Build map of membership number → earliest start date (for First Response deadline)
-        const memberStartDates = new Map<string, string>();
-        for (const r of memberListResponse.data || []) {
-          const num = r['Membership number'];
-          const start = r['Start date'];
-          if (start) {
-            const existing = memberStartDates.get(num);
-            if (!existing || new Date(start) < new Date(existing)) {
-              memberStartDates.set(num, start);
-            }
+  const fetchPrimaryData = useCallback(
+    async (signal?: AbortSignal) => {
+      return tracer.startActiveSpan(
+        "dashboard.fetchPrimaryData",
+        async (span) => {
+          // Skip network fetch when we don't have a valid token yet (background-auth state)
+          if (!token && !MOCK_MODE) {
+            span.end();
+            return;
           }
-        }
 
-        // Transform and set data
-        const data = transformLearningResults(learningResult.members, undefined, memberStartDates);
-        setRecords(data);
-        setSummary(client.computeComplianceSummary(data));
+          setPrimaryLoading(true);
+          setPrimaryError(null);
 
-        // Cache the results and update sync timestamp
-        await writeCache('learningRecords', contactId, data);
-        setLastSync(Date.now());
-        setCacheUpdatedAt(Date.now());
+          try {
+            // Initialize client if no contactId
+            if (!contactId) {
+              await client.initialize();
+            }
 
-        span.setStatus({ code: SpanStatusCode.OK });
-      } catch (err) {
-        // Ignore aborted fetches — a new fetch will have already been started.
-        // Don't call span.end() here; finally handles it.
-        if ((err as Error).name === 'AbortError') return;
-        const message = (err as Error).message;
-        span.setStatus({ code: SpanStatusCode.ERROR, message });
-        span.recordException(err as Error);
-        if (message === 'TOKEN_EXPIRED') {
-          onTokenExpired();
-        } else {
-          setPrimaryError(message);
-        }
-      } finally {
-        setPrimaryLoading(false);
-        span.end();
-      }
-    });
-  }, [client, contactId, onTokenExpired]);
+            // Expose debug helpers
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (window as any).apiClient = client;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (window as any).testTable = (tableName: string) =>
+              client.testTable(tableName);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (window as any).checkLearning = (membershipNumbers: string[]) =>
+              client.checkLearningByMembershipNumbers(membershipNumbers);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (window as any).testJoiningJourney = () =>
+              client.getJoiningJourney(50);
+
+            // Get member list
+            const memberListResponse = await client.getAllLearningCompliance(
+              1000,
+              signal,
+            );
+            if (memberListResponse.error) {
+              throw new Error(memberListResponse.error);
+            }
+
+            // Extract unique membership numbers
+            const uniqueMembershipNumbers = [
+              ...new Set(
+                (memberListResponse.data || []).map(
+                  (r) => r["Membership number"],
+                ),
+              ),
+            ];
+            span.setAttribute(
+              "records.learning_compliance",
+              memberListResponse.data?.length ?? 0,
+            );
+            span.setAttribute(
+              "records.members_checked",
+              uniqueMembershipNumbers.length,
+            );
+
+            // Fetch learning details
+            const learningResult =
+              await client.checkLearningByMembershipNumbers(
+                uniqueMembershipNumbers,
+                signal,
+              );
+            if (!learningResult.success || !learningResult.members) {
+              throw new Error(
+                learningResult.error || "Failed to fetch learning details",
+              );
+            }
+
+            // Build map of membership number → earliest start date (for First Response deadline)
+            const memberStartDates = new Map<string, string>();
+            for (const r of memberListResponse.data || []) {
+              const num = r["Membership number"];
+              const start = r["Start date"];
+              if (start) {
+                const existing = memberStartDates.get(num);
+                if (!existing || new Date(start) < new Date(existing)) {
+                  memberStartDates.set(num, start);
+                }
+              }
+            }
+
+            // Transform and set data
+            const data = transformLearningResults(
+              learningResult.members,
+              undefined,
+              memberStartDates,
+            );
+            setRecords(data);
+            setSummary(client.computeComplianceSummary(data));
+
+            // Cache the results and update sync timestamp
+            await writeCache("learningRecords", contactId, data);
+            setLastSync(Date.now());
+            setCacheUpdatedAt(Date.now());
+
+            span.setStatus({ code: SpanStatusCode.OK });
+          } catch (err) {
+            // Ignore aborted fetches — a new fetch will have already been started.
+            // Don't call span.end() here; finally handles it.
+            if ((err as Error).name === "AbortError") return;
+            const message = (err as Error).message;
+            span.setStatus({ code: SpanStatusCode.ERROR, message });
+            span.recordException(err as Error);
+            if (message === "TOKEN_EXPIRED") {
+              onTokenExpired();
+            } else {
+              setPrimaryError(message);
+            }
+          } finally {
+            setPrimaryLoading(false);
+            span.end();
+          }
+        },
+      );
+    },
+    [client, contactId, onTokenExpired],
+  );
 
   // Section loaders — fetch from network and write to cache on success.
   const loadJoiningJourney = useCallback(async () => {
-    setJoiningJourney(s => ({ ...s, state: 'loading', error: null }));
-    return tracer.startActiveSpan('dashboard.load.joiningJourney', async (span) => {
-      try {
-        const response = await client.getJoiningJourney(500);
-        if (response.error) throw new Error(response.error);
-        const data = response.data || [];
-        span.setAttribute('records.count', data.length);
-        span.setStatus({ code: SpanStatusCode.OK });
-        setJoiningJourney({ state: 'loaded', data, error: null });
-        await writeCache('joiningJourney', contactId, data);
-        setLastSync(Date.now());
-      } catch (err) {
-        span.recordException(err as Error);
-        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
-        if ((err as Error).message === 'TOKEN_EXPIRED') { onTokenExpired(); return; }
-        setJoiningJourney(s => ({ ...s, state: 'error', error: (err as Error).message }));
-      } finally {
-        span.end();
-      }
-    });
+    setJoiningJourney((s) => ({ ...s, state: "loading", error: null }));
+    return tracer.startActiveSpan(
+      "dashboard.load.joiningJourney",
+      async (span) => {
+        try {
+          const response = await client.getJoiningJourney(500);
+          if (response.error) throw new Error(response.error);
+          const data = response.data || [];
+          span.setAttribute("records.count", data.length);
+          span.setStatus({ code: SpanStatusCode.OK });
+          setJoiningJourney({ state: "loaded", data, error: null });
+          await writeCache("joiningJourney", contactId, data);
+          setLastSync(Date.now());
+        } catch (err) {
+          span.recordException(err as Error);
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: (err as Error).message,
+          });
+          if ((err as Error).message === "TOKEN_EXPIRED") {
+            onTokenExpired();
+            return;
+          }
+          setJoiningJourney((s) => ({
+            ...s,
+            state: "error",
+            error: (err as Error).message,
+          }));
+        } finally {
+          span.end();
+        }
+      },
+    );
   }, [client, contactId, onTokenExpired]);
 
   const loadDisclosures = useCallback(async () => {
-    setDisclosures(s => ({ ...s, state: 'loading', error: null }));
-    return tracer.startActiveSpan('dashboard.load.disclosures', async (span) => {
-      try {
-        const response = await client.getDisclosureCompliance(500);
-        if (response.error) throw new Error(response.error);
-        const records = response.data || [];
-        span.setAttribute('records.count', records.length);
-        span.setStatus({ code: SpanStatusCode.OK });
-        setDisclosures({
-          state: 'loaded',
-          data: { records, summary: client.computeDisclosureSummary(records) },
-          error: null
-        });
-        await writeCache('disclosures', contactId, records);
-        setLastSync(Date.now());
-      } catch (err) {
-        span.recordException(err as Error);
-        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
-        if ((err as Error).message === 'TOKEN_EXPIRED') { onTokenExpired(); return; }
-        setDisclosures(s => ({ ...s, state: 'error', error: (err as Error).message }));
-      } finally {
-        span.end();
-      }
-    });
+    setDisclosures((s) => ({ ...s, state: "loading", error: null }));
+    return tracer.startActiveSpan(
+      "dashboard.load.disclosures",
+      async (span) => {
+        try {
+          const response = await client.getDisclosureCompliance(500);
+          if (response.error) throw new Error(response.error);
+          const records = response.data || [];
+          span.setAttribute("records.count", records.length);
+          span.setStatus({ code: SpanStatusCode.OK });
+          setDisclosures({
+            state: "loaded",
+            data: {
+              records,
+              summary: client.computeDisclosureSummary(records),
+            },
+            error: null,
+          });
+          await writeCache("disclosures", contactId, records);
+          setLastSync(Date.now());
+        } catch (err) {
+          span.recordException(err as Error);
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: (err as Error).message,
+          });
+          if ((err as Error).message === "TOKEN_EXPIRED") {
+            onTokenExpired();
+            return;
+          }
+          setDisclosures((s) => ({
+            ...s,
+            state: "error",
+            error: (err as Error).message,
+          }));
+        } finally {
+          span.end();
+        }
+      },
+    );
   }, [client, contactId, onTokenExpired]);
 
   const loadSuspensions = useCallback(async () => {
-    setSuspensions(s => ({ ...s, state: 'loading', error: null }));
-    return tracer.startActiveSpan('dashboard.load.suspensions', async (span) => {
-      try {
-        const response = await client.getSuspensions(500);
-        if (response.error) throw new Error(response.error);
-        const data = response.data || [];
-        span.setAttribute('records.count', data.length);
-        span.setStatus({ code: SpanStatusCode.OK });
-        setSuspensions({ state: 'loaded', data, error: null });
-        await writeCache('suspensions', contactId, data);
-        setLastSync(Date.now());
-      } catch (err) {
-        span.recordException(err as Error);
-        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
-        if ((err as Error).message === 'TOKEN_EXPIRED') { onTokenExpired(); return; }
-        setSuspensions(s => ({ ...s, state: 'error', error: (err as Error).message }));
-      } finally {
-        span.end();
-      }
-    });
+    setSuspensions((s) => ({ ...s, state: "loading", error: null }));
+    return tracer.startActiveSpan(
+      "dashboard.load.suspensions",
+      async (span) => {
+        try {
+          const response = await client.getSuspensions(500);
+          if (response.error) throw new Error(response.error);
+          const data = response.data || [];
+          span.setAttribute("records.count", data.length);
+          span.setStatus({ code: SpanStatusCode.OK });
+          setSuspensions({ state: "loaded", data, error: null });
+          await writeCache("suspensions", contactId, data);
+          setLastSync(Date.now());
+        } catch (err) {
+          span.recordException(err as Error);
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: (err as Error).message,
+          });
+          if ((err as Error).message === "TOKEN_EXPIRED") {
+            onTokenExpired();
+            return;
+          }
+          setSuspensions((s) => ({
+            ...s,
+            state: "error",
+            error: (err as Error).message,
+          }));
+        } finally {
+          span.end();
+        }
+      },
+    );
   }, [client, contactId, onTokenExpired]);
 
   const loadTeamReviews = useCallback(async () => {
-    setTeamReviews(s => ({ ...s, state: 'loading', error: null }));
-    return tracer.startActiveSpan('dashboard.load.teamReviews', async (span) => {
-      try {
-        const response = await client.getTeamReviews(500);
-        if (response.error) throw new Error(response.error);
-        const data = response.data || [];
-        span.setAttribute('records.count', data.length);
-        span.setStatus({ code: SpanStatusCode.OK });
-        setTeamReviews({ state: 'loaded', data, error: null });
-        await writeCache('teamReviews', contactId, data);
-        setLastSync(Date.now());
-      } catch (err) {
-        span.recordException(err as Error);
-        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
-        if ((err as Error).message === 'TOKEN_EXPIRED') { onTokenExpired(); return; }
-        setTeamReviews(s => ({ ...s, state: 'error', error: (err as Error).message }));
-      } finally {
-        span.end();
-      }
-    });
+    setTeamReviews((s) => ({ ...s, state: "loading", error: null }));
+    return tracer.startActiveSpan(
+      "dashboard.load.teamReviews",
+      async (span) => {
+        try {
+          const response = await client.getTeamReviews(500);
+          if (response.error) throw new Error(response.error);
+          const data = response.data || [];
+          span.setAttribute("records.count", data.length);
+          span.setStatus({ code: SpanStatusCode.OK });
+          setTeamReviews({ state: "loaded", data, error: null });
+          await writeCache("teamReviews", contactId, data);
+          setLastSync(Date.now());
+        } catch (err) {
+          span.recordException(err as Error);
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: (err as Error).message,
+          });
+          if ((err as Error).message === "TOKEN_EXPIRED") {
+            onTokenExpired();
+            return;
+          }
+          setTeamReviews((s) => ({
+            ...s,
+            state: "error",
+            error: (err as Error).message,
+          }));
+        } finally {
+          span.end();
+        }
+      },
+    );
   }, [client, contactId, onTokenExpired]);
 
   const loadPermits = useCallback(async () => {
-    setPermits(s => ({ ...s, state: 'loading', error: null }));
-    return tracer.startActiveSpan('dashboard.load.permits', async (span) => {
+    setPermits((s) => ({ ...s, state: "loading", error: null }));
+    return tracer.startActiveSpan("dashboard.load.permits", async (span) => {
       try {
         const response = await client.getPermits(500);
         if (response.error) throw new Error(response.error);
         const data = response.data || [];
-        span.setAttribute('records.count', data.length);
+        span.setAttribute("records.count", data.length);
         span.setStatus({ code: SpanStatusCode.OK });
-        setPermits({ state: 'loaded', data, error: null });
-        await writeCache('permits', contactId, data);
+        setPermits({ state: "loaded", data, error: null });
+        await writeCache("permits", contactId, data);
         setLastSync(Date.now());
       } catch (err) {
         span.recordException(err as Error);
-        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
-        if ((err as Error).message === 'TOKEN_EXPIRED') { onTokenExpired(); return; }
-        setPermits(s => ({ ...s, state: 'error', error: (err as Error).message }));
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: (err as Error).message,
+        });
+        if ((err as Error).message === "TOKEN_EXPIRED") {
+          onTokenExpired();
+          return;
+        }
+        setPermits((s) => ({
+          ...s,
+          state: "error",
+          error: (err as Error).message,
+        }));
       } finally {
         span.end();
       }
@@ -334,22 +484,32 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   }, [client, contactId, onTokenExpired]);
 
   const loadAwards = useCallback(async () => {
-    setAwards(s => ({ ...s, state: 'loading', error: null }));
-    return tracer.startActiveSpan('dashboard.load.awards', async (span) => {
+    setAwards((s) => ({ ...s, state: "loading", error: null }));
+    return tracer.startActiveSpan("dashboard.load.awards", async (span) => {
       try {
         const response = await client.getAwards(500);
         if (response.error) throw new Error(response.error);
         const data = response.data || [];
-        span.setAttribute('records.count', data.length);
+        span.setAttribute("records.count", data.length);
         span.setStatus({ code: SpanStatusCode.OK });
-        setAwards({ state: 'loaded', data, error: null });
-        await writeCache('awards', contactId, data);
+        setAwards({ state: "loaded", data, error: null });
+        await writeCache("awards", contactId, data);
         setLastSync(Date.now());
       } catch (err) {
         span.recordException(err as Error);
-        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
-        if ((err as Error).message === 'TOKEN_EXPIRED') { onTokenExpired(); return; }
-        setAwards(s => ({ ...s, state: 'error', error: (err as Error).message }));
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: (err as Error).message,
+        });
+        if ((err as Error).message === "TOKEN_EXPIRED") {
+          onTokenExpired();
+          return;
+        }
+        setAwards((s) => ({
+          ...s,
+          state: "error",
+          error: (err as Error).message,
+        }));
       } finally {
         span.end();
       }
@@ -361,12 +521,36 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
   // Non-visible sections stay in 'loading' with stale data until scrolled into view.
   const refreshAll = useCallback(async () => {
     triggeredSections.current.clear();
-    setJoiningJourney(s => ({ ...s, state: s.data.length > 0 ? 'loading' : 'idle', error: null }));
-    setDisclosures(s => ({ ...s, state: s.data.records.length > 0 ? 'loading' : 'idle', error: null }));
-    setSuspensions(s => ({ ...s, state: s.data.length > 0 ? 'loading' : 'idle', error: null }));
-    setTeamReviews(s => ({ ...s, state: s.data.length > 0 ? 'loading' : 'idle', error: null }));
-    setPermits(s => ({ ...s, state: s.data.length > 0 ? 'loading' : 'idle', error: null }));
-    setAwards(s => ({ ...s, state: s.data.length > 0 ? 'loading' : 'idle', error: null }));
+    setJoiningJourney((s) => ({
+      ...s,
+      state: s.data.length > 0 ? "loading" : "idle",
+      error: null,
+    }));
+    setDisclosures((s) => ({
+      ...s,
+      state: s.data.records.length > 0 ? "loading" : "idle",
+      error: null,
+    }));
+    setSuspensions((s) => ({
+      ...s,
+      state: s.data.length > 0 ? "loading" : "idle",
+      error: null,
+    }));
+    setTeamReviews((s) => ({
+      ...s,
+      state: s.data.length > 0 ? "loading" : "idle",
+      error: null,
+    }));
+    setPermits((s) => ({
+      ...s,
+      state: s.data.length > 0 ? "loading" : "idle",
+      error: null,
+    }));
+    setAwards((s) => ({
+      ...s,
+      state: s.data.length > 0 ? "loading" : "idle",
+      error: null,
+    }));
     await fetchPrimaryData();
   }, [fetchPrimaryData]);
 
@@ -377,27 +561,49 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       void refreshAll();
     }
     prevTokenRef.current = token;
-  // refreshAll is intentionally excluded to avoid re-running when it changes due to other deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // refreshAll is intentionally excluded to avoid re-running when it changes due to other deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   // Handle member selection - load all lazy sections that are still idle
   const handleTileClick = useCallback((learningType: string) => {
-    setTrainingTab('training');
-    setTileDeepLink(prev => ({ learning: learningType, key: (prev?.key ?? 0) + 1 }));
-    joiningJourneyRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTrainingTab("training");
+    setTileDeepLink((prev) => ({
+      learning: learningType,
+      key: (prev?.key ?? 0) + 1,
+    }));
+    joiningJourneyRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  const handleMemberSelect = useCallback((membershipNumber: string, name: string) => {
-    setSelectedMember({ membershipNumber, name });
-    // Don't trigger network loads while background auth is still in progress (no token yet)
-    if (!token && !MOCK_MODE) return;
-    if (joiningJourney.state === 'idle') loadJoiningJourney();
-    if (disclosures.state === 'idle') loadDisclosures();
-    if (!teamReviewsCollapsed && teamReviews.state === 'idle') loadTeamReviews();
-    if (!permitsCollapsed && permits.state === 'idle') loadPermits();
-    if (!awardsCollapsed && awards.state === 'idle') loadAwards();
-  }, [token, joiningJourney.state, loadJoiningJourney, disclosures.state, loadDisclosures, teamReviewsCollapsed, teamReviews.state, loadTeamReviews, permitsCollapsed, permits.state, loadPermits, awardsCollapsed, awards.state, loadAwards]);
+  const handleMemberSelect = useCallback(
+    (membershipNumber: string, name: string) => {
+      setSelectedMember({ membershipNumber, name });
+      // Don't trigger network loads while background auth is still in progress (no token yet)
+      if (!token && !MOCK_MODE) return;
+      if (joiningJourney.state === "idle") loadJoiningJourney();
+      if (disclosures.state === "idle") loadDisclosures();
+      if (!teamReviewsCollapsed && teamReviews.state === "idle")
+        loadTeamReviews();
+      if (!permitsCollapsed && permits.state === "idle") loadPermits();
+      if (!awardsCollapsed && awards.state === "idle") loadAwards();
+    },
+    [
+      token,
+      joiningJourney.state,
+      loadJoiningJourney,
+      disclosures.state,
+      loadDisclosures,
+      teamReviewsCollapsed,
+      teamReviews.state,
+      loadTeamReviews,
+      permitsCollapsed,
+      permits.state,
+      loadPermits,
+      awardsCollapsed,
+      awards.state,
+      loadAwards,
+    ],
+  );
 
   // On mount: seed state from IndexedDB cache for immediate render, then
   // fetch fresh data from the network if online.
@@ -414,13 +620,18 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
 
       try {
         [cachedRecords, cachedLastSync] = await Promise.all([
-          readCache('learningRecords', contactId) as Promise<LearningRecord[] | null>,
+          readCache("learningRecords", contactId) as Promise<
+            LearningRecord[] | null
+          >,
           readLastSync(contactId),
         ]);
       } catch (err) {
         // IndexedDB failed (unavailable, blocked, or quota exceeded).
         // Proceed without cached data so the network fetch path can still run.
-        console.warn('Failed to read primary cache from IndexedDB; continuing without cache.', err);
+        console.warn(
+          "Failed to read primary cache from IndexedDB; continuing without cache.",
+          err,
+        );
       }
       if (controller.signal.aborted) return;
 
@@ -433,7 +644,9 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       } else if (!isOnline) {
         // Offline with no cached data — stop loading and surface a message
         setPrimaryLoading(false);
-        setPrimaryError('You are offline and there is no cached data available.');
+        setPrimaryError(
+          "You are offline and there is no cached data available.",
+        );
       }
 
       if (controller.signal.aborted) return;
@@ -442,52 +655,103 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
       // before starting the primary network fetch so loading isn't delayed by
       // on-demand sections that haven't been scrolled into view yet.
       Promise.all([
-        readCache('disclosures', contactId) as Promise<DisclosureRecord[] | null>,
-        readCache('joiningJourney', contactId) as Promise<JoiningJourneyRecord[] | null>,
-        readCache('suspensions', contactId) as Promise<SuspensionRecord[] | null>,
-        readCache('teamReviews', contactId) as Promise<TeamReviewRecord[] | null>,
-        readCache('permits', contactId) as Promise<PermitRecord[] | null>,
-        readCache('awards', contactId) as Promise<AwardRecord[] | null>,
-      ]).then(([
-        cachedDisclosures,
-        cachedJoiningJourney,
-        cachedSuspensions,
-        cachedTeamReviews,
-        cachedPermits,
-        cachedAwards,
-      ]) => {
-        if (controller.signal.aborted) return;
-        if (!triggeredSections.current.has('disclosures') && cachedDisclosures && cachedDisclosures.length > 0) {
-          setDisclosures({
-            state: 'loaded',
-            data: { records: cachedDisclosures, summary: client.computeDisclosureSummary(cachedDisclosures) },
-            error: null,
-          });
-          triggeredSections.current.add('disclosures');
-        }
-        if (!triggeredSections.current.has('joiningJourney') && cachedJoiningJourney && cachedJoiningJourney.length > 0) {
-          setJoiningJourney({ state: 'loaded', data: cachedJoiningJourney, error: null });
-          triggeredSections.current.add('joiningJourney');
-        }
-        if (!triggeredSections.current.has('suspensions') && cachedSuspensions && cachedSuspensions.length > 0) {
-          setSuspensions({ state: 'loaded', data: cachedSuspensions, error: null });
-          triggeredSections.current.add('suspensions');
-        }
-        if (!triggeredSections.current.has('teamReviews') && cachedTeamReviews && cachedTeamReviews.length > 0) {
-          setTeamReviews({ state: 'loaded', data: cachedTeamReviews, error: null });
-          triggeredSections.current.add('teamReviews');
-        }
-        if (!triggeredSections.current.has('permits') && cachedPermits && cachedPermits.length > 0) {
-          setPermits({ state: 'loaded', data: cachedPermits, error: null });
-          triggeredSections.current.add('permits');
-        }
-        if (!triggeredSections.current.has('awards') && cachedAwards && cachedAwards.length > 0) {
-          setAwards({ state: 'loaded', data: cachedAwards, error: null });
-          triggeredSections.current.add('awards');
-        }
-      }).catch(err => {
-        console.warn('Failed to read secondary caches from IndexedDB.', err);
-      });
+        readCache("disclosures", contactId) as Promise<
+          DisclosureRecord[] | null
+        >,
+        readCache("joiningJourney", contactId) as Promise<
+          JoiningJourneyRecord[] | null
+        >,
+        readCache("suspensions", contactId) as Promise<
+          SuspensionRecord[] | null
+        >,
+        readCache("teamReviews", contactId) as Promise<
+          TeamReviewRecord[] | null
+        >,
+        readCache("permits", contactId) as Promise<PermitRecord[] | null>,
+        readCache("awards", contactId) as Promise<AwardRecord[] | null>,
+      ])
+        .then(
+          ([
+            cachedDisclosures,
+            cachedJoiningJourney,
+            cachedSuspensions,
+            cachedTeamReviews,
+            cachedPermits,
+            cachedAwards,
+          ]) => {
+            if (controller.signal.aborted) return;
+            if (
+              !triggeredSections.current.has("disclosures") &&
+              cachedDisclosures &&
+              cachedDisclosures.length > 0
+            ) {
+              setDisclosures({
+                state: "loaded",
+                data: {
+                  records: cachedDisclosures,
+                  summary: client.computeDisclosureSummary(cachedDisclosures),
+                },
+                error: null,
+              });
+              triggeredSections.current.add("disclosures");
+            }
+            if (
+              !triggeredSections.current.has("joiningJourney") &&
+              cachedJoiningJourney &&
+              cachedJoiningJourney.length > 0
+            ) {
+              setJoiningJourney({
+                state: "loaded",
+                data: cachedJoiningJourney,
+                error: null,
+              });
+              triggeredSections.current.add("joiningJourney");
+            }
+            if (
+              !triggeredSections.current.has("suspensions") &&
+              cachedSuspensions &&
+              cachedSuspensions.length > 0
+            ) {
+              setSuspensions({
+                state: "loaded",
+                data: cachedSuspensions,
+                error: null,
+              });
+              triggeredSections.current.add("suspensions");
+            }
+            if (
+              !triggeredSections.current.has("teamReviews") &&
+              cachedTeamReviews &&
+              cachedTeamReviews.length > 0
+            ) {
+              setTeamReviews({
+                state: "loaded",
+                data: cachedTeamReviews,
+                error: null,
+              });
+              triggeredSections.current.add("teamReviews");
+            }
+            if (
+              !triggeredSections.current.has("permits") &&
+              cachedPermits &&
+              cachedPermits.length > 0
+            ) {
+              setPermits({ state: "loaded", data: cachedPermits, error: null });
+              triggeredSections.current.add("permits");
+            }
+            if (
+              !triggeredSections.current.has("awards") &&
+              cachedAwards &&
+              cachedAwards.length > 0
+            ) {
+              setAwards({ state: "loaded", data: cachedAwards, error: null });
+              triggeredSections.current.add("awards");
+            }
+          },
+        )
+        .catch((err) => {
+          console.warn("Failed to read secondary caches from IndexedDB.", err);
+        });
 
       // Fetch fresh data from the network if online and authenticated
       if (isOnline && token && !controller.signal.aborted) {
@@ -496,36 +760,76 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
     }
 
     init();
-    return () => { controller.abort(); };
-  // Run once on mount only — isOnline and fetchPrimaryData are intentionally
-  // excluded to avoid re-running when online state flips mid-session.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      controller.abort();
+    };
+    // Run once on mount only — isOnline and fetchPrimaryData are intentionally
+    // excluded to avoid re-running when online state flips mid-session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Set up intersection observers for lazy sections
   useEffect(() => {
     const sections = [
-      { ref: joiningJourneyRef, key: 'joiningJourney', load: loadJoiningJourney, collapsed: false },
-      { ref: disclosuresRef, key: 'disclosures', load: loadDisclosures, collapsed: false },
-      { ref: suspensionsRef, key: 'suspensions', load: loadSuspensions, collapsed: false },
-      { ref: teamReviewsRef, key: 'teamReviews', load: loadTeamReviews, collapsed: teamReviewsCollapsed },
-      { ref: permitsRef, key: 'permits', load: loadPermits, collapsed: permitsCollapsed },
-      { ref: awardsRef, key: 'awards', load: loadAwards, collapsed: awardsCollapsed },
+      {
+        ref: joiningJourneyRef,
+        key: "joiningJourney",
+        load: loadJoiningJourney,
+        collapsed: false,
+      },
+      {
+        ref: disclosuresRef,
+        key: "disclosures",
+        load: loadDisclosures,
+        collapsed: false,
+      },
+      {
+        ref: suspensionsRef,
+        key: "suspensions",
+        load: loadSuspensions,
+        collapsed: false,
+      },
+      {
+        ref: teamReviewsRef,
+        key: "teamReviews",
+        load: loadTeamReviews,
+        collapsed: teamReviewsCollapsed,
+      },
+      {
+        ref: permitsRef,
+        key: "permits",
+        load: loadPermits,
+        collapsed: permitsCollapsed,
+      },
+      {
+        ref: awardsRef,
+        key: "awards",
+        load: loadAwards,
+        collapsed: awardsCollapsed,
+      },
     ];
 
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach(entry => {
+        entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            const section = sections.find(s => s.ref.current === entry.target);
-            if (section && !section.collapsed && !triggeredSections.current.has(section.key) && isOnline && (token || MOCK_MODE)) {
+            const section = sections.find(
+              (s) => s.ref.current === entry.target,
+            );
+            if (
+              section &&
+              !section.collapsed &&
+              !triggeredSections.current.has(section.key) &&
+              isOnline &&
+              (token || MOCK_MODE)
+            ) {
               triggeredSections.current.add(section.key);
               section.load();
             }
           }
         });
       },
-      { rootMargin: '100px' }
+      { rootMargin: "100px" },
     );
 
     sections.forEach(({ ref }) => {
@@ -533,27 +837,47 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
     });
 
     return () => observer.disconnect();
-  }, [isOnline, teamReviewsCollapsed, permitsCollapsed, awardsCollapsed, loadJoiningJourney, loadDisclosures, loadSuspensions, loadTeamReviews, loadPermits, loadAwards]);
+  }, [
+    isOnline,
+    teamReviewsCollapsed,
+    permitsCollapsed,
+    awardsCollapsed,
+    loadJoiningJourney,
+    loadDisclosures,
+    loadSuspensions,
+    loadTeamReviews,
+    loadPermits,
+    loadAwards,
+  ]);
 
-  const isAnyLoading = primaryLoading ||
-    joiningJourney.state === 'loading' ||
-    disclosures.state === 'loading' ||
-    suspensions.state === 'loading' ||
-    teamReviews.state === 'loading' ||
-    permits.state === 'loading' ||
-    awards.state === 'loading';
+  const isAnyLoading =
+    primaryLoading ||
+    joiningJourney.state === "loading" ||
+    disclosures.state === "loading" ||
+    suspensions.state === "loading" ||
+    teamReviews.state === "loading" ||
+    permits.state === "loading" ||
+    awards.state === "loading";
 
   const permitExpiringSoon = useMemo(() => {
-    return permits.data.filter(r => isExpiringSoon(r['Permit expiry date'])).length;
+    return permits.data.filter((r) => isExpiringSoon(r["Permit expiry date"]))
+      .length;
   }, [permits.data]);
 
   const memberNameMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const r of records) {
-      map.set(r['Membership number'], `${r['First name']} ${r['Last name']}`.trim());
+      map.set(
+        r["Membership number"],
+        `${r["First name"]} ${r["Last name"]}`.trim(),
+      );
     }
     return map;
   }, [records]);
+
+  if (showModuleRules) {
+    return <ModuleRulesPage onBack={() => setShowModuleRules(false)} />;
+  }
 
   if (selectedMember) {
     return (
@@ -584,7 +908,9 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           <div className="flex items-center justify-between gap-2">
             <div>
               <h1 className="text-xl font-bold text-gray-900">GLV Dashboard</h1>
-              <p className="text-sm text-gray-500 hidden sm:block">Training Compliance Overview</p>
+              <p className="text-sm text-gray-500 hidden sm:block">
+                Training Compliance Overview
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -599,7 +925,8 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           <div className="mt-2 space-y-1">
             {username && (
               <div className="hidden sm:block text-sm text-gray-500">
-                Signed in as <span className="font-medium text-gray-600">{username}</span>
+                Signed in as{" "}
+                <span className="font-medium text-gray-600">{username}</span>
               </div>
             )}
             <SyncStatus
@@ -638,12 +965,22 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
           {searchTerm && (
             <button
-              onClick={() => setSearchTerm('')}
+              onClick={() => setSearchTerm("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               aria-label="Clear search"
             >
@@ -655,12 +992,32 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         {/* Summary Tiles - Always load immediately */}
         <section>
           <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Compliance Summary</h2>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Compliance Summary
+            </h2>
+            <button
+              onClick={() => setShowModuleRules(true)}
+              className="text-sm text-purple-600 hover:text-purple-800 hover:underline"
+            >
+              Module rules ↗
+            </button>
             {primaryLoading && (
               <span className="text-sm text-purple-600 animate-pulse flex items-center gap-2">
                 <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
                 </svg>
                 Loading...
               </span>
@@ -678,52 +1035,81 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
         {/* Training & Onboarding - merged section */}
         <section ref={joiningJourneyRef} id="section-learning">
           <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Training &amp; Onboarding</h2>
-            {trainingTab === 'training' && primaryLoading && (
+            <h2 className="text-lg font-semibold text-gray-900">
+              Training &amp; Onboarding
+            </h2>
+            {trainingTab === "training" && primaryLoading && (
               <span className="text-sm text-purple-600 animate-pulse flex items-center gap-2">
                 <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
                 </svg>
                 Loading...
               </span>
             )}
-            {trainingTab === 'onboarding' && joiningJourney.state === 'loading' && (
-              <span className="text-sm text-purple-600 animate-pulse flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Loading...
-              </span>
-            )}
-            <div className="ml-auto flex items-center gap-3">
-              {trainingTab === 'onboarding' && joiningJourney.state === 'loaded' && joiningJourney.data.length > 0 && (
-                <div className="flex gap-1 rounded-lg overflow-hidden border border-gray-200 text-sm">
-                  <button
-                    onClick={() => setJoiningJourneyView('progress')}
-                    className={`px-3 py-1 ${joiningJourneyView === 'progress' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                  >
-                    By Member
-                  </button>
-                  <button
-                    onClick={() => setJoiningJourneyView('items')}
-                    className={`px-3 py-1 ${joiningJourneyView === 'items' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                  >
-                    All Tasks
-                  </button>
-                </div>
+            {trainingTab === "onboarding" &&
+              joiningJourney.state === "loading" && (
+                <span className="text-sm text-purple-600 animate-pulse flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Loading...
+                </span>
               )}
+            <div className="ml-auto flex items-center gap-3">
+              {trainingTab === "onboarding" &&
+                joiningJourney.state === "loaded" &&
+                joiningJourney.data.length > 0 && (
+                  <div className="flex gap-1 rounded-lg overflow-hidden border border-gray-200 text-sm">
+                    <button
+                      onClick={() => setJoiningJourneyView("progress")}
+                      className={`px-3 py-1 ${joiningJourneyView === "progress" ? "bg-purple-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
+                    >
+                      By Member
+                    </button>
+                    <button
+                      onClick={() => setJoiningJourneyView("items")}
+                      className={`px-3 py-1 ${joiningJourneyView === "items" ? "bg-purple-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
+                    >
+                      All Tasks
+                    </button>
+                  </div>
+                )}
               <div className="flex gap-1 rounded-lg overflow-hidden border border-gray-200 text-sm">
                 <button
-                  onClick={() => setTrainingTab('onboarding')}
-                  className={`px-3 py-1 ${trainingTab === 'onboarding' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  onClick={() => setTrainingTab("onboarding")}
+                  className={`px-3 py-1 ${trainingTab === "onboarding" ? "bg-purple-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
                 >
                   Onboarding
                 </button>
                 <button
-                  onClick={() => setTrainingTab('training')}
-                  className={`px-3 py-1 ${trainingTab === 'training' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  onClick={() => setTrainingTab("training")}
+                  className={`px-3 py-1 ${trainingTab === "training" ? "bg-purple-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
                 >
                   Training Records
                 </button>
@@ -731,7 +1117,7 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
             </div>
           </div>
 
-          {trainingTab === 'training' && (
+          {trainingTab === "training" && (
             <ComplianceTable
               key={tileDeepLink?.key ?? 0}
               records={records}
@@ -739,46 +1125,65 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
               onMemberSelect={handleMemberSelect}
               searchTerm={searchTerm}
               initialLearning={tileDeepLink?.learning}
-              initialSortField={tileDeepLink ? 'status' : undefined}
-              initialSortOrder={tileDeepLink ? 'asc' : undefined}
-              initialFilterExpiringOrNotStarted={tileDeepLink ? false : undefined}
+              initialSortField={tileDeepLink ? "status" : undefined}
+              initialSortOrder={tileDeepLink ? "asc" : undefined}
+              initialFilterExpiringOrNotStarted={
+                tileDeepLink ? false : undefined
+              }
             />
           )}
 
-          {trainingTab === 'onboarding' && (
+          {trainingTab === "onboarding" && (
             <>
-              {joiningJourney.state === 'error' && (
+              {joiningJourney.state === "error" && (
                 <div className="bg-white rounded-lg shadow-sm border p-6">
-                  <div className="text-red-600 mb-2">Failed to load: {joiningJourney.error}</div>
+                  <div className="text-red-600 mb-2">
+                    Failed to load: {joiningJourney.error}
+                  </div>
                   <button
-                    onClick={() => { triggeredSections.current.delete('joiningJourney'); loadJoiningJourney(); }}
+                    onClick={() => {
+                      triggeredSections.current.delete("joiningJourney");
+                      loadJoiningJourney();
+                    }}
                     className="text-sm text-purple-600 hover:text-purple-800 underline"
                   >
                     Try again
                   </button>
                 </div>
               )}
-              {joiningJourney.state === 'idle' && (
+              {joiningJourney.state === "idle" && (
                 <div className="bg-white rounded-lg shadow-sm border">
-                  <div className="p-4 border-b"><div className="h-6 bg-gray-200 rounded w-48 animate-pulse"></div></div>
+                  <div className="p-4 border-b">
+                    <div className="h-6 bg-gray-200 rounded w-48 animate-pulse"></div>
+                  </div>
                   <div className="p-4 space-y-3">
-                    {[...Array(3)].map((_, i) => (<div key={i} className="h-12 bg-gray-100 rounded animate-pulse"></div>))}
+                    {[...Array(3)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-12 bg-gray-100 rounded animate-pulse"
+                      ></div>
+                    ))}
                   </div>
                 </div>
               )}
-              {(joiningJourney.state === 'loading' || joiningJourney.state === 'loaded') && (
-                joiningJourneyView === 'progress' ? (
+              {(joiningJourney.state === "loading" ||
+                joiningJourney.state === "loaded") &&
+                (joiningJourneyView === "progress" ? (
                   <JoiningJourneyProgress
                     joiningJourneyRecords={joiningJourney.data}
                     learningRecords={records}
-                    isLoading={joiningJourney.state === 'loading'}
+                    isLoading={joiningJourney.state === "loading"}
                     onMemberSelect={handleMemberSelect}
                     searchTerm={searchTerm}
                   />
                 ) : (
-                  <JoiningJourneyTable records={joiningJourney.data} isLoading={joiningJourney.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
-                )
-              )}
+                  <JoiningJourneyTable
+                    records={joiningJourney.data}
+                    isLoading={joiningJourney.state === "loading"}
+                    onMemberSelect={handleMemberSelect}
+                    searchTerm={searchTerm}
+                  />
+                ))}
             </>
           )}
         </section>
@@ -790,12 +1195,15 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           title="Disclosure Compliance"
           state={disclosures.state}
           error={disclosures.error}
-          onRetry={() => { triggeredSections.current.delete('disclosures'); loadDisclosures(); }}
+          onRetry={() => {
+            triggeredSections.current.delete("disclosures");
+            loadDisclosures();
+          }}
         >
           <DisclosureTable
             records={disclosures.data.records}
             summary={disclosures.data.summary}
-            isLoading={disclosures.state === 'loading'}
+            isLoading={disclosures.state === "loading"}
             onMemberSelect={handleMemberSelect}
             searchTerm={searchTerm}
           />
@@ -807,9 +1215,17 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           title="Suspensions"
           state={suspensions.state}
           error={suspensions.error}
-          onRetry={() => { triggeredSections.current.delete('suspensions'); loadSuspensions(); }}
+          onRetry={() => {
+            triggeredSections.current.delete("suspensions");
+            loadSuspensions();
+          }}
         >
-          <SuspensionsTable records={suspensions.data} isLoading={suspensions.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
+          <SuspensionsTable
+            records={suspensions.data}
+            isLoading={suspensions.state === "loading"}
+            onMemberSelect={handleMemberSelect}
+            searchTerm={searchTerm}
+          />
         </LazySection>
 
         {/* Team Reviews - Lazy loaded, collapsed by default */}
@@ -820,30 +1236,30 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           error={teamReviews.error}
           onRetry={() => {
             if (!token && !MOCK_MODE) return;
-            triggeredSections.current.delete('teamReviews');
+            triggeredSections.current.delete("teamReviews");
             loadTeamReviews();
           }}
           collapsed={teamReviewsCollapsed}
           onToggle={() => {
             const next = !teamReviewsCollapsed;
             setTeamReviewsCollapsed(next);
-            if (!next && teamReviews.state === 'idle' && (token || MOCK_MODE)) {
-              triggeredSections.current.add('teamReviews');
+            if (!next && teamReviews.state === "idle" && (token || MOCK_MODE)) {
+              triggeredSections.current.add("teamReviews");
               loadTeamReviews();
             }
           }}
           headerExtra={
-            teamReviews.state === 'loaded' && teamReviews.data.length > 0 ? (
+            teamReviews.state === "loaded" && teamReviews.data.length > 0 ? (
               <div className="flex gap-1 rounded-lg overflow-hidden border border-gray-200 text-sm">
                 <button
-                  onClick={() => setTeamDirView('directory')}
-                  className={`px-3 py-1 ${teamDirView === 'directory' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  onClick={() => setTeamDirView("directory")}
+                  className={`px-3 py-1 ${teamDirView === "directory" ? "bg-purple-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
                 >
                   Directory
                 </button>
                 <button
-                  onClick={() => setTeamDirView('structure')}
-                  className={`px-3 py-1 ${teamDirView === 'structure' ? 'bg-purple-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                  onClick={() => setTeamDirView("structure")}
+                  className={`px-3 py-1 ${teamDirView === "structure" ? "bg-purple-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
                 >
                   Structure
                 </button>
@@ -851,10 +1267,20 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
             ) : undefined
           }
         >
-          {teamDirView === 'directory' ? (
-            <TeamReviewsTable records={teamReviews.data} isLoading={teamReviews.state === 'loading'} searchTerm={searchTerm} memberNameMap={memberNameMap} />
+          {teamDirView === "directory" ? (
+            <TeamReviewsTable
+              records={teamReviews.data}
+              isLoading={teamReviews.state === "loading"}
+              searchTerm={searchTerm}
+              memberNameMap={memberNameMap}
+            />
           ) : (
-            <TeamStructure records={teamReviews.data} isLoading={teamReviews.state === 'loading'} memberNameMap={memberNameMap} searchTerm={searchTerm} />
+            <TeamStructure
+              records={teamReviews.data}
+              isLoading={teamReviews.state === "loading"}
+              memberNameMap={memberNameMap}
+              searchTerm={searchTerm}
+            />
           )}
         </LazySection>
 
@@ -867,20 +1293,25 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           error={permits.error}
           onRetry={() => {
             if (!token && !MOCK_MODE) return;
-            triggeredSections.current.delete('permits');
+            triggeredSections.current.delete("permits");
             loadPermits();
           }}
           collapsed={permitsCollapsed}
           onToggle={() => {
             const next = !permitsCollapsed;
             setPermitsCollapsed(next);
-            if (!next && permits.state === 'idle' && (token || MOCK_MODE)) {
-              triggeredSections.current.add('permits');
+            if (!next && permits.state === "idle" && (token || MOCK_MODE)) {
+              triggeredSections.current.add("permits");
               loadPermits();
             }
           }}
         >
-          <PermitsTable records={permits.data} isLoading={permits.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
+          <PermitsTable
+            records={permits.data}
+            isLoading={permits.state === "loading"}
+            onMemberSelect={handleMemberSelect}
+            searchTerm={searchTerm}
+          />
         </LazySection>
 
         {/* Awards - Lazy loaded, collapsed by default */}
@@ -891,28 +1322,37 @@ export function Dashboard({ token, contactId, username, isOnline, onLogout, onTo
           error={awards.error}
           onRetry={() => {
             if (!token && !MOCK_MODE) return;
-            triggeredSections.current.delete('awards');
+            triggeredSections.current.delete("awards");
             loadAwards();
           }}
           collapsed={awardsCollapsed}
           onToggle={() => {
             const next = !awardsCollapsed;
             setAwardsCollapsed(next);
-            if (!next && awards.state === 'idle' && (token || MOCK_MODE)) {
-              triggeredSections.current.add('awards');
+            if (!next && awards.state === "idle" && (token || MOCK_MODE)) {
+              triggeredSections.current.add("awards");
               loadAwards();
             }
           }}
         >
-          <AwardsTable records={awards.data} isLoading={awards.state === 'loading'} onMemberSelect={handleMemberSelect} searchTerm={searchTerm} />
+          <AwardsTable
+            records={awards.data}
+            isLoading={awards.state === "loading"}
+            onMemberSelect={handleMemberSelect}
+            searchTerm={searchTerm}
+          />
         </LazySection>
       </main>
 
       {/* Footer */}
       <footer className="max-w-7xl mx-auto px-4 py-6 text-center text-sm text-gray-500">
-        Data fetched directly from the Scouts membership portal. Cached locally for offline access.
+        Data fetched directly from the Scouts membership portal. Cached locally
+        for offline access.
         <div className="mt-1">
-          <VersionFooter updateAvailable={updateAvailable} onUpdate={onUpdate} />
+          <VersionFooter
+            updateAvailable={updateAvailable}
+            onUpdate={onUpdate}
+          />
         </div>
       </footer>
     </div>

@@ -9,39 +9,73 @@ import type { LearningRecord, MemberLearningResult } from "./types";
 export const FIRST_RESPONSE_MODULE = "First Response";
 
 /**
- * Growing Roots modules required as part of the joining journey.
- * deadlineDays: number of days from role start by which this module must be completed (null = no deadline).
+ * Unified module config covering all modules that have deadlines, mandatory synthesis,
+ * or display grouping.
+ *
+ * deadlineDays: days from role start by which the module must be completed (null = no deadline).
+ *   First Response uses 365 (≈ 1 year); Growing Roots vary by module.
  * synthesizeIfMissing: when true, a "Not Started" record is synthesised for any member whose
- *   GetLmsDetailsAsync result contains no entry for this module — ensures mandatory modules are
- *   always visible in compliance tiles rather than silently absent.
- * These names are matched against module titles returned by GetLmsDetailsAsync.
+ *   GetLmsDetailsAsync result contains no entry for this module.
+ * group: display group name ("Growing Roots") or null for standalone modules.
  */
-export const GROWING_ROOTS_MODULES: ReadonlyArray<{
+export const MODULE_CONFIG: ReadonlyArray<{
   name: string;
   deadlineDays: number | null;
   synthesizeIfMissing?: boolean;
+  group: string | null;
 }> = [
-  { name: "Safeguarding", deadlineDays: 30, synthesizeIfMissing: true },
-  { name: "Safety", deadlineDays: 30, synthesizeIfMissing: true },
+  {
+    name: FIRST_RESPONSE_MODULE,
+    deadlineDays: 365,
+    synthesizeIfMissing: true,
+    group: null,
+  },
+  {
+    name: "Safeguarding",
+    deadlineDays: 30,
+    synthesizeIfMissing: true,
+    group: "Growing Roots",
+  },
+  {
+    name: "Safety",
+    deadlineDays: 30,
+    synthesizeIfMissing: true,
+    group: "Growing Roots",
+  },
   {
     name: "Who We Are and What We Do",
     deadlineDays: 180,
     synthesizeIfMissing: true,
+    group: "Growing Roots",
   },
-  { name: "Creating Inclusion", deadlineDays: 180, synthesizeIfMissing: true },
+  {
+    name: "Creating Inclusion",
+    deadlineDays: 180,
+    synthesizeIfMissing: true,
+    group: "Growing Roots",
+  },
   {
     name: "Data Protection in Scouts",
     deadlineDays: 180,
     synthesizeIfMissing: true,
+    group: "Growing Roots",
   },
-  { name: "Delivering a Great Programme", deadlineDays: null },
-  { name: "Leading Scout Volunteers", deadlineDays: null },
-  { name: "Being a Trustee", deadlineDays: null },
+  {
+    name: "Delivering a Great Programme",
+    deadlineDays: null,
+    group: "Growing Roots",
+  },
+  {
+    name: "Leading Scout Volunteers",
+    deadlineDays: null,
+    group: "Growing Roots",
+  },
+  { name: "Being a Trustee", deadlineDays: null, group: "Growing Roots" },
 ];
 
-/** Returns true if the module title matches a known Growing Roots module */
+/** Returns true if the module title is a known Growing Roots module */
 export function isGrowingRootsModule(title: string): boolean {
-  return GROWING_ROOTS_MODULES.some((m) => m.name === title);
+  return MODULE_CONFIG.some((m) => m.group === "Growing Roots" && m.name === title);
 }
 
 /**
@@ -119,7 +153,11 @@ export function isExpiringSoon(
 export function getDeadlineInfo(
   startDateStr: string | null | undefined,
   deadlineDays: number | null,
-): { deadlineDate: Date | null; daysRemaining: number | null; isOverdue: boolean } {
+): {
+  deadlineDate: Date | null;
+  daysRemaining: number | null;
+  isOverdue: boolean;
+} {
   if (!startDateStr || deadlineDays === null) {
     return { deadlineDate: null, daysRemaining: null, isOverdue: false };
   }
@@ -166,16 +204,11 @@ export function transformLearningResults(
   const records: LearningRecord[] = [];
 
   for (const member of members) {
-    const hasFirstResponse = member.modules.some(
-      (m) => m.title === FIRST_RESPONSE_MODULE,
-    );
-
-    // Include modules with expiry dates, First Response, and all Growing Roots modules
+    // Include modules with expiry dates, or any module known to MODULE_CONFIG
     const includedModules = member.modules.filter(
       (m) =>
         m.expiryDate !== null ||
-        m.title === FIRST_RESPONSE_MODULE ||
-        isGrowingRootsModule(m.title),
+        MODULE_CONFIG.some((c) => c.name === m.title),
     );
 
     for (const module of includedModules) {
@@ -191,16 +224,9 @@ export function transformLearningResults(
         "Expiry date": expiryDate ? expiryDate.toISOString() : null,
       };
 
-      // Attach start date to First Response so the 1-year deadline can be shown
-      if (module.title === FIRST_RESPONSE_MODULE && memberStartDates) {
-        record["Start date"] =
-          memberStartDates.get(member.membershipNumber) ?? null;
-      }
-
-      // Attach start date to Growing Roots modules with a deadline so the
-      // MemberDashboard can compute when the module must be completed
-      const grConfig = GROWING_ROOTS_MODULES.find((m) => m.name === module.title);
-      if (grConfig && grConfig.deadlineDays !== null && memberStartDates) {
+      // Attach start date to any module with a deadline so the UI can show it
+      const modConfig = MODULE_CONFIG.find((c) => c.name === module.title);
+      if (modConfig && modConfig.deadlineDays !== null && memberStartDates) {
         record["Start date"] =
           memberStartDates.get(member.membershipNumber) ?? null;
       }
@@ -208,35 +234,23 @@ export function transformLearningResults(
       records.push(record);
     }
 
-    // Synthesise a "Not Started" record for members with no First Response module at all
-    if (!hasFirstResponse) {
-      records.push({
-        "First name": member.firstName,
-        "Last name": member.lastName,
-        "Membership number": member.membershipNumber,
-        Learning: FIRST_RESPONSE_MODULE,
-        Status: "Not Started",
-        "Expiry date": null,
-        "Start date": memberStartDates?.get(member.membershipNumber) ?? null,
-      });
-    }
-
-    // Synthesise "Not Started" for modules with synthesizeIfMissing=true absent from
-    // GetLmsDetailsAsync data — the LMS endpoint can return an empty array for members the
-    // portal flags as non-compliant, which would otherwise hide them from compliance tiles.
-    for (const grModule of GROWING_ROOTS_MODULES) {
-      if (!grModule.synthesizeIfMissing) continue;
-      const hasModule = member.modules.some((m) => m.title === grModule.name);
+    // Synthesise "Not Started" for any module with synthesizeIfMissing=true that is
+    // absent from GetLmsDetailsAsync data. This covers First Response (1-year deadline)
+    // and mandatory Growing Roots modules — the LMS endpoint can return an empty array
+    // for members the portal flags as non-compliant, making them invisible in tiles.
+    for (const modConfig of MODULE_CONFIG) {
+      if (!modConfig.synthesizeIfMissing) continue;
+      const hasModule = member.modules.some((m) => m.title === modConfig.name);
       if (!hasModule) {
         const synthRecord: LearningRecord = {
           "First name": member.firstName,
           "Last name": member.lastName,
           "Membership number": member.membershipNumber,
-          Learning: grModule.name,
+          Learning: modConfig.name,
           Status: "Not Started",
           "Expiry date": null,
         };
-        if (grModule.deadlineDays !== null && memberStartDates) {
+        if (modConfig.deadlineDays !== null && memberStartDates) {
           synthRecord["Start date"] =
             memberStartDates.get(member.membershipNumber) ?? null;
         }

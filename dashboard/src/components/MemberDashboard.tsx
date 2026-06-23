@@ -17,7 +17,7 @@ import type {
   AwardRecord,
 } from "../types";
 import type { LoadState } from "./LazySection";
-import { GROWING_ROOTS_MODULES, getDeadlineInfo } from "../utils";
+import { MODULE_CONFIG, getDeadlineInfo } from "../utils";
 
 interface MemberDashboardProps {
   membershipNumber: string;
@@ -184,11 +184,12 @@ export function MemberDashboard({
     (r) => r["Membership number"] === membershipNumber,
   );
 
-  const growingRootsNames = new Set(GROWING_ROOTS_MODULES.map((m) => m.name));
+  const GR_MODULES = MODULE_CONFIG.filter((m) => m.group === "Growing Roots");
+  const growingRootsNames = new Set(GR_MODULES.map((m) => m.name));
   const otherLearning = memberLearning.filter(
     (r) => !growingRootsNames.has(r.Learning),
   );
-  const growingRootsLearning = GROWING_ROOTS_MODULES.flatMap((m) => {
+  const growingRootsLearning = GR_MODULES.flatMap((m) => {
     const record = memberLearning.find((r) => r.Learning === m.name);
     return record ? [{ module: m, record }] : [];
   });
@@ -437,7 +438,7 @@ export function MemberDashboard({
                       </div>
                       {/* Expand Growing Roots to individual module status */}
                       {isGrowingRoots &&
-                        GROWING_ROOTS_MODULES.map((grModule) => {
+                        GR_MODULES.map((grModule) => {
                           const moduleRecord = memberLearning.find(
                             (lr) => lr.Learning === grModule.name,
                           );

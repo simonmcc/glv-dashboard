@@ -4,8 +4,9 @@
  * Displays detailed learning compliance records in a sortable, filterable table.
  */
 
-import { useState, useMemo } from 'react';
-import type { LearningRecord } from '../types';
+import { useState, useMemo } from "react";
+import type { LearningRecord } from "../types";
+import { MODULE_CONFIG, getDeadlineInfo } from "../utils";
 
 interface ComplianceTableProps {
   records: LearningRecord[];
@@ -18,71 +19,64 @@ interface ComplianceTableProps {
   initialFilterExpiringOrNotStarted?: boolean;
 }
 
-type SortField = 'name' | 'learning' | 'status' | 'expiry';
-type SortOrder = 'asc' | 'desc';
+type SortField = "name" | "learning" | "status" | "expiry";
+type SortOrder = "asc" | "desc";
 
 const statusColors: Record<string, string> = {
-  'Valid': 'bg-green-100 text-green-800',
-  'In-Progress': 'bg-blue-100 text-blue-800',
-  'Expiring': 'bg-yellow-100 text-yellow-800',
-  'Renewal Due': 'bg-orange-100 text-orange-800',
-  'Expired': 'bg-red-100 text-red-800',
-  'Not Started': 'bg-gray-100 text-gray-800',
+  Valid: "bg-green-100 text-green-800",
+  "In-Progress": "bg-blue-100 text-blue-800",
+  Expiring: "bg-yellow-100 text-yellow-800",
+  "Renewal Due": "bg-orange-100 text-orange-800",
+  Expired: "bg-red-100 text-red-800",
+  "Not Started": "bg-gray-100 text-gray-800",
 };
 
 export function ComplianceTable({
   records,
   isLoading,
   onMemberSelect,
-  searchTerm = '',
-  initialLearning = 'all',
-  initialSortField = 'expiry',
-  initialSortOrder = 'asc',
+  searchTerm = "",
+  initialLearning = "all",
+  initialSortField = "expiry",
+  initialSortOrder = "asc",
   initialFilterExpiringOrNotStarted = true,
 }: ComplianceTableProps) {
   const [sortField, setSortField] = useState<SortField>(initialSortField);
   const [sortOrder, setSortOrder] = useState<SortOrder>(initialSortOrder);
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterLearning, setFilterLearning] = useState<string>(initialLearning);
   const [filterOverdue, setFilterOverdue] = useState(false);
   const [filterNoExpiry, setFilterNoExpiry] = useState(false);
-  const [filterExpiringOrNotStarted, setFilterExpiringOrNotStarted] = useState(initialFilterExpiringOrNotStarted);
+  const [filterExpiringOrNotStarted, setFilterExpiringOrNotStarted] = useState(
+    initialFilterExpiringOrNotStarted,
+  );
 
   // Get unique values for filters
   const statuses = useMemo(() => {
-    const unique = new Set(records.map(r => r.Status));
-    return ['all', ...Array.from(unique).sort()];
+    const unique = new Set(records.map((r) => r.Status));
+    return ["all", ...Array.from(unique).sort()];
   }, [records]);
 
   const learningTypes = useMemo(() => {
-    const unique = new Set(records.map(r => r.Learning));
-    return ['all', ...Array.from(unique).sort()];
+    const unique = new Set(records.map((r) => r.Learning));
+    return ["all", ...Array.from(unique).sort()];
   }, [records]);
 
-  // Count overdue records (expired or new members past deadline)
+  // Count overdue records (expired or members past their module deadline)
   const overdueCount = useMemo(() => {
-    return records.filter(r => {
-      // Expired status
-      if (r.Status === 'Expired') return true;
-      // Days since expiry > 0
-      if (r['Days since expiry'] && r['Days since expiry'] > 0) return true;
-      // New member past 12-month deadline (In-Progress or Not Started with no expiry)
-      if ((r.Status === 'In-Progress' || r.Status === 'Not Started') && !r['Expiry date'] && r['Start date']) {
-        const { isOverdue } = getNewMemberDeadline(r['Start date']);
-        return isOverdue;
-      }
-      return false;
-    }).length;
+    return records.filter(isRecordOverdue).length;
   }, [records]);
 
   // Count records with no expiry date
   const noExpiryCount = useMemo(() => {
-    return records.filter(r => !r['Expiry date']).length;
+    return records.filter((r) => !r["Expiry date"]).length;
   }, [records]);
 
   // Count records that are Expiring or Not Started
   const expiringOrNotStartedCount = useMemo(() => {
-    return records.filter(r => r.Status === 'Expiring' || r.Status === 'Not Started').length;
+    return records.filter(
+      (r) => r.Status === "Expiring" || r.Status === "Not Started",
+    ).length;
   }, [records]);
 
   // Filter and sort records
@@ -91,40 +85,35 @@ export function ComplianceTable({
 
     // Apply overdue filter
     if (filterOverdue) {
-      result = result.filter(r => {
-        if (r.Status === 'Expired') return true;
-        if (r['Days since expiry'] && r['Days since expiry'] > 0) return true;
-        if ((r.Status === 'In-Progress' || r.Status === 'Not Started') && !r['Expiry date'] && r['Start date']) {
-          const { isOverdue } = getNewMemberDeadline(r['Start date']);
-          return isOverdue;
-        }
-        return false;
-      });
+      result = result.filter(isRecordOverdue);
     }
 
     // Apply no expiry filter
     if (filterNoExpiry) {
-      result = result.filter(r => !r['Expiry date']);
+      result = result.filter((r) => !r["Expiry date"]);
     }
 
     // Apply expiring or not started filter
     if (filterExpiringOrNotStarted) {
-      result = result.filter(r => r.Status === 'Expiring' || r.Status === 'Not Started');
+      result = result.filter(
+        (r) => r.Status === "Expiring" || r.Status === "Not Started",
+      );
     }
 
     // Apply filters
-    if (filterStatus !== 'all') {
-      result = result.filter(r => r.Status === filterStatus);
+    if (filterStatus !== "all") {
+      result = result.filter((r) => r.Status === filterStatus);
     }
-    if (filterLearning !== 'all') {
-      result = result.filter(r => r.Learning === filterLearning);
+    if (filterLearning !== "all") {
+      result = result.filter((r) => r.Learning === filterLearning);
     }
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(r =>
-        r['First name'].toLowerCase().includes(term) ||
-        r['Last name'].toLowerCase().includes(term) ||
-        r['Membership number'].includes(term)
+      result = result.filter(
+        (r) =>
+          r["First name"].toLowerCase().includes(term) ||
+          r["Last name"].toLowerCase().includes(term) ||
+          r["Membership number"].includes(term),
       );
     }
 
@@ -132,42 +121,53 @@ export function ComplianceTable({
     result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case 'name':
-          comparison = `${a['Last name']} ${a['First name']}`.localeCompare(
-            `${b['Last name']} ${b['First name']}`
+        case "name":
+          comparison = `${a["Last name"]} ${a["First name"]}`.localeCompare(
+            `${b["Last name"]} ${b["First name"]}`,
           );
           break;
-        case 'learning':
+        case "learning":
           comparison = a.Learning.localeCompare(b.Learning);
           break;
-        case 'status':
+        case "status":
           comparison = a.Status.localeCompare(b.Status);
           break;
-        case 'expiry': {
-          const dateA = a['Expiry date'] || '';
-          const dateB = b['Expiry date'] || '';
+        case "expiry": {
+          const dateA = a["Expiry date"] || "";
+          const dateB = b["Expiry date"] || "";
           comparison = dateA.localeCompare(dateB);
           break;
         }
       }
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return sortOrder === "asc" ? comparison : -comparison;
     });
 
     return result;
-  }, [records, filterStatus, filterLearning, searchTerm, sortField, sortOrder, filterOverdue, filterNoExpiry, filterExpiringOrNotStarted]);
+  }, [
+    records,
+    filterStatus,
+    filterLearning,
+    searchTerm,
+    sortField,
+    sortOrder,
+    filterOverdue,
+    filterNoExpiry,
+    filterExpiringOrNotStarted,
+  ]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortOrder('asc');
+      setSortOrder("asc");
     }
   };
 
   const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
-    return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
+    if (sortField !== field)
+      return <span className="text-gray-300 ml-1">↕</span>;
+    return <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>;
   };
 
   if (isLoading) {
@@ -178,7 +178,10 @@ export function ComplianceTable({
         </div>
         <div className="p-4 space-y-3">
           {[...Array(10)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-100 rounded animate-pulse"></div>
+            <div
+              key={i}
+              className="h-12 bg-gray-100 rounded animate-pulse"
+            ></div>
           ))}
         </div>
       </div>
@@ -195,9 +198,9 @@ export function ComplianceTable({
             onChange={(e) => setFilterLearning(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-purple-500"
           >
-            {learningTypes.map(type => (
+            {learningTypes.map((type) => (
               <option key={type} value={type}>
-                {type === 'all' ? 'All Learning Types' : type}
+                {type === "all" ? "All Learning Types" : type}
               </option>
             ))}
           </select>
@@ -207,9 +210,9 @@ export function ComplianceTable({
             onChange={(e) => setFilterStatus(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-purple-500"
           >
-            {statuses.map(status => (
+            {statuses.map((status) => (
               <option key={status} value={status}>
-                {status === 'all' ? 'All Statuses' : status}
+                {status === "all" ? "All Statuses" : status}
               </option>
             ))}
           </select>
@@ -219,8 +222,8 @@ export function ComplianceTable({
               onClick={() => setFilterOverdue(!filterOverdue)}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 filterOverdue
-                  ? 'bg-red-600 text-white'
-                  : 'bg-red-100 text-red-800 hover:bg-red-200'
+                  ? "bg-red-600 text-white"
+                  : "bg-red-100 text-red-800 hover:bg-red-200"
               }`}
             >
               Overdue ({overdueCount})
@@ -232,8 +235,8 @@ export function ComplianceTable({
               onClick={() => setFilterNoExpiry(!filterNoExpiry)}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 filterNoExpiry
-                  ? 'bg-orange-600 text-white'
-                  : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                  ? "bg-orange-600 text-white"
+                  : "bg-orange-100 text-orange-800 hover:bg-orange-200"
               }`}
             >
               No Expiry ({noExpiryCount})
@@ -242,11 +245,13 @@ export function ComplianceTable({
 
           {expiringOrNotStartedCount > 0 && (
             <button
-              onClick={() => setFilterExpiringOrNotStarted(!filterExpiringOrNotStarted)}
+              onClick={() =>
+                setFilterExpiringOrNotStarted(!filterExpiringOrNotStarted)
+              }
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 filterExpiringOrNotStarted
-                  ? 'bg-yellow-600 text-white'
-                  : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                  ? "bg-yellow-600 text-white"
+                  : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
               }`}
             >
               Expiring / Not Started ({expiringOrNotStartedCount})
@@ -266,7 +271,7 @@ export function ComplianceTable({
             <tr>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('name')}
+                onClick={() => handleSort("name")}
               >
                 Name {renderSortIcon("name")}
               </th>
@@ -275,19 +280,19 @@ export function ComplianceTable({
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('learning')}
+                onClick={() => handleSort("learning")}
               >
                 Learning {renderSortIcon("learning")}
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('status')}
+                onClick={() => handleSort("status")}
               >
                 Status {renderSortIcon("status")}
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('expiry')}
+                onClick={() => handleSort("expiry")}
               >
                 Expiry Date {renderSortIcon("expiry")}
               </th>
@@ -302,44 +307,59 @@ export function ComplianceTable({
               </tr>
             ) : (
               filteredRecords.map((record, index) => (
-                <tr key={`${record['Membership number']}-${record.Learning}-${index}`} className="hover:bg-gray-50">
+                <tr
+                  key={`${record["Membership number"]}-${record.Learning}-${index}`}
+                  className="hover:bg-gray-50"
+                >
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
                       {onMemberSelect ? (
                         <button
-                          onClick={() => onMemberSelect(record['Membership number'], `${record['First name']} ${record['Last name']}`)}
+                          onClick={() =>
+                            onMemberSelect(
+                              record["Membership number"],
+                              `${record["First name"]} ${record["Last name"]}`,
+                            )
+                          }
                           className="text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
                         >
-                          {record['First name']} {record['Last name']}
+                          {record["First name"]} {record["Last name"]}
                         </button>
                       ) : (
-                        `${record['First name']} ${record['Last name']}`
+                        `${record["First name"]} ${record["Last name"]}`
                       )}
                     </div>
-                    {record['Email address'] && (
-                      <div className="text-sm text-gray-500">{record['Email address']}</div>
+                    {record["Email address"] && (
+                      <div className="text-sm text-gray-500">
+                        {record["Email address"]}
+                      </div>
                     )}
                   </td>
                   <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
-                    {record['Membership number']}
+                    {record["Membership number"]}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
                     {record.Learning}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[record.Status] || 'bg-gray-100 text-gray-800'}`}>
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[record.Status] || "bg-gray-100 text-gray-800"}`}
+                    >
                       {record.Status}
                     </span>
-                    {record['Days since expiry'] && record['Days since expiry'] > 0 && (
-                      <div className="text-xs text-red-600 mt-1">
-                        {record['Days since expiry']} days overdue
-                      </div>
-                    )}
+                    {record["Days since expiry"] &&
+                      record["Days since expiry"] > 0 && (
+                        <div className="text-xs text-red-600 mt-1">
+                          {record["Days since expiry"]} days overdue
+                        </div>
+                      )}
                     {(() => {
                       const deadlineInfo = formatDeadlineInfo(record);
                       if (deadlineInfo) {
                         return (
-                          <div className={`text-xs mt-1 ${deadlineInfo.colorClass}`}>
+                          <div
+                            className={`text-xs mt-1 ${deadlineInfo.colorClass}`}
+                          >
                             {deadlineInfo.text}
                           </div>
                         );
@@ -348,14 +368,15 @@ export function ComplianceTable({
                     })()}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {record['Expiry date'] ? (
-                      formatDate(record['Expiry date'])
-                    ) : record.Status === 'In-Progress' && record['Start date'] ? (
+                    {record["Expiry date"] ? (
+                      formatDate(record["Expiry date"])
+                    ) : record.Status === "In-Progress" &&
+                      record["Start date"] ? (
                       <span className="text-gray-400 italic">
-                        Started {formatDate(record['Start date'])}
+                        Started {formatDate(record["Start date"])}
                       </span>
                     ) : (
-                      '-'
+                      "-"
                     )}
                   </td>
                 </tr>
@@ -369,76 +390,71 @@ export function ComplianceTable({
 }
 
 function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '-';
+  if (!dateStr) return "-";
   try {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
+    return date.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
     });
   } catch {
     return dateStr;
   }
 }
 
-/**
- * Calculate deadline info for new members (12 months from start date)
- */
-function getNewMemberDeadline(startDateStr: string | null | undefined): {
-  deadlineDate: Date | null;
-  monthsRemaining: number | null;
-  isOverdue: boolean;
-} {
-  if (!startDateStr) return { deadlineDate: null, monthsRemaining: null, isOverdue: false };
-
-  try {
-    const startDate = new Date(startDateStr);
-    const deadlineDate = new Date(startDate);
-    deadlineDate.setFullYear(deadlineDate.getFullYear() + 1); // 12 months from start
-
-    const now = new Date();
-    const monthsRemaining = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30));
-    const isOverdue = deadlineDate < now;
-
-    return { deadlineDate, monthsRemaining, isOverdue };
-  } catch {
-    return { deadlineDate: null, monthsRemaining: null, isOverdue: false };
+/** Returns true if a record is past its module-specific deadline. */
+function isRecordOverdue(record: LearningRecord): boolean {
+  if (record.Status === "Expired") return true;
+  if (record["Days since expiry"] && record["Days since expiry"] > 0)
+    return true;
+  if (
+    (record.Status === "In-Progress" || record.Status === "Not Started") &&
+    !record["Expiry date"] &&
+    record["Start date"]
+  ) {
+    const modConfig = MODULE_CONFIG.find((m) => m.name === record.Learning);
+    if (!modConfig || modConfig.deadlineDays === null) return false;
+    return getDeadlineInfo(record["Start date"], modConfig.deadlineDays)
+      .isOverdue;
   }
+  return false;
 }
 
 /**
- * Format deadline info for display
+ * Format deadline info for display in the status cell.
+ * Uses deadlineDays from MODULE_CONFIG, which covers both First Response (365d) and
+ * Growing Roots modules (30d or 180d).
  */
-function formatDeadlineInfo(record: LearningRecord): { text: string; colorClass: string } | null {
-  // Show for In-Progress or Not Started records with a start date but no expiry date
-  if ((record.Status !== 'In-Progress' && record.Status !== 'Not Started') || record['Expiry date'] || !record['Start date']) {
+function formatDeadlineInfo(
+  record: LearningRecord,
+): { text: string; colorClass: string } | null {
+  if (
+    (record.Status !== "In-Progress" && record.Status !== "Not Started") ||
+    record["Expiry date"] ||
+    !record["Start date"]
+  ) {
     return null;
   }
 
-  const { deadlineDate, monthsRemaining, isOverdue } = getNewMemberDeadline(record['Start date']);
+  const modConfig = MODULE_CONFIG.find((m) => m.name === record.Learning);
+  if (!modConfig || modConfig.deadlineDays === null) return null;
 
-  if (!deadlineDate || monthsRemaining === null) {
-    return null;
-  }
+  const { deadlineDate, daysRemaining, isOverdue } = getDeadlineInfo(
+    record["Start date"],
+    modConfig.deadlineDays,
+  );
+  if (!deadlineDate || daysRemaining === null) return null;
 
   if (isOverdue) {
     return {
       text: `Overdue (was due ${formatDate(deadlineDate.toISOString())})`,
-      colorClass: 'text-red-600',
+      colorClass: "text-red-600",
     };
   }
-
-  if (monthsRemaining <= 2) {
-    return {
-      text: `Due in ${monthsRemaining} month${monthsRemaining === 1 ? '' : 's'}`,
-      colorClass: 'text-orange-600',
-    };
-  }
-
   return {
     text: `Due by ${formatDate(deadlineDate.toISOString())}`,
-    colorClass: 'text-gray-500',
+    colorClass: daysRemaining <= 14 ? "text-orange-600" : "text-gray-500",
   };
 }
 
