@@ -1,5 +1,5 @@
 /** localStorage key for persisting authentication state */
-export const SESSION_KEY = 'glv-dashboard-session';
+export const SESSION_KEY = "glv-dashboard-session";
 
 /**
  * Sessions older than this are treated as expired and discarded on load.
@@ -10,7 +10,11 @@ export const SESSION_KEY = 'glv-dashboard-session';
 export const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours
 
 /** Load session from localStorage. Returns null if missing, malformed, or older than SESSION_MAX_AGE_MS. */
-export function loadSession(): { token: string; contactId: string; username?: string } | null {
+export function loadSession(): {
+  token: string;
+  contactId: string;
+  username?: string;
+} | null {
   try {
     const stored = localStorage.getItem(SESSION_KEY);
     if (stored) {
@@ -31,8 +35,15 @@ export function loadSession(): { token: string; contactId: string; username?: st
 }
 
 /** Save session to localStorage with the current timestamp. */
-export function saveSession(token: string, contactId: string, username?: string): void {
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ token, contactId, username, loginAt: Date.now() }));
+export function saveSession(
+  token: string,
+  contactId: string,
+  username?: string,
+): void {
+  localStorage.setItem(
+    SESSION_KEY,
+    JSON.stringify({ token, contactId, username, loginAt: Date.now() }),
+  );
 }
 
 /** Clear session from localStorage. */
@@ -41,7 +52,7 @@ export function clearSession(): void {
 }
 
 /** localStorage key for persisting credential hash (enables fast-path login). */
-const CREDENTIALS_KEY = 'glv-dashboard-credentials';
+const CREDENTIALS_KEY = "glv-dashboard-credentials";
 
 /**
  * Credential records older than this are discarded to limit exposure
@@ -57,32 +68,41 @@ const CREDENTIALS_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 export async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
-    'raw',
+    "raw",
     encoder.encode(password),
-    { name: 'PBKDF2' },
+    { name: "PBKDF2" },
     false,
-    ['deriveBits'],
+    ["deriveBits"],
   );
   const derivedBits = await crypto.subtle.deriveBits(
     {
-      name: 'PBKDF2',
-      hash: 'SHA-256',
-      salt: encoder.encode('glv-dashboard-credential-salt'),
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt: encoder.encode("glv-dashboard-credential-salt"),
       iterations: 100_000,
     },
     keyMaterial,
     256,
   );
   return Array.from(new Uint8Array(derivedBits))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 /** Save credential verifier to localStorage for fast-path login on next visit. */
-export function saveCredentials(username: string, passwordHash: string, contactId: string): void {
+export function saveCredentials(
+  username: string,
+  passwordHash: string,
+  contactId: string,
+): void {
   localStorage.setItem(
     CREDENTIALS_KEY,
-    JSON.stringify({ username, passwordHash, contactId, createdAt: Date.now() }),
+    JSON.stringify({
+      username,
+      passwordHash,
+      contactId,
+      createdAt: Date.now(),
+    }),
   );
 }
 
@@ -90,27 +110,37 @@ export function saveCredentials(username: string, passwordHash: string, contactI
  * Load saved credential verifier from localStorage.
  * Returns null if missing, malformed, fields are not strings, or older than CREDENTIALS_MAX_AGE_MS.
  */
-export function loadCredentials(): { username: string; passwordHash: string; contactId: string } | null {
+export function loadCredentials(): {
+  username: string;
+  passwordHash: string;
+  contactId: string;
+} | null {
   try {
     const stored = localStorage.getItem(CREDENTIALS_KEY);
     if (!stored) return null;
-    const { username, passwordHash, contactId, createdAt } = JSON.parse(stored) ?? {};
+    const { username, passwordHash, contactId, createdAt } =
+      JSON.parse(stored) ?? {};
     if (
-      typeof username !== 'string' || !username ||
-      typeof passwordHash !== 'string' || !passwordHash ||
-      typeof contactId !== 'string'
+      typeof username !== "string" ||
+      !username ||
+      typeof passwordHash !== "string" ||
+      !passwordHash ||
+      typeof contactId !== "string"
       // contactId may legitimately be '' — the app fetches it dynamically via client.initialize()
     ) {
       localStorage.removeItem(CREDENTIALS_KEY);
       return null;
     }
     const createdAtMs =
-      typeof createdAt === 'number' && Number.isFinite(createdAt)
+      typeof createdAt === "number" && Number.isFinite(createdAt)
         ? createdAt
-        : typeof createdAt === 'string' && createdAt.trim() !== ''
+        : typeof createdAt === "string" && createdAt.trim() !== ""
           ? Number(createdAt)
           : NaN;
-    if (!Number.isFinite(createdAtMs) || Date.now() - createdAtMs > CREDENTIALS_MAX_AGE_MS) {
+    if (
+      !Number.isFinite(createdAtMs) ||
+      Date.now() - createdAtMs > CREDENTIALS_MAX_AGE_MS
+    ) {
       localStorage.removeItem(CREDENTIALS_KEY);
       return null;
     }

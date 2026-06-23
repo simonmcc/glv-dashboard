@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi } from "vitest";
 
 export const useRegisterSW = vi.fn(() => ({
   needRefresh: [false, vi.fn()],

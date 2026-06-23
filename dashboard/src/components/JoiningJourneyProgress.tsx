@@ -8,9 +8,9 @@
  * derived from learningRecords.
  */
 
-import { useMemo, useState } from 'react';
-import type { JoiningJourneyRecord, LearningRecord } from '../types';
-import { GROWING_ROOTS_MODULES } from '../utils';
+import { useMemo, useState } from "react";
+import type { JoiningJourneyRecord, LearningRecord } from "../types";
+import { MODULE_CONFIG } from "../utils";
 
 interface JoiningJourneyProgressProps {
   joiningJourneyRecords: JoiningJourneyRecord[];
@@ -21,63 +21,98 @@ interface JoiningJourneyProgressProps {
 }
 
 // The discrete journey steps tracked by InProgressActionDashboardView
-const JOURNEY_STEPS: ReadonlyArray<{ item: string; abbr: string; deadlineDays?: number }> = [
-  { item: 'Criminal Record Check', abbr: 'CRC', deadlineDays: 30 },
-  { item: 'Internal Check', abbr: 'Int. Check', deadlineDays: 30 },
-  { item: 'References', abbr: 'Ref.' },
-  { item: 'Declaration', abbr: 'Decl.' },
-  { item: 'Trustee Eligibility Check', abbr: 'Trustee' },
-  { item: 'Welcome Conversation', abbr: 'Welcome' },
+const JOURNEY_STEPS: ReadonlyArray<{
+  item: string;
+  abbr: string;
+  deadlineDays?: number;
+}> = [
+  { item: "Criminal Record Check", abbr: "CRC", deadlineDays: 30 },
+  { item: "Internal Check", abbr: "Int. Check", deadlineDays: 30 },
+  { item: "References", abbr: "Ref." },
+  { item: "Declaration", abbr: "Decl." },
+  { item: "Trustee Eligibility Check", abbr: "Trustee" },
+  { item: "Welcome Conversation", abbr: "Welcome" },
 ];
 
 const KNOWN_JOURNEY_ITEMS = new Set([
-  ...JOURNEY_STEPS.map(s => s.item),
-  'Growing Roots',
-  'Core Learning',
+  ...JOURNEY_STEPS.map((s) => s.item),
+  "Growing Roots",
+  "Core Learning",
 ]);
 
-// Derived from GROWING_ROOTS_MODULES so deadlineDays is the single source of truth
+const GROWING_ROOTS_MODULES = MODULE_CONFIG.filter(
+  (m) => m.group === "Growing Roots",
+);
 const GR_30DAY_MODULES = new Set(
-  GROWING_ROOTS_MODULES.filter(m => m.deadlineDays === 30).map(m => m.name),
+  GROWING_ROOTS_MODULES.filter((m) => m.deadlineDays === 30).map((m) => m.name),
 );
 
-type ItemStatus = 'complete' | 'incomplete' | 'valid' | 'not-started' | 'expiring' | 'expired' | 'in-progress';
+type ItemStatus =
+  | "complete"
+  | "incomplete"
+  | "valid"
+  | "not-started"
+  | "expiring"
+  | "expired"
+  | "in-progress";
 
-function StatusChip({ status, label, deadline30 = false }: { status: ItemStatus; label: string; deadline30?: boolean }) {
+function StatusChip({
+  status,
+  label,
+  deadline30 = false,
+}: {
+  status: ItemStatus;
+  label: string;
+  deadline30?: boolean;
+}) {
   const colorClass: Record<ItemStatus, string> = {
-    'complete':    'bg-green-100 text-green-800',
-    'valid':       'bg-green-100 text-green-800',
-    'incomplete':  'bg-red-100 text-red-800',
-    'not-started': 'bg-gray-100 text-gray-600',
-    'expiring':    'bg-yellow-100 text-yellow-800',
-    'expired':     'bg-red-100 text-red-800',
-    'in-progress': 'bg-blue-100 text-blue-800',
+    complete: "bg-green-100 text-green-800",
+    valid: "bg-green-100 text-green-800",
+    incomplete: "bg-red-100 text-red-800",
+    "not-started": "bg-gray-100 text-gray-600",
+    expiring: "bg-yellow-100 text-yellow-800",
+    expired: "bg-red-100 text-red-800",
+    "in-progress": "bg-blue-100 text-blue-800",
   };
 
   const icon: Record<ItemStatus, string> = {
-    'complete':    '✓',
-    'valid':       '✓',
-    'incomplete':  '✗',
-    'not-started': '–',
-    'expiring':    '⚠',
-    'expired':     '✗',
-    'in-progress': '⟳',
+    complete: "✓",
+    valid: "✓",
+    incomplete: "✗",
+    "not-started": "–",
+    expiring: "⚠",
+    expired: "✗",
+    "in-progress": "⟳",
   };
 
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${colorClass[status]}`}>
-      {icon[status]} {label}{deadline30 && <span className="text-[10px] text-orange-600 font-medium ml-0.5">30d</span>}
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${colorClass[status]}`}
+    >
+      {icon[status]} {label}
+      {deadline30 && (
+        <span className="text-[10px] text-orange-600 font-medium ml-0.5">
+          30d
+        </span>
+      )}
     </span>
   );
 }
 
 function learningStatusToItemStatus(status: string): ItemStatus {
   switch (status) {
-    case 'Valid': return 'valid';
-    case 'Expiring': case 'Expiring Soon': case 'Renewal Due': return 'expiring';
-    case 'Expired': return 'expired';
-    case 'In-Progress': return 'in-progress';
-    default: return 'not-started';
+    case "Valid":
+      return "valid";
+    case "Expiring":
+    case "Expiring Soon":
+    case "Renewal Due":
+      return "expiring";
+    case "Expired":
+      return "expired";
+    case "In-Progress":
+      return "in-progress";
+    default:
+      return "not-started";
   }
 }
 
@@ -86,26 +121,29 @@ export function JoiningJourneyProgress({
   learningRecords,
   isLoading,
   onMemberSelect,
-  searchTerm = '',
+  searchTerm = "",
 }: JoiningJourneyProgressProps) {
-  const [sortBy, setSortBy] = useState<'name' | 'outstanding'>('outstanding');
+  const [sortBy, setSortBy] = useState<"name" | "outstanding">("outstanding");
 
   // Build per-member view: group outstanding items by member
   const members = useMemo(() => {
-    const byMember = new Map<string, {
-      membershipNumber: string;
-      firstName: string;
-      lastName: string;
-      outstandingItems: Set<string>;
-    }>();
+    const byMember = new Map<
+      string,
+      {
+        membershipNumber: string;
+        firstName: string;
+        lastName: string;
+        outstandingItems: Set<string>;
+      }
+    >();
 
     for (const r of joiningJourneyRecords) {
-      const num = r['Membership number'];
+      const num = r["Membership number"];
       if (!byMember.has(num)) {
         byMember.set(num, {
           membershipNumber: num,
-          firstName: r['First name'],
-          lastName: r['Last name'],
+          firstName: r["First name"],
+          lastName: r["Last name"],
           outstandingItems: new Set(),
         });
       }
@@ -119,7 +157,7 @@ export function JoiningJourneyProgress({
   const learningByMember = useMemo(() => {
     const index = new Map<string, Map<string, string>>();
     for (const r of learningRecords) {
-      const num = r['Membership number'];
+      const num = r["Membership number"];
       if (!index.has(num)) index.set(num, new Map());
       index.get(num)!.set(r.Learning, r.Status);
     }
@@ -130,10 +168,11 @@ export function JoiningJourneyProgress({
   const filtered = useMemo(() => {
     if (!searchTerm) return members;
     const term = searchTerm.toLowerCase();
-    return members.filter(m =>
-      m.firstName.toLowerCase().includes(term) ||
-      m.lastName.toLowerCase().includes(term) ||
-      m.membershipNumber.includes(term)
+    return members.filter(
+      (m) =>
+        m.firstName.toLowerCase().includes(term) ||
+        m.lastName.toLowerCase().includes(term) ||
+        m.membershipNumber.includes(term),
     );
   }, [members, searchTerm]);
 
@@ -141,15 +180,20 @@ export function JoiningJourneyProgress({
   const sorted = useMemo(() => {
     // Count the number of visible chips a member would show, expanding Growing Roots
     // to individual module chips so the sort matches what the user sees.
-    const getChipCount = (member: { membershipNumber: string; outstandingItems: Set<string> }): number => {
+    const getChipCount = (member: {
+      membershipNumber: string;
+      outstandingItems: Set<string>;
+    }): number => {
       const memberModules = learningByMember.get(member.membershipNumber);
       let count = 0;
       for (const item of member.outstandingItems) {
-        if (item === 'Growing Roots') {
-          const outstandingGR = GROWING_ROOTS_MODULES.filter(grModule => {
+        if (item === "Growing Roots") {
+          const outstandingGR = GROWING_ROOTS_MODULES.filter((grModule) => {
             const rawStatus = memberModules?.get(grModule.name);
-            const status = rawStatus ? learningStatusToItemStatus(rawStatus) : 'not-started';
-            return status !== 'valid' && status !== 'complete';
+            const status = rawStatus
+              ? learningStatusToItemStatus(rawStatus)
+              : "not-started";
+            return status !== "valid" && status !== "complete";
           }).length;
           // At least 1 (the fallback chip) even if all GR modules are done
           count += Math.max(outstandingGR, 1);
@@ -161,11 +205,17 @@ export function JoiningJourneyProgress({
     };
 
     return [...filtered].sort((a, b) => {
-      if (sortBy === 'outstanding') {
-        return getChipCount(b) - getChipCount(a) ||
-          `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+      if (sortBy === "outstanding") {
+        return (
+          getChipCount(b) - getChipCount(a) ||
+          `${a.lastName} ${a.firstName}`.localeCompare(
+            `${b.lastName} ${b.firstName}`,
+          )
+        );
       }
-      return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+      return `${a.lastName} ${a.firstName}`.localeCompare(
+        `${b.lastName} ${b.firstName}`,
+      );
     });
   }, [filtered, sortBy, learningByMember]);
 
@@ -194,78 +244,120 @@ export function JoiningJourneyProgress({
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500">Sort:</span>
           <button
-            onClick={() => setSortBy('outstanding')}
-            className={`px-3 py-1.5 text-sm rounded-lg ${sortBy === 'outstanding' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            onClick={() => setSortBy("outstanding")}
+            className={`px-3 py-1.5 text-sm rounded-lg ${sortBy === "outstanding" ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
           >
             Most outstanding
           </button>
           <button
-            onClick={() => setSortBy('name')}
-            className={`px-3 py-1.5 text-sm rounded-lg ${sortBy === 'name' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            onClick={() => setSortBy("name")}
+            className={`px-3 py-1.5 text-sm rounded-lg ${sortBy === "name" ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
           >
             Name
           </button>
         </div>
         <span className="text-sm text-gray-500 ml-auto">
-          {sorted.length} member{sorted.length !== 1 ? 's' : ''} in joining journey
+          {sorted.length} member{sorted.length !== 1 ? "s" : ""} in joining
+          journey
         </span>
       </div>
 
       {/* Member rows */}
       <div className="divide-y divide-gray-100">
         {sorted.length === 0 ? (
-          <div className="px-4 py-8 text-center text-gray-500">No records match your search</div>
+          <div className="px-4 py-8 text-center text-gray-500">
+            No records match your search
+          </div>
         ) : (
-          sorted.map(member => {
+          sorted.map((member) => {
             const memberModules = learningByMember.get(member.membershipNumber);
-            const growingRootsOutstanding = member.outstandingItems.has('Growing Roots');
+            const growingRootsOutstanding =
+              member.outstandingItems.has("Growing Roots");
 
             // All outstanding GR module chips (not valid/complete)
             const outstandingGRChips = growingRootsOutstanding
-              ? GROWING_ROOTS_MODULES.map(grModule => {
+              ? GROWING_ROOTS_MODULES.map((grModule) => {
                   const rawStatus = memberModules?.get(grModule.name);
-                  const status = rawStatus ? learningStatusToItemStatus(rawStatus) : 'not-started' as ItemStatus;
+                  const status = rawStatus
+                    ? learningStatusToItemStatus(rawStatus)
+                    : ("not-started" as ItemStatus);
                   return { ...grModule, status };
-                }).filter(m => m.status !== 'valid' && m.status !== 'complete')
+                }).filter(
+                  (m) => m.status !== "valid" && m.status !== "complete",
+                )
               : [];
 
             // Split GR chips into "Within 30 days" and "Growing Roots" groups
-            const gr30dChips = outstandingGRChips.filter(m => GR_30DAY_MODULES.has(m.name));
-            const grRemainingChips = outstandingGRChips.filter(m => !GR_30DAY_MODULES.has(m.name));
+            const gr30dChips = outstandingGRChips.filter((m) =>
+              GR_30DAY_MODULES.has(m.name),
+            );
+            const grRemainingChips = outstandingGRChips.filter(
+              (m) => !GR_30DAY_MODULES.has(m.name),
+            );
             // Fallback chip: GR is outstanding but all modules are already done
-            const grFallbackNeeded = growingRootsOutstanding && outstandingGRChips.length === 0;
+            const grFallbackNeeded =
+              growingRootsOutstanding && outstandingGRChips.length === 0;
 
             // Group 1: Within 30 days — steps with deadlineDays=30 + 30d GR modules
             const within30dChips = [
-              ...JOURNEY_STEPS
-                .filter(s => s.deadlineDays === 30 && member.outstandingItems.has(s.item))
-                .map(s => <StatusChip key={s.item} status="incomplete" label={s.abbr} deadline30 />),
-              ...gr30dChips.map(m => (
-                <StatusChip key={m.name} status={m.status} label={m.name} deadline30 />
+              ...JOURNEY_STEPS.filter(
+                (s) =>
+                  s.deadlineDays === 30 && member.outstandingItems.has(s.item),
+              ).map((s) => (
+                <StatusChip
+                  key={s.item}
+                  status="incomplete"
+                  label={s.abbr}
+                  deadline30
+                />
+              )),
+              ...gr30dChips.map((m) => (
+                <StatusChip
+                  key={m.name}
+                  status={m.status}
+                  label={m.name}
+                  deadline30
+                />
               )),
             ];
 
             // Group 2: Welcome & Checks — steps with no deadline
-            const welcomeChips = JOURNEY_STEPS
-              .filter(s => s.deadlineDays == null && member.outstandingItems.has(s.item))
-              .map(s => <StatusChip key={s.item} status="incomplete" label={s.abbr} />);
+            const welcomeChips = JOURNEY_STEPS.filter(
+              (s) =>
+                s.deadlineDays == null && member.outstandingItems.has(s.item),
+            ).map((s) => (
+              <StatusChip key={s.item} status="incomplete" label={s.abbr} />
+            ));
 
             // Group 3: Growing Roots — remaining modules (not in 30d group)
             const growingRootsChips = [
-              ...grRemainingChips.map(m => (
-                <StatusChip key={m.name} status={m.status} label={m.name} deadline30={m.deadlineDays === 30} />
+              ...grRemainingChips.map((m) => (
+                <StatusChip
+                  key={m.name}
+                  status={m.status}
+                  label={m.name}
+                  deadline30={m.deadlineDays === 30}
+                />
               )),
-              ...(grFallbackNeeded ? [<StatusChip key="gr-fallback" status="incomplete" label="Growing Roots" />] : []),
+              ...(grFallbackNeeded
+                ? [
+                    <StatusChip
+                      key="gr-fallback"
+                      status="incomplete"
+                      label="Growing Roots"
+                    />,
+                  ]
+                : []),
             ];
 
             const chipGroups = [
-              { label: 'Within 30 days', chips: within30dChips },
-              { label: 'Welcome & Checks', chips: welcomeChips },
-              { label: 'Growing Roots', chips: growingRootsChips },
-            ].filter(g => g.chips.length > 0);
+              { label: "Within 30 days", chips: within30dChips },
+              { label: "Welcome & Checks", chips: welcomeChips },
+              { label: "Growing Roots", chips: growingRootsChips },
+            ].filter((g) => g.chips.length > 0);
 
             const catchAllItems = Array.from(member.outstandingItems)
-              .filter(item => !KNOWN_JOURNEY_ITEMS.has(item))
+              .filter((item) => !KNOWN_JOURNEY_ITEMS.has(item))
               .sort((a, b) => a.localeCompare(b));
 
             return (
@@ -275,21 +367,33 @@ export function JoiningJourneyProgress({
                   <div className="min-w-[140px] max-w-[200px]">
                     {onMemberSelect ? (
                       <button
-                        onClick={() => onMemberSelect(member.membershipNumber, `${member.firstName} ${member.lastName}`)}
+                        onClick={() =>
+                          onMemberSelect(
+                            member.membershipNumber,
+                            `${member.firstName} ${member.lastName}`,
+                          )
+                        }
                         className="text-sm font-medium text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
                       >
                         {member.firstName} {member.lastName}
                       </button>
                     ) : (
-                      <span className="text-sm font-medium">{member.firstName} {member.lastName}</span>
+                      <span className="text-sm font-medium">
+                        {member.firstName} {member.lastName}
+                      </span>
                     )}
-                    <div className="text-xs text-gray-400 font-mono">{member.membershipNumber}</div>
+                    <div className="text-xs text-gray-400 font-mono">
+                      {member.membershipNumber}
+                    </div>
                   </div>
 
                   {/* Outstanding chips grouped by Joining Journey category */}
                   <div className="flex flex-col gap-1.5 flex-1">
-                    {chipGroups.map(group => (
-                      <div key={group.label} className="flex flex-wrap items-center gap-1.5">
+                    {chipGroups.map((group) => (
+                      <div
+                        key={group.label}
+                        className="flex flex-wrap items-center gap-1.5"
+                      >
                         <span className="text-[10px] text-gray-400 uppercase tracking-wide font-medium w-[90px] shrink-0">
                           {group.label}
                         </span>
@@ -298,7 +402,7 @@ export function JoiningJourneyProgress({
                     ))}
 
                     {/* Core Learning (ungrouped — individual modules not exposed by API) */}
-                    {member.outstandingItems.has('Core Learning') && (
+                    {member.outstandingItems.has("Core Learning") && (
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[10px] text-gray-400 uppercase tracking-wide font-medium w-[90px] shrink-0">
                           Core Learning
@@ -311,8 +415,12 @@ export function JoiningJourneyProgress({
                     {catchAllItems.length > 0 && (
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[10px] text-gray-400 uppercase tracking-wide font-medium w-[90px] shrink-0" />
-                        {catchAllItems.map(item => (
-                          <StatusChip key={item} status="incomplete" label={item} />
+                        {catchAllItems.map((item) => (
+                          <StatusChip
+                            key={item}
+                            status="incomplete"
+                            label={item}
+                          />
                         ))}
                       </div>
                     )}

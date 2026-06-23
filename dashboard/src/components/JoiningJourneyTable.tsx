@@ -4,8 +4,8 @@
  * Displays joining journey/onboarding status for members.
  */
 
-import { useState, useMemo } from 'react';
-import type { JoiningJourneyRecord } from '../types';
+import { useState, useMemo } from "react";
+import type { JoiningJourneyRecord } from "../types";
 
 interface JoiningJourneyTableProps {
   records: JoiningJourneyRecord[];
@@ -14,43 +14,48 @@ interface JoiningJourneyTableProps {
   searchTerm?: string;
 }
 
-type SortField = 'name' | 'item' | 'status';
-type SortOrder = 'asc' | 'desc';
+type SortField = "name" | "item" | "status";
+type SortOrder = "asc" | "desc";
 
 const statusColors: Record<string, string> = {
-  'Complete': 'bg-green-100 text-green-800',
-  'Completed': 'bg-green-100 text-green-800',
-  'In Progress': 'bg-blue-100 text-blue-800',
-  'In-Progress': 'bg-blue-100 text-blue-800',
-  'Pending': 'bg-yellow-100 text-yellow-800',
-  'Not Started': 'bg-gray-100 text-gray-800',
-  'Incomplete': 'bg-red-100 text-red-800',
-  'Overdue': 'bg-red-100 text-red-800',
+  Complete: "bg-green-100 text-green-800",
+  Completed: "bg-green-100 text-green-800",
+  "In Progress": "bg-blue-100 text-blue-800",
+  "In-Progress": "bg-blue-100 text-blue-800",
+  Pending: "bg-yellow-100 text-yellow-800",
+  "Not Started": "bg-gray-100 text-gray-800",
+  Incomplete: "bg-red-100 text-red-800",
+  Overdue: "bg-red-100 text-red-800",
 };
 
-export function JoiningJourneyTable({ records, isLoading, onMemberSelect, searchTerm = '' }: JoiningJourneyTableProps) {
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
-  const [filterItem, setFilterItem] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+export function JoiningJourneyTable({
+  records,
+  isLoading,
+  onMemberSelect,
+  searchTerm = "",
+}: JoiningJourneyTableProps) {
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [filterItem, setFilterItem] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterIncomplete, setFilterIncomplete] = useState(false);
 
   // Get unique values for filters
   const items = useMemo(() => {
-    const unique = new Set(records.map(r => r.Item));
-    return ['all', ...Array.from(unique).sort()];
+    const unique = new Set(records.map((r) => r.Item));
+    return ["all", ...Array.from(unique).sort()];
   }, [records]);
 
   const statuses = useMemo(() => {
-    const unique = new Set(records.map(r => r.Status));
-    return ['all', ...Array.from(unique).sort()];
+    const unique = new Set(records.map((r) => r.Status));
+    return ["all", ...Array.from(unique).sort()];
   }, [records]);
 
   // Count incomplete records
   const incompleteCount = useMemo(() => {
-    return records.filter(r => {
+    return records.filter((r) => {
       const status = r.Status.toLowerCase();
-      return status !== 'complete' && status !== 'completed';
+      return status !== "complete" && status !== "completed";
     }).length;
   }, [records]);
 
@@ -60,25 +65,26 @@ export function JoiningJourneyTable({ records, isLoading, onMemberSelect, search
 
     // Apply incomplete filter
     if (filterIncomplete) {
-      result = result.filter(r => {
+      result = result.filter((r) => {
         const status = r.Status.toLowerCase();
-        return status !== 'complete' && status !== 'completed';
+        return status !== "complete" && status !== "completed";
       });
     }
 
     // Apply filters
-    if (filterItem !== 'all') {
-      result = result.filter(r => r.Item === filterItem);
+    if (filterItem !== "all") {
+      result = result.filter((r) => r.Item === filterItem);
     }
-    if (filterStatus !== 'all') {
-      result = result.filter(r => r.Status === filterStatus);
+    if (filterStatus !== "all") {
+      result = result.filter((r) => r.Status === filterStatus);
     }
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(r =>
-        r['First name'].toLowerCase().includes(term) ||
-        r['Last name'].toLowerCase().includes(term) ||
-        r['Membership number'].includes(term)
+      result = result.filter(
+        (r) =>
+          r["First name"].toLowerCase().includes(term) ||
+          r["Last name"].toLowerCase().includes(term) ||
+          r["Membership number"].includes(term),
       );
     }
 
@@ -86,36 +92,45 @@ export function JoiningJourneyTable({ records, isLoading, onMemberSelect, search
     result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case 'name':
-          comparison = `${a['Last name']} ${a['First name']}`.localeCompare(
-            `${b['Last name']} ${b['First name']}`
+        case "name":
+          comparison = `${a["Last name"]} ${a["First name"]}`.localeCompare(
+            `${b["Last name"]} ${b["First name"]}`,
           );
           break;
-        case 'item':
+        case "item":
           comparison = a.Item.localeCompare(b.Item);
           break;
-        case 'status':
+        case "status":
           comparison = a.Status.localeCompare(b.Status);
           break;
       }
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return sortOrder === "asc" ? comparison : -comparison;
     });
 
     return result;
-  }, [records, filterItem, filterStatus, searchTerm, sortField, sortOrder, filterIncomplete]);
+  }, [
+    records,
+    filterItem,
+    filterStatus,
+    searchTerm,
+    sortField,
+    sortOrder,
+    filterIncomplete,
+  ]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortOrder('asc');
+      setSortOrder("asc");
     }
   };
 
   const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) return <span className="text-gray-300 ml-1">↕</span>;
-    return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
+    if (sortField !== field)
+      return <span className="text-gray-300 ml-1">↕</span>;
+    return <span className="ml-1">{sortOrder === "asc" ? "↑" : "↓"}</span>;
   };
 
   if (isLoading) {
@@ -126,7 +141,10 @@ export function JoiningJourneyTable({ records, isLoading, onMemberSelect, search
         </div>
         <div className="p-4 space-y-3">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-100 rounded animate-pulse"></div>
+            <div
+              key={i}
+              className="h-12 bg-gray-100 rounded animate-pulse"
+            ></div>
           ))}
         </div>
       </div>
@@ -151,9 +169,9 @@ export function JoiningJourneyTable({ records, isLoading, onMemberSelect, search
             onChange={(e) => setFilterItem(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-purple-500"
           >
-            {items.map(item => (
+            {items.map((item) => (
               <option key={item} value={item}>
-                {item === 'all' ? 'All Items' : item}
+                {item === "all" ? "All Items" : item}
               </option>
             ))}
           </select>
@@ -163,9 +181,9 @@ export function JoiningJourneyTable({ records, isLoading, onMemberSelect, search
             onChange={(e) => setFilterStatus(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-purple-500"
           >
-            {statuses.map(status => (
+            {statuses.map((status) => (
               <option key={status} value={status}>
-                {status === 'all' ? 'All Statuses' : status}
+                {status === "all" ? "All Statuses" : status}
               </option>
             ))}
           </select>
@@ -175,8 +193,8 @@ export function JoiningJourneyTable({ records, isLoading, onMemberSelect, search
               onClick={() => setFilterIncomplete(!filterIncomplete)}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 filterIncomplete
-                  ? 'bg-orange-600 text-white'
-                  : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                  ? "bg-orange-600 text-white"
+                  : "bg-orange-100 text-orange-800 hover:bg-orange-200"
               }`}
             >
               Incomplete ({incompleteCount})
@@ -196,7 +214,7 @@ export function JoiningJourneyTable({ records, isLoading, onMemberSelect, search
             <tr>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('name')}
+                onClick={() => handleSort("name")}
               >
                 Name {renderSortIcon("name")}
               </th>
@@ -205,13 +223,13 @@ export function JoiningJourneyTable({ records, isLoading, onMemberSelect, search
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('item')}
+                onClick={() => handleSort("item")}
               >
                 Item {renderSortIcon("item")}
               </th>
               <th
                 className="px-4 py-3 text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('status')}
+                onClick={() => handleSort("status")}
               >
                 Status {renderSortIcon("status")}
               </th>
@@ -226,29 +244,39 @@ export function JoiningJourneyTable({ records, isLoading, onMemberSelect, search
               </tr>
             ) : (
               filteredRecords.map((record, index) => (
-                <tr key={`${record['Membership number']}-${record.Item}-${index}`} className="hover:bg-gray-50">
+                <tr
+                  key={`${record["Membership number"]}-${record.Item}-${index}`}
+                  className="hover:bg-gray-50"
+                >
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
                       {onMemberSelect ? (
                         <button
-                          onClick={() => onMemberSelect(record['Membership number'], `${record['First name']} ${record['Last name']}`)}
+                          onClick={() =>
+                            onMemberSelect(
+                              record["Membership number"],
+                              `${record["First name"]} ${record["Last name"]}`,
+                            )
+                          }
                           className="text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
                         >
-                          {record['First name']} {record['Last name']}
+                          {record["First name"]} {record["Last name"]}
                         </button>
                       ) : (
-                        `${record['First name']} ${record['Last name']}`
+                        `${record["First name"]} ${record["Last name"]}`
                       )}
                     </div>
                   </td>
                   <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
-                    {record['Membership number']}
+                    {record["Membership number"]}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900">
                     {record.Item}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[record.Status] || 'bg-gray-100 text-gray-800'}`}>
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[record.Status] || "bg-gray-100 text-gray-800"}`}
+                    >
                       {record.Status}
                     </span>
                   </td>

@@ -589,7 +589,9 @@ describe("getDeadlineInfo", () => {
 
   it("returns isOverdue true when deadline is in the past", () => {
     // Start 60 days ago, 30d deadline → deadline was 30 days ago
-    const startDate = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    const startDate = new Date(
+      Date.now() - 60 * 24 * 60 * 60 * 1000,
+    ).toISOString();
     const { isOverdue, daysRemaining } = getDeadlineInfo(startDate, 30);
     expect(isOverdue).toBe(true);
     expect(daysRemaining).toBeLessThan(0);
@@ -597,7 +599,9 @@ describe("getDeadlineInfo", () => {
 
   it("returns isOverdue false with positive daysRemaining when deadline is in the future", () => {
     // Start 10 days ago, 30d deadline → ~20 days remaining
-    const startDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    const startDate = new Date(
+      Date.now() - 10 * 24 * 60 * 60 * 1000,
+    ).toISOString();
     const { isOverdue, daysRemaining } = getDeadlineInfo(startDate, 30);
     expect(isOverdue).toBe(false);
     expect(daysRemaining).toBeGreaterThan(0);
@@ -606,7 +610,9 @@ describe("getDeadlineInfo", () => {
 
   it("handles 180-day deadline correctly", () => {
     // Start 90 days ago, 180d deadline → ~90 days remaining
-    const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const startDate = new Date(
+      Date.now() - 90 * 24 * 60 * 60 * 1000,
+    ).toISOString();
     const { isOverdue, daysRemaining } = getDeadlineInfo(startDate, 180);
     expect(isOverdue).toBe(false);
     expect(daysRemaining).toBeGreaterThan(80);
@@ -624,7 +630,13 @@ describe("transformLearningResults – Growing Roots start dates", () => {
         contactId: "c1",
         firstName: "Alice",
         lastName: "Smith",
-        modules: [{ title: "Safeguarding", expiryDate: null, currentLevel: "Not started" }],
+        modules: [
+          {
+            title: "Safeguarding",
+            expiryDate: null,
+            currentLevel: "Not started",
+          },
+        ],
       },
     ];
     const startDates = new Map([["111", "2024-12-01"]]);
@@ -640,12 +652,20 @@ describe("transformLearningResults – Growing Roots start dates", () => {
         contactId: "c2",
         firstName: "Bob",
         lastName: "Jones",
-        modules: [{ title: "Delivering a Great Programme", expiryDate: null, currentLevel: "Not started" }],
+        modules: [
+          {
+            title: "Delivering a Great Programme",
+            expiryDate: null,
+            currentLevel: "Not started",
+          },
+        ],
       },
     ];
     const startDates = new Map([["222", "2024-12-01"]]);
     const result = transformLearningResults(members, fixedNow, startDates);
-    const record = result.find((r) => r.Learning === "Delivering a Great Programme");
+    const record = result.find(
+      (r) => r.Learning === "Delivering a Great Programme",
+    );
     expect(record!["Start date"]).toBeUndefined();
   });
 
@@ -674,7 +694,9 @@ describe("transformLearningResults – Growing Roots start dates", () => {
         contactId: "c4",
         firstName: "Dave",
         lastName: "Lee",
-        modules: [{ title: "Safety", expiryDate: null, currentLevel: "Not started" }],
+        modules: [
+          { title: "Safety", expiryDate: null, currentLevel: "Not started" },
+        ],
       },
     ];
     const result = transformLearningResults(members, fixedNow);

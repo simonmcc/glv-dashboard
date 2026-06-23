@@ -6,9 +6,9 @@
  * Supports collapsing via the collapsed/onToggle props.
  */
 
-import { forwardRef } from 'react';
+import { forwardRef } from "react";
 
-export type LoadState = 'idle' | 'loading' | 'loaded' | 'error';
+export type LoadState = "idle" | "loading" | "loaded" | "error";
 
 interface LazySectionProps {
   title: string;
@@ -23,7 +23,20 @@ interface LazySectionProps {
 }
 
 export const LazySection = forwardRef<HTMLElement, LazySectionProps>(
-  function LazySection({ title, state, error, onRetry, children, id, headerExtra, collapsed = false, onToggle }, ref) {
+  function LazySection(
+    {
+      title,
+      state,
+      error,
+      onRetry,
+      children,
+      id,
+      headerExtra,
+      collapsed = false,
+      onToggle,
+    },
+    ref,
+  ) {
     return (
       <section ref={ref} id={id}>
         <div className="flex items-center gap-3 mb-4">
@@ -34,24 +47,29 @@ export const LazySection = forwardRef<HTMLElement, LazySectionProps>(
               aria-label={collapsed ? `Expand ${title}` : `Collapse ${title}`}
             >
               <svg
-                className={`h-4 w-4 transition-transform duration-200 ${collapsed ? '-rotate-90' : ''}`}
+                className={`h-4 w-4 transition-transform duration-200 ${collapsed ? "-rotate-90" : ""}`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </button>
           )}
           <h2
-            className={`text-lg font-semibold text-gray-900 ${onToggle ? 'cursor-pointer select-none' : ''}`}
+            className={`text-lg font-semibold text-gray-900 ${onToggle ? "cursor-pointer select-none" : ""}`}
             onClick={onToggle}
-            role={onToggle ? 'button' : undefined}
+            role={onToggle ? "button" : undefined}
             tabIndex={onToggle ? 0 : undefined}
             onKeyDown={
               onToggle
                 ? (event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
+                    if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
                       onToggle();
                     }
@@ -61,7 +79,7 @@ export const LazySection = forwardRef<HTMLElement, LazySectionProps>(
           >
             {title}
           </h2>
-          {!collapsed && state === 'loading' && (
+          {!collapsed && state === "loading" && (
             <span className="text-sm text-purple-600 animate-pulse flex items-center gap-2">
               <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                 <circle
@@ -82,12 +100,14 @@ export const LazySection = forwardRef<HTMLElement, LazySectionProps>(
               Loading...
             </span>
           )}
-          {headerExtra && !collapsed && <div className="ml-auto">{headerExtra}</div>}
+          {headerExtra && !collapsed && (
+            <div className="ml-auto">{headerExtra}</div>
+          )}
         </div>
 
         {!collapsed && (
           <>
-            {state === 'error' && (
+            {state === "error" && (
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <div className="text-red-600 mb-2">Failed to load: {error}</div>
                 <button
@@ -99,25 +119,28 @@ export const LazySection = forwardRef<HTMLElement, LazySectionProps>(
               </div>
             )}
 
-            {state === 'idle' && (
+            {state === "idle" && (
               <div className="bg-white rounded-lg shadow-sm border">
                 <div className="p-4 border-b">
                   <div className="h-6 bg-gray-200 rounded w-48 animate-pulse"></div>
                 </div>
                 <div className="p-4 space-y-3">
                   {[...Array(3)].map((_, i) => (
-                    <div key={i} className="h-12 bg-gray-100 rounded animate-pulse"></div>
+                    <div
+                      key={i}
+                      className="h-12 bg-gray-100 rounded animate-pulse"
+                    ></div>
                   ))}
                 </div>
               </div>
             )}
 
-            {(state === 'loading' || state === 'loaded') && children}
+            {(state === "loading" || state === "loaded") && children}
           </>
         )}
       </section>
     );
-  }
+  },
 );
 
 export default LazySection;
