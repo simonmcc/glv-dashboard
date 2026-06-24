@@ -26,17 +26,16 @@ jobs:
           cache-dependency-path: dashboard/package-lock.json
       - run: npm ci
       - run: npm run build
-      - uses: google-github-actions/auth@v2
-        id: auth
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GLV_DASHBOARD }}
-          token_format: access_token
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GLV_DASHBOARD }}
-          channelId: live
-          projectId: glv-dashboard
-          entryPoint: dashboard
+      - name: Write Firebase credentials (fix deprecated token_uri)
         env:
-          GOOGLE_OAUTH_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GLV_DASHBOARD }}
+        run: |
+          echo "$FIREBASE_SA" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          d['token_uri'] = 'https://oauth2.googleapis.com/token'
+          print(json.dumps(d))
+          " > /tmp/firebase-sa.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/firebase-sa.json" >> $GITHUB_ENV
+      - name: Deploy to Firebase live channel
+        run: npx firebase-tools@latest hosting:deploy --project glv-dashboard
