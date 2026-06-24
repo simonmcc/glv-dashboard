@@ -580,12 +580,39 @@ export function Dashboard({
       setSelectedMember({ membershipNumber, name });
       // Don't trigger network loads while background auth is still in progress (no token yet)
       if (!token && !MOCK_MODE) return;
-      if (joiningJourney.state === "idle") loadJoiningJourney();
-      if (disclosures.state === "idle") loadDisclosures();
-      if (!teamReviewsCollapsed && teamReviews.state === "idle")
-        loadTeamReviews();
-      if (!permitsCollapsed && permits.state === "idle") loadPermits();
-      if (!awardsCollapsed && awards.state === "idle") loadAwards();
+
+      tracer.startActiveSpan(
+        "dashboard.memberSelect",
+        { attributes: { "member.membership_number": membershipNumber } },
+        (span) => {
+          try {
+            // Load all idle sections regardless of collapsed state — MemberDashboard needs all data.
+            // Loads are triggered inside startActiveSpan so the section load spans are parented here.
+            const sectionsTriggered: string[] = [];
+            if (joiningJourney.state === "idle") { loadJoiningJourney(); sectionsTriggered.push("joiningJourney"); }
+            if (disclosures.state === "idle") { loadDisclosures(); sectionsTriggered.push("disclosures"); }
+            if (teamReviews.state === "idle") { loadTeamReviews(); sectionsTriggered.push("teamReviews"); }
+            if (permits.state === "idle") { loadPermits(); sectionsTriggered.push("permits"); }
+            if (awards.state === "idle") { loadAwards(); sectionsTriggered.push("awards"); }
+
+            span.setAttribute("sections.triggered", sectionsTriggered.join(","));
+            span.setAttribute(
+              "sections.already_loaded",
+              [
+                joiningJourney.state !== "idle" ? "joiningJourney" : null,
+                disclosures.state !== "idle" ? "disclosures" : null,
+                teamReviews.state !== "idle" ? "teamReviews" : null,
+                permits.state !== "idle" ? "permits" : null,
+                awards.state !== "idle" ? "awards" : null,
+              ]
+                .filter(Boolean)
+                .join(","),
+            );
+          } finally {
+            span.end();
+          }
+        },
+      );
     },
     [
       token,
@@ -593,13 +620,10 @@ export function Dashboard({
       loadJoiningJourney,
       disclosures.state,
       loadDisclosures,
-      teamReviewsCollapsed,
       teamReviews.state,
       loadTeamReviews,
-      permitsCollapsed,
       permits.state,
       loadPermits,
-      awardsCollapsed,
       awards.state,
       loadAwards,
     ],

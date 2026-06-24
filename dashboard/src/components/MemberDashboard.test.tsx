@@ -203,7 +203,7 @@ describe("MemberDashboard", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows a not-loaded message when joining journey is idle", () => {
+  it("shows a loading message when joining journey is idle", () => {
     render(
       <MemberDashboard
         {...defaultProps}
@@ -212,7 +212,7 @@ describe("MemberDashboard", () => {
       />,
     );
 
-    expect(screen.getByText(/not yet loaded/)).toBeInTheDocument();
+    expect(screen.getByText(/Loading joining journey data/)).toBeInTheDocument();
   });
 
   it("only shows disclosure records for the selected member", () => {
