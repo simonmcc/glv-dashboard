@@ -143,9 +143,7 @@ function SectionPlaceholder({
   if (state === "idle") {
     return (
       <div className="text-center text-gray-500 py-4">
-        <span>
-          {label} not yet loaded. Scroll down on the main dashboard to load it.
-        </span>
+        <span className="text-purple-600 animate-pulse">Loading {label}…</span>
       </div>
     );
   }
