@@ -16,27 +16,27 @@
     "test-api": "tsx src/test-api.ts"
   },
   "dependencies": {
-    "@google-cloud/opentelemetry-cloud-trace-exporter": "^3.0.0",
+    "@google-cloud/opentelemetry-cloud-trace-exporter": "^3.1.0",
     "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/auto-instrumentations-node": "^0.76.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.218.0",
-    "@opentelemetry/resources": "^2.7.1",
-    "@opentelemetry/sdk-node": "^0.218.0",
-    "@opentelemetry/semantic-conventions": "^1.41.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.79.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.221.0",
+    "@opentelemetry/resources": "^2.10.0",
+    "@opentelemetry/sdk-node": "^0.221.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
     "cors": "^2.8.5",
     "express": "^5.2.1",
-    "playwright": "^1.60.0",
-    "express-rate-limit": "^8.5.2"
+    "playwright": "^1.62.1",
+    "express-rate-limit": "^8.6.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.6",
-    "@types/node": "^25.9.1",
-    "@types/supertest": "^7.2.0",
-    "@vitest/coverage-v8": "^4.1.7",
+    "@types/node": "^26.2.0",
+    "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "^4.1.10",
     "supertest": "^7.1.0",
-    "tsx": "^4.22.3",
-    "typescript": "^6.0.3",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.1"
   }
 }
