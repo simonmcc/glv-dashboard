@@ -1,7 +1,9 @@
 /**
- * SyncStatus — shows when data was last synced, an offline banner,
- * and background authentication progress.
+ * SyncStatus — shows when data was last synced, which data types are currently
+ * loading, an offline banner, and background authentication progress.
  */
+
+import { formatLoadingLabel } from "../utils";
 
 function formatTimeAgo(ms: number): string {
   const seconds = Math.floor((Date.now() - ms) / 1000);
@@ -16,7 +18,8 @@ function formatTimeAgo(ms: number): string {
 interface SyncStatusProps {
   lastSync: number | null;
   isOnline: boolean;
-  isLoading: boolean;
+  /** Human-readable names of the data types currently being fetched. */
+  loading: string[];
   onRefresh: () => void;
   onLogout?: () => void;
   backgroundAuth?: { message: string; isError?: boolean };
@@ -25,11 +28,12 @@ interface SyncStatusProps {
 export function SyncStatus({
   lastSync,
   isOnline,
-  isLoading,
+  loading,
   onRefresh,
   onLogout,
   backgroundAuth,
 }: SyncStatusProps) {
+  const isLoading = loading.length > 0;
   return (
     <div className="space-y-2">
       {!isOnline && (
@@ -114,9 +118,11 @@ export function SyncStatus({
           <button
             onClick={onRefresh}
             disabled={!isOnline || isLoading}
+            title={isLoading ? `Loading: ${loading.join(", ")}` : undefined}
+            aria-live="polite"
             className="text-purple-600 hover:text-purple-800 disabled:opacity-40 disabled:cursor-not-allowed underline"
           >
-            {isLoading ? "Refreshing…" : "Refresh"}
+            {formatLoadingLabel(loading)}
           </button>
         )}
       </div>

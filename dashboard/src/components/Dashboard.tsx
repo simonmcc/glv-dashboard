@@ -2,11 +2,14 @@
  * Main Dashboard Component
  *
  * Orchestrates the dashboard layout and data fetching.
- * Uses lazy loading to fetch section data when scrolled into view.
+ * Every section's data is fetched up front (in parallel) rather than waiting
+ * for the section to be scrolled into view, so the whole dashboard is ready
+ * to search and browse as soon as it settles.
  * Caches all fetched data in IndexedDB for offline access.
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { trace, SpanStatusCode } from "@opentelemetry/api";
 import { ScoutsApiClient } from "../api-client";
 import { MockScoutsApiClient } from "../mock-api-client";
@@ -56,11 +59,43 @@ interface DashboardProps {
   onUpdate?: () => void;
 }
 
+// Human-readable names for each data type, shown in the sync status label
+// while that section is being fetched.
+const DATA_TYPE_LABELS = {
+  learning: "training records",
+  joiningJourney: "onboarding",
+  disclosures: "disclosures",
+  suspensions: "suspensions",
+  teamReviews: "team directory",
+  permits: "permits",
+  awards: "awards",
+} as const;
+
 // Section state for lazy loading
 interface SectionState<T> {
   state: LoadState;
   data: T;
   error: string | null;
+}
+
+/**
+ * Fill a section with cached rows, but only while it is still empty — a section
+ * that already has network data (or is mid-fetch with data on screen) keeps it.
+ */
+function seedSection<T>(
+  setState: Dispatch<SetStateAction<SectionState<T[]>>>,
+  cached: T[] | null,
+) {
+  if (!cached || cached.length === 0) return;
+  setState((s) =>
+    s.data.length > 0
+      ? s
+      : {
+          state: s.state === "idle" ? "loaded" : s.state,
+          data: cached,
+          error: s.error,
+        },
+  );
 }
 
 export function Dashboard({
@@ -155,9 +190,6 @@ export function Dashboard({
   const permitsRef = useRef<HTMLElement>(null);
   const awardsRef = useRef<HTMLElement>(null);
 
-  // Track which sections have been triggered
-  const triggeredSections = useRef<Set<string>>(new Set());
-
   // Memoize the API client (use mock client in mock mode)
   const client = useMemo(() => {
     if (MOCK_MODE) {
@@ -173,6 +205,22 @@ export function Dashboard({
     }
     return c;
   }, [token, contactId]);
+
+  // Resolve the contact id once per client. Every loader awaits this, so the
+  // parallel section fetches can't each fire their own /GetContactDetailAsync.
+  const ensureInitialized = useMemo(() => {
+    let pending: Promise<void> | null = null;
+    return () => {
+      if (contactId) return Promise.resolve();
+      if (!pending) {
+        pending = client.initialize().catch((err) => {
+          pending = null;
+          throw err;
+        });
+      }
+      return pending;
+    };
+  }, [client, contactId]);
 
   // Primary data fetch (learning records + summary)
   // Accepts an AbortSignal so the useEffect cleanup can cancel the in-flight request
@@ -192,10 +240,8 @@ export function Dashboard({
           setPrimaryError(null);
 
           try {
-            // Initialize client if no contactId
-            if (!contactId) {
-              await client.initialize();
-            }
+            // Resolve the contact id (shared with the section loaders)
+            await ensureInitialized();
 
             // Expose debug helpers
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -295,7 +341,7 @@ export function Dashboard({
         },
       );
     },
-    [client, contactId, onTokenExpired],
+    [client, contactId, ensureInitialized, onTokenExpired],
   );
 
   // Section loaders — fetch from network and write to cache on success.
@@ -305,6 +351,7 @@ export function Dashboard({
       "dashboard.load.joiningJourney",
       async (span) => {
         try {
+          await ensureInitialized();
           const response = await client.getJoiningJourney(500);
           if (response.error) throw new Error(response.error);
           const data = response.data || [];
@@ -333,7 +380,7 @@ export function Dashboard({
         }
       },
     );
-  }, [client, contactId, onTokenExpired]);
+  }, [client, contactId, ensureInitialized, onTokenExpired]);
 
   const loadDisclosures = useCallback(async () => {
     setDisclosures((s) => ({ ...s, state: "loading", error: null }));
@@ -341,6 +388,7 @@ export function Dashboard({
       "dashboard.load.disclosures",
       async (span) => {
         try {
+          await ensureInitialized();
           const response = await client.getDisclosureCompliance(500);
           if (response.error) throw new Error(response.error);
           const records = response.data || [];
@@ -376,7 +424,7 @@ export function Dashboard({
         }
       },
     );
-  }, [client, contactId, onTokenExpired]);
+  }, [client, contactId, ensureInitialized, onTokenExpired]);
 
   const loadSuspensions = useCallback(async () => {
     setSuspensions((s) => ({ ...s, state: "loading", error: null }));
@@ -384,6 +432,7 @@ export function Dashboard({
       "dashboard.load.suspensions",
       async (span) => {
         try {
+          await ensureInitialized();
           const response = await client.getSuspensions(500);
           if (response.error) throw new Error(response.error);
           const data = response.data || [];
@@ -412,7 +461,7 @@ export function Dashboard({
         }
       },
     );
-  }, [client, contactId, onTokenExpired]);
+  }, [client, contactId, ensureInitialized, onTokenExpired]);
 
   const loadTeamReviews = useCallback(async () => {
     setTeamReviews((s) => ({ ...s, state: "loading", error: null }));
@@ -420,6 +469,7 @@ export function Dashboard({
       "dashboard.load.teamReviews",
       async (span) => {
         try {
+          await ensureInitialized();
           const response = await client.getTeamReviews(500);
           if (response.error) throw new Error(response.error);
           const data = response.data || [];
@@ -448,12 +498,13 @@ export function Dashboard({
         }
       },
     );
-  }, [client, contactId, onTokenExpired]);
+  }, [client, contactId, ensureInitialized, onTokenExpired]);
 
   const loadPermits = useCallback(async () => {
     setPermits((s) => ({ ...s, state: "loading", error: null }));
     return tracer.startActiveSpan("dashboard.load.permits", async (span) => {
       try {
+        await ensureInitialized();
         const response = await client.getPermits(500);
         if (response.error) throw new Error(response.error);
         const data = response.data || [];
@@ -481,12 +532,13 @@ export function Dashboard({
         span.end();
       }
     });
-  }, [client, contactId, onTokenExpired]);
+  }, [client, contactId, ensureInitialized, onTokenExpired]);
 
   const loadAwards = useCallback(async () => {
     setAwards((s) => ({ ...s, state: "loading", error: null }));
     return tracer.startActiveSpan("dashboard.load.awards", async (span) => {
       try {
+        await ensureInitialized();
         const response = await client.getAwards(500);
         if (response.error) throw new Error(response.error);
         const data = response.data || [];
@@ -514,48 +566,40 @@ export function Dashboard({
         span.end();
       }
     });
-  }, [client, contactId, onTokenExpired]);
+  }, [client, contactId, ensureInitialized, onTokenExpired]);
 
-  // Refresh all data — preserve existing data while fetching (stale-while-revalidate).
-  // Sections with data go to 'loading' (children still rendered) rather than 'idle' (skeleton).
-  // Non-visible sections stay in 'loading' with stale data until scrolled into view.
+  // Fetch every section's data in parallel. Called on mount and on refresh so
+  // the whole dashboard loads up front rather than section-by-section on scroll.
+  // Existing data stays on screen while each section refetches
+  // (stale-while-revalidate), and failures are isolated per section.
+  const loadAllSections = useCallback(async () => {
+    if (!token && !MOCK_MODE) return;
+    const loaders = [
+      loadJoiningJourney,
+      loadDisclosures,
+      loadSuspensions,
+      loadTeamReviews,
+      loadPermits,
+      loadAwards,
+    ];
+    await Promise.allSettled(loaders.map((load) => load()));
+  }, [
+    token,
+    loadJoiningJourney,
+    loadDisclosures,
+    loadSuspensions,
+    loadTeamReviews,
+    loadPermits,
+    loadAwards,
+  ]);
+
+  // Refresh everything — primary data and all sections together.
   const refreshAll = useCallback(async () => {
-    triggeredSections.current.clear();
-    setJoiningJourney((s) => ({
-      ...s,
-      state: s.data.length > 0 ? "loading" : "idle",
-      error: null,
-    }));
-    setDisclosures((s) => ({
-      ...s,
-      state: s.data.records.length > 0 ? "loading" : "idle",
-      error: null,
-    }));
-    setSuspensions((s) => ({
-      ...s,
-      state: s.data.length > 0 ? "loading" : "idle",
-      error: null,
-    }));
-    setTeamReviews((s) => ({
-      ...s,
-      state: s.data.length > 0 ? "loading" : "idle",
-      error: null,
-    }));
-    setPermits((s) => ({
-      ...s,
-      state: s.data.length > 0 ? "loading" : "idle",
-      error: null,
-    }));
-    setAwards((s) => ({
-      ...s,
-      state: s.data.length > 0 ? "loading" : "idle",
-      error: null,
-    }));
-    await fetchPrimaryData();
-  }, [fetchPrimaryData]);
+    await Promise.allSettled([fetchPrimaryData(), loadAllSections()]);
+  }, [fetchPrimaryData, loadAllSections]);
 
   // When token transitions from null → string (background auth completes), trigger a full refresh
-  const prevTokenRef = useRef<string | null>(null);
+  const prevTokenRef = useRef<string | null>(token);
   useEffect(() => {
     if (token && prevTokenRef.current === null) {
       void refreshAll();
@@ -652,8 +696,14 @@ export function Dashboard({
       if (controller.signal.aborted) return;
 
       // Phase 2: Seed secondary section caches in the background — do NOT await
-      // before starting the primary network fetch so loading isn't delayed by
-      // on-demand sections that haven't been scrolled into view yet.
+      // before starting the primary network fetch so a slow IndexedDB read
+      // can't delay the network requests.
+      //
+      // Cached data only fills a section that is still empty; it never
+      // overwrites data a network fetch has already delivered. Because every
+      // section now starts fetching immediately, this read often resolves while
+      // those fetches are in flight, and the cached rows render underneath the
+      // section's loading state until fresh data replaces them.
       Promise.all([
         readCache("disclosures", contactId) as Promise<
           DisclosureRecord[] | null
@@ -680,82 +730,40 @@ export function Dashboard({
             cachedAwards,
           ]) => {
             if (controller.signal.aborted) return;
-            if (
-              !triggeredSections.current.has("disclosures") &&
-              cachedDisclosures &&
-              cachedDisclosures.length > 0
-            ) {
-              setDisclosures({
-                state: "loaded",
-                data: {
-                  records: cachedDisclosures,
-                  summary: client.computeDisclosureSummary(cachedDisclosures),
-                },
-                error: null,
-              });
-              triggeredSections.current.add("disclosures");
+
+            if (cachedDisclosures && cachedDisclosures.length > 0) {
+              setDisclosures((s) =>
+                s.data.records.length > 0
+                  ? s
+                  : {
+                      state: s.state === "idle" ? "loaded" : s.state,
+                      data: {
+                        records: cachedDisclosures,
+                        summary:
+                          client.computeDisclosureSummary(cachedDisclosures),
+                      },
+                      error: s.error,
+                    },
+              );
             }
-            if (
-              !triggeredSections.current.has("joiningJourney") &&
-              cachedJoiningJourney &&
-              cachedJoiningJourney.length > 0
-            ) {
-              setJoiningJourney({
-                state: "loaded",
-                data: cachedJoiningJourney,
-                error: null,
-              });
-              triggeredSections.current.add("joiningJourney");
-            }
-            if (
-              !triggeredSections.current.has("suspensions") &&
-              cachedSuspensions &&
-              cachedSuspensions.length > 0
-            ) {
-              setSuspensions({
-                state: "loaded",
-                data: cachedSuspensions,
-                error: null,
-              });
-              triggeredSections.current.add("suspensions");
-            }
-            if (
-              !triggeredSections.current.has("teamReviews") &&
-              cachedTeamReviews &&
-              cachedTeamReviews.length > 0
-            ) {
-              setTeamReviews({
-                state: "loaded",
-                data: cachedTeamReviews,
-                error: null,
-              });
-              triggeredSections.current.add("teamReviews");
-            }
-            if (
-              !triggeredSections.current.has("permits") &&
-              cachedPermits &&
-              cachedPermits.length > 0
-            ) {
-              setPermits({ state: "loaded", data: cachedPermits, error: null });
-              triggeredSections.current.add("permits");
-            }
-            if (
-              !triggeredSections.current.has("awards") &&
-              cachedAwards &&
-              cachedAwards.length > 0
-            ) {
-              setAwards({ state: "loaded", data: cachedAwards, error: null });
-              triggeredSections.current.add("awards");
-            }
+            seedSection(setJoiningJourney, cachedJoiningJourney);
+            seedSection(setSuspensions, cachedSuspensions);
+            seedSection(setTeamReviews, cachedTeamReviews);
+            seedSection(setPermits, cachedPermits);
+            seedSection(setAwards, cachedAwards);
           },
         )
         .catch((err) => {
           console.warn("Failed to read secondary caches from IndexedDB.", err);
         });
 
-      // Fetch fresh data from the network if online and authenticated
+      // Fetch fresh data from the network if online and authenticated.
+      // The primary fetch starts first (it is the slowest and feeds the tiles),
+      // then every section loads in parallel rather than on scroll.
       if (isOnline && token && !controller.signal.aborted) {
-        await fetchPrimaryData(controller.signal);
+        const primary = fetchPrimaryData(controller.signal);
+        const sections = loadAllSections();
+        await Promise.allSettled([primary, sections]);
       }
     }
 
@@ -768,96 +776,32 @@ export function Dashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Set up intersection observers for lazy sections
-  useEffect(() => {
-    const sections = [
-      {
-        ref: joiningJourneyRef,
-        key: "joiningJourney",
-        load: loadJoiningJourney,
-        collapsed: false,
-      },
-      {
-        ref: disclosuresRef,
-        key: "disclosures",
-        load: loadDisclosures,
-        collapsed: false,
-      },
-      {
-        ref: suspensionsRef,
-        key: "suspensions",
-        load: loadSuspensions,
-        collapsed: false,
-      },
-      {
-        ref: teamReviewsRef,
-        key: "teamReviews",
-        load: loadTeamReviews,
-        collapsed: teamReviewsCollapsed,
-      },
-      {
-        ref: permitsRef,
-        key: "permits",
-        load: loadPermits,
-        collapsed: permitsCollapsed,
-      },
-      {
-        ref: awardsRef,
-        key: "awards",
-        load: loadAwards,
-        collapsed: awardsCollapsed,
-      },
-    ];
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const section = sections.find(
-              (s) => s.ref.current === entry.target,
-            );
-            if (
-              section &&
-              !section.collapsed &&
-              !triggeredSections.current.has(section.key) &&
-              isOnline &&
-              (token || MOCK_MODE)
-            ) {
-              triggeredSections.current.add(section.key);
-              section.load();
-            }
-          }
-        });
-      },
-      { rootMargin: "100px" },
-    );
-
-    sections.forEach(({ ref }) => {
-      if (ref.current) observer.observe(ref.current);
-    });
-
-    return () => observer.disconnect();
+  // Names of the data types currently in flight, in the order they appear on
+  // the page. Drives the sync status label so it says what is loading rather
+  // than a generic "Refreshing…".
+  const loadingTypes = useMemo(() => {
+    const types: string[] = [];
+    if (primaryLoading) types.push(DATA_TYPE_LABELS.learning);
+    if (joiningJourney.state === "loading")
+      types.push(DATA_TYPE_LABELS.joiningJourney);
+    if (disclosures.state === "loading")
+      types.push(DATA_TYPE_LABELS.disclosures);
+    if (suspensions.state === "loading")
+      types.push(DATA_TYPE_LABELS.suspensions);
+    if (teamReviews.state === "loading")
+      types.push(DATA_TYPE_LABELS.teamReviews);
+    if (permits.state === "loading") types.push(DATA_TYPE_LABELS.permits);
+    if (awards.state === "loading") types.push(DATA_TYPE_LABELS.awards);
+    return types;
   }, [
-    isOnline,
-    teamReviewsCollapsed,
-    permitsCollapsed,
-    awardsCollapsed,
-    loadJoiningJourney,
-    loadDisclosures,
-    loadSuspensions,
-    loadTeamReviews,
-    loadPermits,
-    loadAwards,
+    primaryLoading,
+    joiningJourney.state,
+    disclosures.state,
+    suspensions.state,
+    teamReviews.state,
+    permits.state,
+    awards.state,
   ]);
-
-  const isAnyLoading =
-    primaryLoading ||
-    joiningJourney.state === "loading" ||
-    disclosures.state === "loading" ||
-    suspensions.state === "loading" ||
-    teamReviews.state === "loading" ||
-    permits.state === "loading" ||
-    awards.state === "loading";
 
   const permitExpiringSoon = useMemo(() => {
     return permits.data.filter((r) => isExpiringSoon(r["Permit expiry date"]))
@@ -932,7 +876,7 @@ export function Dashboard({
             <SyncStatus
               lastSync={lastSync}
               isOnline={isOnline}
-              isLoading={isAnyLoading}
+              loading={loadingTypes}
               onRefresh={refreshAll}
               onLogout={onLogout}
               backgroundAuth={backgroundAuth}
@@ -1141,10 +1085,7 @@ export function Dashboard({
                     Failed to load: {joiningJourney.error}
                   </div>
                   <button
-                    onClick={() => {
-                      triggeredSections.current.delete("joiningJourney");
-                      loadJoiningJourney();
-                    }}
+                    onClick={() => loadJoiningJourney()}
                     className="text-sm text-purple-600 hover:text-purple-800 underline"
                   >
                     Try again
@@ -1195,10 +1136,7 @@ export function Dashboard({
           title="Disclosure Compliance"
           state={disclosures.state}
           error={disclosures.error}
-          onRetry={() => {
-            triggeredSections.current.delete("disclosures");
-            loadDisclosures();
-          }}
+          onRetry={() => loadDisclosures()}
         >
           <DisclosureTable
             records={disclosures.data.records}
@@ -1215,10 +1153,7 @@ export function Dashboard({
           title="Suspensions"
           state={suspensions.state}
           error={suspensions.error}
-          onRetry={() => {
-            triggeredSections.current.delete("suspensions");
-            loadSuspensions();
-          }}
+          onRetry={() => loadSuspensions()}
         >
           <SuspensionsTable
             records={suspensions.data}
@@ -1236,7 +1171,6 @@ export function Dashboard({
           error={teamReviews.error}
           onRetry={() => {
             if (!token && !MOCK_MODE) return;
-            triggeredSections.current.delete("teamReviews");
             loadTeamReviews();
           }}
           collapsed={teamReviewsCollapsed}
@@ -1244,7 +1178,6 @@ export function Dashboard({
             const next = !teamReviewsCollapsed;
             setTeamReviewsCollapsed(next);
             if (!next && teamReviews.state === "idle" && (token || MOCK_MODE)) {
-              triggeredSections.current.add("teamReviews");
               loadTeamReviews();
             }
           }}
@@ -1293,7 +1226,6 @@ export function Dashboard({
           error={permits.error}
           onRetry={() => {
             if (!token && !MOCK_MODE) return;
-            triggeredSections.current.delete("permits");
             loadPermits();
           }}
           collapsed={permitsCollapsed}
@@ -1301,7 +1233,6 @@ export function Dashboard({
             const next = !permitsCollapsed;
             setPermitsCollapsed(next);
             if (!next && permits.state === "idle" && (token || MOCK_MODE)) {
-              triggeredSections.current.add("permits");
               loadPermits();
             }
           }}
@@ -1322,7 +1253,6 @@ export function Dashboard({
           error={awards.error}
           onRetry={() => {
             if (!token && !MOCK_MODE) return;
-            triggeredSections.current.delete("awards");
             loadAwards();
           }}
           collapsed={awardsCollapsed}
@@ -1330,7 +1260,6 @@ export function Dashboard({
             const next = !awardsCollapsed;
             setAwardsCollapsed(next);
             if (!next && awards.state === "idle" && (token || MOCK_MODE)) {
-              triggeredSections.current.add("awards");
               loadAwards();
             }
           }}
