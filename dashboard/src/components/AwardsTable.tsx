@@ -27,13 +27,20 @@ export function AwardsTable({
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [filterAccreditation, setFilterAccreditation] = useState<string>("all");
 
+  // PreloadedAwardsDashboardView is the team directory: it returns a row per role whether
+  // or not the member holds an accreditation, so rows with none are not awards.
+  const awarded = useMemo(
+    () => records.filter((r) => (r["Accreditation"] || "").trim() !== ""),
+    [records],
+  );
+
   const accreditations = useMemo(() => {
-    const unique = new Set(records.map((r) => r["Accreditation"]));
+    const unique = new Set(awarded.map((r) => r["Accreditation"]));
     return ["all", ...Array.from(unique).filter(Boolean).sort()];
-  }, [records]);
+  }, [awarded]);
 
   const filteredRecords = useMemo(() => {
-    let result = [...records];
+    let result = [...awarded];
 
     if (filterAccreditation !== "all") {
       result = result.filter((r) => r["Accreditation"] === filterAccreditation);
@@ -70,7 +77,7 @@ export function AwardsTable({
     });
 
     return result;
-  }, [records, filterAccreditation, searchTerm, sortField, sortOrder]);
+  }, [awarded, filterAccreditation, searchTerm, sortField, sortOrder]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -102,7 +109,7 @@ export function AwardsTable({
     );
   }
 
-  if (records.length === 0) {
+  if (awarded.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-sm border p-8 text-center text-gray-500">
         No award records found
@@ -127,7 +134,7 @@ export function AwardsTable({
           </select>
         </div>
         <div className="text-sm text-gray-500">
-          Showing {filteredRecords.length} of {records.length} records
+          Showing {filteredRecords.length} of {awarded.length} records
         </div>
       </div>
 

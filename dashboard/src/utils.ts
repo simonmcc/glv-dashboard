@@ -272,3 +272,96 @@ export function formatLoadingLabel(loading: string[]): string {
   if (loading.length === 1) return `Loading ${loading[0]}…`;
   return `Loading ${loading[0]} +${loading.length - 1} more…`;
 }
+
+/** One extra field shown on a row so near-identical records can be told apart */
+export interface RowDetail {
+  label: string;
+  value: string;
+}
+
+/** A record, how many identical copies it stands in for, and what makes it distinct */
+export interface RowGroup<T> {
+  record: T;
+  count: number;
+  details: RowDetail[];
+}
+
+/**
+ * Collapse identical records and work out which of their remaining fields differ.
+ *
+ * Dashboard views return many more fields than a row template shows, so several records
+ * can render identically ("Greenfield" four times, "Team Leader" twice) while the data
+ * behind them differs. Records that are identical in every field are merged into a single
+ * row with a count; the rest carry the fields that actually vary between them, so every
+ * row on screen is distinguishable.
+ *
+ * `hiddenFields` names fields the row already displays, or that identify the member — those
+ * are never useful as detail.
+ */
+export function groupRowsWithDetails<T extends Record<string, unknown>>(
+  rows: T[],
+  hiddenFields: readonly string[],
+): RowGroup<T>[] {
+  const hidden = new Set(hiddenFields.map((f) => f.toLowerCase()));
+
+  const detailFields = (row: T): Map<string, string> => {
+    const fields = new Map<string, string>();
+    for (const [key, value] of Object.entries(row)) {
+      if (hidden.has(key.toLowerCase())) continue;
+      if (value === null || value === undefined) continue;
+      const text = String(value).trim();
+      if (text === "") continue;
+      fields.set(key, text);
+    }
+    return fields;
+  };
+
+  // Merge records that are identical in every field, displayed or not
+  const groups = new Map<string, { record: T; count: number }>();
+  for (const row of rows) {
+    const key = JSON.stringify(
+      Object.entries(row)
+        .map(([k, v]) => [k, v === null || v === undefined ? "" : String(v)])
+        .sort(([a], [b]) => a.localeCompare(b)),
+    );
+    const existing = groups.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      groups.set(key, { record: row, count: 1 });
+    }
+  }
+
+  const grouped = [...groups.values()];
+  const fieldsByGroup = grouped.map((g) => detailFields(g.record));
+
+  // A field is worth showing only when its value varies across the surviving rows
+  const fieldOrder: string[] = [];
+  const valuesByField = new Map<string, Set<string>>();
+  for (const fields of fieldsByGroup) {
+    for (const key of fields.keys()) {
+      if (!valuesByField.has(key)) {
+        valuesByField.set(key, new Set());
+        fieldOrder.push(key);
+      }
+    }
+  }
+  for (const key of fieldOrder) {
+    const values = valuesByField.get(key)!;
+    for (const fields of fieldsByGroup) {
+      values.add(fields.get(key) ?? "");
+    }
+  }
+  const distinguishing = fieldOrder.filter(
+    (key) => valuesByField.get(key)!.size > 1,
+  );
+
+  return grouped.map((group, i) => ({
+    record: group.record,
+    count: group.count,
+    details: distinguishing.flatMap((key) => {
+      const value = fieldsByGroup[i].get(key);
+      return value ? [{ label: key, value }] : [];
+    }),
+  }));
+}

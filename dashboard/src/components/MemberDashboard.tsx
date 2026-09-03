@@ -17,7 +17,8 @@ import type {
   AwardRecord,
 } from "../types";
 import type { LoadState } from "./LazySection";
-import { MODULE_CONFIG, getDeadlineInfo } from "../utils";
+import { MODULE_CONFIG, getDeadlineInfo, groupRowsWithDetails } from "../utils";
+import type { RowDetail } from "../utils";
 
 interface MemberDashboardProps {
   membershipNumber: string;
@@ -48,6 +49,52 @@ function formatDate(dateStr: string | null | undefined): string {
   } catch {
     return dateStr;
   }
+}
+
+/** Fields the team review row already shows, so they are never useful as row detail */
+const TEAM_REVIEW_ROW_FIELDS = [
+  "First name",
+  "Last name",
+  "Membership number",
+  "Role",
+  "Scheduled review date",
+  "Review overdue",
+];
+
+/** Fields the permit row already shows, so they are never useful as row detail */
+const PERMIT_ROW_FIELDS = [
+  "First name",
+  "Last name",
+  "Membership number",
+  "Permit category",
+  "Permit type",
+  "Permit status",
+  "Permit expiry date",
+];
+
+function formatDetailValue(value: string): string {
+  return /^\d{4}-\d{2}-\d{2}/.test(value) ? formatDate(value) : value;
+}
+
+/** Extra fields that distinguish a row from its otherwise-identical siblings */
+function RowDetails({ details }: { details: RowDetail[] }) {
+  if (details.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-600 mt-0.5">
+      {details.map((d) => (
+        <span key={d.label}>
+          <span className="text-gray-500">{d.label}:</span>{" "}
+          {formatDetailValue(d.value)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Badge shown when a row stands in for several byte-identical records */
+function DuplicateCount({ count }: { count: number }) {
+  if (count < 2) return null;
+  return <span className="text-xs text-gray-500 tabular-nums">×{count}</span>;
 }
 
 const learningStatusColors: Record<string, string> = {
@@ -206,9 +253,19 @@ export function MemberDashboard({
   const memberPermits = permitRecords.filter(
     (r) => r["Membership number"] === membershipNumber,
   );
+  // PreloadedAwardsDashboardView is the team directory: it returns a row per role whether
+  // or not the member holds an accreditation, so drop the rows with nothing to show.
   const memberAwards = awardRecords.filter(
-    (r) => r["Membership number"] === membershipNumber,
+    (r) =>
+      r["Membership number"] === membershipNumber &&
+      (r.Accreditation || "").trim() !== "",
   );
+
+  const teamReviewGroups = groupRowsWithDetails(
+    memberTeamReviews,
+    TEAM_REVIEW_ROW_FIELDS,
+  );
+  const permitGroups = groupRowsWithDetails(memberPermits, PERMIT_ROW_FIELDS);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -605,12 +662,12 @@ export function MemberDashboard({
             />
           ) : (
             <div className="divide-y divide-gray-100">
-              {memberTeamReviews.length === 0 ? (
+              {teamReviewGroups.length === 0 ? (
                 <div className="px-4">
                   <EmptySection label="team review records" />
                 </div>
               ) : (
-                memberTeamReviews.map((r, i) => {
+                teamReviewGroups.map(({ record: r, count, details }, i) => {
                   const isOverdue =
                     r["Review overdue"]?.toLowerCase() === "yes" ||
                     r["Review overdue"] === "true";
@@ -618,16 +675,26 @@ export function MemberDashboard({
                   return (
                     <div
                       key={`${r.Role}-${i}`}
-                      className={`flex items-center justify-between px-4 py-3 ${teamReviewStatusColors[reviewStatus]}`}
+                      className={`flex items-start justify-between px-4 py-3 ${teamReviewStatusColors[reviewStatus]}`}
                     >
-                      <div className="flex items-center gap-3">
-                        <StatusDot
-                          status={reviewStatus}
-                          colorMap={teamReviewStatusColors}
-                        />
-                        <span className="font-medium text-sm">{r.Role}</span>
+                      <div className="flex items-start gap-3">
+                        <span className="mt-1">
+                          <StatusDot
+                            status={reviewStatus}
+                            colorMap={teamReviewStatusColors}
+                          />
+                        </span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">
+                              {r.Role}
+                            </span>
+                            <DuplicateCount count={count} />
+                          </div>
+                          <RowDetails details={details} />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 shrink-0">
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60">
                           {reviewStatus}
                         </span>
@@ -657,33 +724,40 @@ export function MemberDashboard({
             <SectionPlaceholder state={permitsState} label="permit data" />
           ) : (
             <div className="divide-y divide-gray-100">
-              {memberPermits.length === 0 ? (
+              {permitGroups.length === 0 ? (
                 <div className="px-4">
                   <EmptySection label="permit records" />
                 </div>
               ) : (
-                memberPermits.map((r, i) => (
+                permitGroups.map(({ record: r, count, details }, i) => (
                   <div
                     key={`${r["Permit category"]}-${i}`}
-                    className={`flex items-center justify-between px-4 py-3 ${permitStatusColors[r["Permit status"]] || "bg-white border-gray-200"}`}
+                    data-testid="permit-row"
+                    className={`flex items-start justify-between px-4 py-3 ${permitStatusColors[r["Permit status"]] || "bg-white border-gray-200"}`}
                   >
-                    <div className="flex items-center gap-3">
-                      <StatusDot
-                        status={r["Permit status"]}
-                        colorMap={permitStatusColors}
-                      />
+                    <div className="flex items-start gap-3">
+                      <span className="mt-1">
+                        <StatusDot
+                          status={r["Permit status"]}
+                          colorMap={permitStatusColors}
+                        />
+                      </span>
                       <div>
-                        <span className="font-medium text-sm">
-                          {r["Permit category"]}
-                        </span>
-                        {r["Permit type"] && (
-                          <span className="text-xs text-gray-500 ml-1">
-                            ({r["Permit type"]})
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">
+                            {r["Permit category"]}
                           </span>
-                        )}
+                          {r["Permit type"] && (
+                            <span className="text-xs text-gray-500">
+                              ({r["Permit type"]})
+                            </span>
+                          )}
+                          <DuplicateCount count={count} />
+                        </div>
+                        <RowDetails details={details} />
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 shrink-0">
                       <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-white/60">
                         {r["Permit status"]}
                       </span>
