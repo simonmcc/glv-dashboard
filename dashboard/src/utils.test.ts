@@ -5,6 +5,7 @@ import {
   transformLearningResults,
   isExpiringSoon,
   getDeadlineInfo,
+  formatLoadingLabel,
   FIRST_RESPONSE_MODULE,
 } from "./utils";
 import type { MemberLearningResult } from "./types";
@@ -702,5 +703,21 @@ describe("transformLearningResults – Growing Roots start dates", () => {
     const result = transformLearningResults(members, fixedNow);
     const record = result.find((r) => r.Learning === "Safety");
     expect(record!["Start date"]).toBeUndefined();
+  });
+});
+
+describe("formatLoadingLabel", () => {
+  it("shows the refresh action when nothing is loading", () => {
+    expect(formatLoadingLabel([])).toBe("Refresh");
+  });
+
+  it("names the data type when a single section is loading", () => {
+    expect(formatLoadingLabel(["disclosures"])).toBe("Loading disclosures…");
+  });
+
+  it("names the first type and counts the rest when several are loading", () => {
+    expect(
+      formatLoadingLabel(["training records", "disclosures", "permits"]),
+    ).toBe("Loading training records +2 more…");
   });
 });

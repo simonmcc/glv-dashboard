@@ -261,3 +261,14 @@ export function transformLearningResults(
 
   return records;
 }
+
+/**
+ * Builds the sync-status refresh label from the list of data types currently
+ * loading. One type is named in full and any others are summarised as a count,
+ * so the label says what is loading without changing width on every tick.
+ */
+export function formatLoadingLabel(loading: string[]): string {
+  if (loading.length === 0) return "Refresh";
+  if (loading.length === 1) return `Loading ${loading[0]}…`;
+  return `Loading ${loading[0]} +${loading.length - 1} more…`;
+}
