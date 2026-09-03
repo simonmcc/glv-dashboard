@@ -38,4 +38,4 @@ jobs:
           " > /tmp/firebase-sa.json
           echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/firebase-sa.json" >> $GITHUB_ENV
       - name: Deploy to Firebase live channel
-        run: npx firebase-tools@latest hosting:deploy --project glv-dashboard
+        run: npx firebase-tools@latest deploy --only hosting --project glv-dashboard
