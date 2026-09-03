@@ -143,6 +143,8 @@ export interface SuspensionRecord {
  * Team directory review record from TeamDirectoryReviewsDashboardView
  */
 export interface TeamReviewRecord {
+  /** The view returns more fields than are mapped below; extras are kept for row detail */
+  [key: string]: unknown;
   "First name"?: string;
   "Last name"?: string;
   "Membership number": string;
@@ -158,6 +160,8 @@ export interface TeamReviewRecord {
  * Permit record from PermitsDashboardView
  */
 export interface PermitRecord {
+  /** The view returns more fields than are mapped below; extras are kept for row detail */
+  [key: string]: unknown;
   "First name": string;
   "Last name": string;
   "Membership number": string;

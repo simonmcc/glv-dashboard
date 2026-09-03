@@ -5,6 +5,7 @@ import {
   transformLearningResults,
   isExpiringSoon,
   getDeadlineInfo,
+  groupRowsWithDetails,
   formatLoadingLabel,
   FIRST_RESPONSE_MODULE,
 } from "./utils";
@@ -719,5 +720,159 @@ describe("formatLoadingLabel", () => {
     expect(
       formatLoadingLabel(["training records", "disclosures", "permits"]),
     ).toBe("Loading training records +2 more…");
+  });
+});
+
+describe("groupRowsWithDetails", () => {
+  const hidden = ["Membership number", "Permit category"];
+
+  it("shows the fields that differ between otherwise identical rows", () => {
+    const rows = [
+      {
+        "Membership number": "1",
+        "Permit category": "Greenfield",
+        "Unit name": "1st Larne Scouts",
+        Team: "Scouts",
+      },
+      {
+        "Membership number": "1",
+        "Permit category": "Greenfield",
+        "Unit name": "1st Larne Cubs",
+        Team: "Scouts",
+      },
+    ];
+    const groups = groupRowsWithDetails(rows, hidden);
+
+    expect(groups).toHaveLength(2);
+    // "Unit name" varies, "Team" does not
+    expect(groups[0].details).toEqual([
+      { label: "Unit name", value: "1st Larne Scouts" },
+    ]);
+    expect(groups[1].details).toEqual([
+      { label: "Unit name", value: "1st Larne Cubs" },
+    ]);
+  });
+
+  it("never offers a field the row already displays as detail", () => {
+    const rows = [
+      { "Membership number": "1", "Permit category": "Greenfield" },
+      { "Membership number": "1", "Permit category": "Nights Away" },
+    ];
+    const groups = groupRowsWithDetails(rows, hidden);
+
+    expect(groups.map((g) => g.details)).toEqual([[], []]);
+  });
+
+  it("collapses byte-identical rows into one with a count", () => {
+    const row = {
+      "Membership number": "1",
+      "Permit category": "Greenfield",
+      "Unit name": "1st Larne",
+    };
+    const groups = groupRowsWithDetails([row, { ...row }, { ...row }], hidden);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].count).toBe(3);
+    expect(groups[0].details).toEqual([]);
+  });
+
+  it("ignores fields that are empty, null or undefined", () => {
+    const rows = [
+      {
+        "Membership number": "1",
+        "Permit category": "Greenfield",
+        Team: "Scouts",
+        Restriction: "",
+        "Unit name": null,
+      },
+      {
+        "Membership number": "1",
+        "Permit category": "Greenfield",
+        Team: "Cubs",
+        Restriction: "   ",
+        "Unit name": undefined,
+      },
+    ];
+    const groups = groupRowsWithDetails(rows, hidden);
+
+    expect(groups[0].details).toEqual([{ label: "Team", value: "Scouts" }]);
+    expect(groups[1].details).toEqual([{ label: "Team", value: "Cubs" }]);
+  });
+
+  it("omits detail for a row whose distinguishing field is absent", () => {
+    const rows = [
+      {
+        "Membership number": "1",
+        "Permit category": "Greenfield",
+        "Scheduled review date": "2025-11-07",
+      },
+      { "Membership number": "1", "Permit category": "Greenfield" },
+    ];
+    const groups = groupRowsWithDetails(rows, hidden);
+
+    expect(groups[0].details).toEqual([
+      { label: "Scheduled review date", value: "2025-11-07" },
+    ]);
+    expect(groups[1].details).toEqual([]);
+  });
+
+  it("keeps rows apart when a value differs only by type", () => {
+    const rows: Record<string, unknown>[] = [
+      { "Membership number": "1", "Permit category": "Greenfield", Level: 1 },
+      { "Membership number": "1", "Permit category": "Greenfield", Level: "1" },
+    ];
+    const groups = groupRowsWithDetails(rows, hidden);
+
+    expect(groups).toHaveLength(2);
+    expect(groups.map((g) => g.count)).toEqual([1, 1]);
+  });
+
+  it("compares nested values structurally rather than as [object Object]", () => {
+    const rows: Record<string, unknown>[] = [
+      {
+        "Membership number": "1",
+        "Permit category": "Greenfield",
+        Restriction: { nights: 2 },
+      },
+      {
+        "Membership number": "1",
+        "Permit category": "Greenfield",
+        Restriction: { nights: 5 },
+      },
+    ];
+    const groups = groupRowsWithDetails(rows, hidden);
+
+    expect(groups).toHaveLength(2);
+    expect(groups[0].details).toEqual([
+      { label: "Restriction", value: '{"nights":2}' },
+    ]);
+    expect(groups[1].details).toEqual([
+      { label: "Restriction", value: '{"nights":5}' },
+    ]);
+  });
+
+  it("merges rows that differ only in which flavour of empty they carry", () => {
+    const rows: Record<string, unknown>[] = [
+      {
+        "Membership number": "1",
+        "Permit category": "Greenfield",
+        "Unit name": null,
+      },
+      {
+        "Membership number": "1",
+        "Permit category": "Greenfield",
+        "Unit name": "",
+      },
+      { "Membership number": "1", "Permit category": "Greenfield" },
+    ];
+    const groups = groupRowsWithDetails(rows, hidden);
+
+    // all three would render identically, so they collapse rather than repeat
+    expect(groups).toHaveLength(1);
+    expect(groups[0].count).toBe(3);
+  });
+
+  it("returns an empty list for no rows", () => {
+    expect(groupRowsWithDetails([], hidden)).toEqual([]);
   });
 });

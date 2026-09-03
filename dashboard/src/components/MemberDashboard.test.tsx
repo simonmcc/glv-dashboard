@@ -283,6 +283,114 @@ describe("MemberDashboard", () => {
     expect(section.textContent).not.toContain("Silver Award");
   });
 
+  it("drops team directory rows that carry no accreditation", () => {
+    render(
+      <MemberDashboard
+        {...defaultProps}
+        awardRecords={[
+          {
+            "First name": "Alice",
+            "Last name": "Johnson",
+            "Membership number": "12345678",
+            Accreditation: "",
+            Role: "Team Member",
+          },
+        ]}
+      />,
+    );
+
+    const section = screen.getByTestId("awards-section");
+    expect(section.textContent).toContain("No award records found");
+    expect(section.textContent).not.toContain("Team Member");
+  });
+
+  it("shows the field that tells two same-role team reviews apart", () => {
+    render(
+      <MemberDashboard
+        {...defaultProps}
+        teamReviewRecords={[
+          {
+            "Membership number": "12345678",
+            Role: "Team Leader",
+            "Team leader": "Alice Johnson",
+            "Scheduled review date": "2025-11-07",
+            "Review overdue": "Yes",
+            Team: "Squirrels",
+          },
+          {
+            "Membership number": "12345678",
+            Role: "Team Leader",
+            "Team leader": "Alice Johnson",
+            "Scheduled review date": "2025-12-03",
+            "Review overdue": "Yes",
+            Team: "Beavers",
+          },
+        ]}
+      />,
+    );
+
+    const section = screen.getByTestId("team-reviews-section");
+    expect(section.textContent).toContain("Squirrels");
+    expect(section.textContent).toContain("Beavers");
+    // the team leader is the same on both rows, so it is not shown as detail
+    expect(section.textContent).not.toContain("Team leader:");
+  });
+
+  it("shows the field that tells two same-category permits apart", () => {
+    render(
+      <MemberDashboard
+        {...defaultProps}
+        permitRecords={[
+          {
+            "First name": "Alice",
+            "Last name": "Johnson",
+            "Membership number": "12345678",
+            "Permit category": "Greenfield",
+            "Permit status": "",
+            "Permit expiry date": null,
+            "Unit name": "1st Larne Scouts",
+          },
+          {
+            "First name": "Alice",
+            "Last name": "Johnson",
+            "Membership number": "12345678",
+            "Permit category": "Greenfield",
+            "Permit status": "",
+            "Permit expiry date": null,
+            "Unit name": "1st Larne Cubs",
+          },
+        ]}
+      />,
+    );
+
+    const section = screen.getByTestId("permits-section");
+    expect(section.textContent).toContain("1st Larne Scouts");
+    expect(section.textContent).toContain("1st Larne Cubs");
+  });
+
+  it("collapses identical permit rows into one with a count", () => {
+    const permit: PermitRecord = {
+      "First name": "Alice",
+      "Last name": "Johnson",
+      "Membership number": "12345678",
+      "Permit category": "Greenfield",
+      "Permit status": "",
+      "Permit expiry date": null,
+    };
+    render(
+      <MemberDashboard
+        {...defaultProps}
+        permitRecords={[permit, { ...permit }, { ...permit }]}
+      />,
+    );
+
+    const section = screen.getByTestId("permits-section");
+    expect(section.querySelectorAll("[data-testid='permit-row']")).toHaveLength(
+      1,
+    );
+    expect(section.textContent).toContain("×3");
+  });
+
   it("shows a loading message when awards are loading", () => {
     render(
       <MemberDashboard

@@ -672,6 +672,8 @@ export class ScoutsApiClient {
 
     const data = (result.data || []).map(
       (record): TeamReviewRecord => ({
+        // Keep the view's other fields — they tell otherwise-identical rows apart
+        ...record,
         "First name": record["First name"] as string,
         "Last name": record["Last name"] as string,
         "Membership number": String(record["Membership number"] || ""),
@@ -718,6 +720,8 @@ export class ScoutsApiClient {
 
     const data = (result.data || []).map(
       (record): PermitRecord => ({
+        // Keep the view's other fields — they tell otherwise-identical rows apart
+        ...record,
         "First name": String(record["First name"] || ""),
         "Last name": String(record["Last name"] || ""),
         "Membership number": String(record["Membership number"] || ""),
