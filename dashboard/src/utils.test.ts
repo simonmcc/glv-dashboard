@@ -816,6 +816,62 @@ describe("groupRowsWithDetails", () => {
     expect(groups[1].details).toEqual([]);
   });
 
+  it("keeps rows apart when a value differs only by type", () => {
+    const rows: Record<string, unknown>[] = [
+      { "Membership number": "1", "Permit category": "Greenfield", Level: 1 },
+      { "Membership number": "1", "Permit category": "Greenfield", Level: "1" },
+    ];
+    const groups = groupRowsWithDetails(rows, hidden);
+
+    expect(groups).toHaveLength(2);
+    expect(groups.map((g) => g.count)).toEqual([1, 1]);
+  });
+
+  it("compares nested values structurally rather than as [object Object]", () => {
+    const rows: Record<string, unknown>[] = [
+      {
+        "Membership number": "1",
+        "Permit category": "Greenfield",
+        Restriction: { nights: 2 },
+      },
+      {
+        "Membership number": "1",
+        "Permit category": "Greenfield",
+        Restriction: { nights: 5 },
+      },
+    ];
+    const groups = groupRowsWithDetails(rows, hidden);
+
+    expect(groups).toHaveLength(2);
+    expect(groups[0].details).toEqual([
+      { label: "Restriction", value: '{"nights":2}' },
+    ]);
+    expect(groups[1].details).toEqual([
+      { label: "Restriction", value: '{"nights":5}' },
+    ]);
+  });
+
+  it("merges rows that differ only in which flavour of empty they carry", () => {
+    const rows: Record<string, unknown>[] = [
+      {
+        "Membership number": "1",
+        "Permit category": "Greenfield",
+        "Unit name": null,
+      },
+      {
+        "Membership number": "1",
+        "Permit category": "Greenfield",
+        "Unit name": "",
+      },
+      { "Membership number": "1", "Permit category": "Greenfield" },
+    ];
+    const groups = groupRowsWithDetails(rows, hidden);
+
+    // all three would render identically, so they collapse rather than repeat
+    expect(groups).toHaveLength(1);
+    expect(groups[0].count).toBe(3);
+  });
+
   it("returns an empty list for no rows", () => {
     expect(groupRowsWithDetails([], hidden)).toEqual([]);
   });

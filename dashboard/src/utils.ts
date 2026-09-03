@@ -286,6 +286,15 @@ export interface RowGroup<T> {
   details: RowDetail[];
 }
 
+/** A field with nothing to show: no value at all, or whitespace */
+function isEmptyValue(value: unknown): boolean {
+  return (
+    value === null ||
+    value === undefined ||
+    (typeof value === "string" && value.trim() === "")
+  );
+}
+
 /**
  * Collapse identical records and work out which of their remaining fields differ.
  *
@@ -308,20 +317,27 @@ export function groupRowsWithDetails<T extends Record<string, unknown>>(
     const fields = new Map<string, string>();
     for (const [key, value] of Object.entries(row)) {
       if (hidden.has(key.toLowerCase())) continue;
-      if (value === null || value === undefined) continue;
-      const text = String(value).trim();
-      if (text === "") continue;
-      fields.set(key, text);
+      if (isEmptyValue(value)) continue;
+      fields.set(
+        key,
+        typeof value === "object"
+          ? JSON.stringify(value)
+          : String(value).trim(),
+      );
     }
     return fields;
   };
 
-  // Merge records that are identical in every field, displayed or not
+  // Merge records that are identical in every field, displayed or not. Values are compared
+  // structurally, so a number never matches a string of the same digits and nested objects
+  // are not flattened to "[object Object]". Fields a row cannot show — null, undefined,
+  // blank or absent — are left out of the key entirely: rows differing only in which
+  // flavour of empty they carry would otherwise render as indistinguishable duplicates.
   const groups = new Map<string, { record: T; count: number }>();
   for (const row of rows) {
     const key = JSON.stringify(
       Object.entries(row)
-        .map(([k, v]) => [k, v === null || v === undefined ? "" : String(v)])
+        .filter(([, value]) => !isEmptyValue(value))
         .sort(([a], [b]) => a.localeCompare(b)),
     );
     const existing = groups.get(key);
