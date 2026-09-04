@@ -1,41 +1,110 @@
+# Dependabot configuration.
+#
+# Grouping strategy — the goal is a small number of reviewable PRs rather than
+# one PR per package:
+#
+#   * Every ecosystem/directory declares BOTH a `version-updates` group and a
+#     `security-updates` group. Groups default to `applies-to: version-updates`,
+#     so without the explicit security groups Dependabot opens one ungrouped PR
+#     per vulnerable package — that was the main source of PR churn here.
+#   * Production and development dependencies are grouped separately so a
+#     breaking dev-tooling upgrade (vite/eslint/vitest majors) cannot block a
+#     runtime dependency bump, and vice versa.
+#   * `cooldown` suppresses the dribble of patch releases: a dependency has to
+#     sit at a version for a few days before Dependabot proposes it, so a
+#     package that ships 8.5.14 → 8.5.25 over a fortnight lands as one bump.
+#   * Version updates run monthly. Security updates ignore `schedule` and are
+#     still raised as soon as an advisory lands.
 version: 2
+
 updates:
   - package-ecosystem: "npm"
     directory: "/dashboard"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
     groups:
-      dashboard-deps:
+      dashboard-prod:
+        applies-to: version-updates
+        dependency-type: "production"
         patterns:
           - "*"
-
-  - package-ecosystem: "npm"
-    directory: "/scraper"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    groups:
-      scraper-deps:
+      dashboard-dev:
+        applies-to: version-updates
+        dependency-type: "development"
+        patterns:
+          - "*"
+      dashboard-security:
+        applies-to: security-updates
         patterns:
           - "*"
 
   - package-ecosystem: "npm"
     directory: "/backend"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
     groups:
-      backend-deps:
+      backend-prod:
+        applies-to: version-updates
+        dependency-type: "production"
+        patterns:
+          - "*"
+      backend-dev:
+        applies-to: version-updates
+        dependency-type: "development"
+        patterns:
+          - "*"
+      backend-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # The scraper is an ad-hoc discovery tool with four dependencies and is never
+  # deployed, so it gets a single catch-all group per update type.
+  - package-ecosystem: "npm"
+    directory: "/scraper"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    cooldown:
+      default-days: 14
+      semver-major-days: 30
+      semver-minor-days: 14
+      semver-patch-days: 7
+    groups:
+      scraper-deps:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      scraper-security:
+        applies-to: security-updates
         patterns:
           - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    cooldown:
+      default-days: 7
     groups:
       github-actions:
+        applies-to: version-updates
+        patterns:
+          - "*"
+      github-actions-security:
+        applies-to: security-updates
         patterns:
           - "*"
