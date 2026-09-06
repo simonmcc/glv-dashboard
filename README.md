@@ -133,7 +133,7 @@ See [docs/CODEQL.md](docs/CODEQL.md) for more details on the security scanning s
 |----------|---------|-------------|
 | `PORT` | `3001` | Server port |
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
-| `CORS_PREVIEW_ORIGIN_PATTERNS` | _(unset)_ | `;`-separated globs of extra allowed origins, e.g. `https://glv-dashboard--*.web.app` for Firebase preview channels. `*` never spans `.` or `/`. |
+| `CORS_PREVIEW_ORIGIN_PATTERNS` | _(unset)_ | `;`-separated globs of extra allowed origins, e.g. `https://glv-dashboard--pr*-preview-????????.web.app` for Firebase preview channels. `*` matches any run of characters, `?` exactly one; neither spans `.` or `/`. |
 | `OTEL_ENABLED` | _(unset)_ | Set to `true` to enable OpenTelemetry tracing |
 | `GOOGLE_CLOUD_PROJECT` | _(unset)_ | GCP project ID — enables Cloud Trace export and log correlation |
 | `DEBUG` | _(unset)_ | Set to `true` to emit debug-level log output |
@@ -145,7 +145,8 @@ Both services are live — no manual setup required.
 - **Backend**: Cloud Run at `https://glv-backend-gxoc276j2a-ew.a.run.app`
   - Deployed via `cloudbuild.yaml` (manual) or `.github/workflows/deploy-backend.yml`
   - `CORS_ORIGIN` is set to `https://glv-dashboard.web.app` in the Cloud Run env vars
-  - `CORS_PREVIEW_ORIGIN_PATTERNS` is set to `https://glv-dashboard--*.web.app` so PR previews can call the proxy
+  - `CORS_PREVIEW_ORIGIN_PATTERNS` is set to `https://glv-dashboard--pr*-preview-????????.web.app` so PR previews can call the proxy.
+    The pattern is pinned to the exact channel shape on purpose — see [Preview origins and CORS](#preview-origins-and-cors)
 - **Dashboard**: Firebase Hosting at `https://glv-dashboard.web.app`
   - Merges to `main` auto-deploy via `.github/workflows/firebase-hosting-merge.yml`
   - PRs get a preview channel deploy via `.github/workflows/firebase-hosting-pull-request.yml`
@@ -165,6 +166,24 @@ The choice is stored in `localStorage` under `glv-dashboard-data-source` and per
 preview until you switch back. Switching either way clears the cached session, because a mock token
 is meaningless to the real backend and vice versa. In live mode you sign in with your real Scouts
 portal credentials and the preview talks to the production Cloud Run proxy.
+
+### Preview origins and CORS
+
+Firebase generates a hostname per preview channel, so the backend allows them via
+`CORS_PREVIEW_ORIGIN_PATTERNS` rather than listing each one. The pattern is deliberately pinned to
+the full channel shape (`pr<N>-preview-<8-character hash>`) instead of a loose
+`https://glv-dashboard--*.web.app`.
+
+The reason is that a hostname under `.web.app` is a Firebase Hosting site ID, and site IDs are
+registrable by anyone. A site ID only has to be a valid hostname label — consecutive hyphens are
+legal in one — of 30 characters or fewer, so a loose pattern could plausibly be satisfied by someone
+registering `glv-dashboard--evil`. Pinning the hash width makes the shortest hostname the pattern
+can match 34 characters, past the 30-character site ID limit, so no registrable site ID can match.
+
+This is defence in depth rather than a security boundary: the proxy holds no cookies or server-side
+sessions, and the Bearer token lives in `localStorage` scoped to the dashboard's own origin, so a
+foreign origin cannot read it. CORS constrains browsers only — the Cloud Run service is
+`--allow-unauthenticated` and reachable directly regardless.
 
 ### Metrics & Telemetry
 

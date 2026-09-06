@@ -27,7 +27,7 @@ npm run dev         # Start server on http://localhost:3001
 |----------|---------|-------------|
 | `PORT` | `3001` | Server port |
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
-| `CORS_PREVIEW_ORIGIN_PATTERNS` | _(unset)_ | `;`-separated globs of extra allowed origins (e.g. `https://glv-dashboard--*.web.app`) |
+| `CORS_PREVIEW_ORIGIN_PATTERNS` | _(unset)_ | `;`-separated globs of extra allowed origins (e.g. `https://glv-dashboard--pr*-preview-????????.web.app`) |
 | `OTEL_ENABLED` | `false` | Enable OpenTelemetry tracing |
 | `HEADLESS` | `true` | Set to `false` for visible Playwright browser |
 
@@ -169,7 +169,7 @@ Set these in Cloud Run console or via `gcloud run deploy`:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `CORS_ORIGIN` | Yes | Frontend URL (e.g., `https://glv-dashboard.web.app`) |
-| `CORS_PREVIEW_ORIGIN_PATTERNS` | No | Extra allowed origins as `;`-separated globs, used for Firebase Hosting preview channels (e.g. `https://glv-dashboard--*.web.app`). `*` matches a single hostname label — it never spans `.` or `/`. Separated by `;` because `gcloud --set-env-vars` splits on commas. |
+| `CORS_PREVIEW_ORIGIN_PATTERNS` | No | Extra allowed origins as `;`-separated globs, used for Firebase Hosting preview channels (e.g. `https://glv-dashboard--pr*-preview-????????.web.app`). `*` matches a single hostname label — it never spans `.` or `/`. Separated by `;` because `gcloud --set-env-vars` splits on commas. |
 
 User credentials are provided at login time via the dashboard, not stored in the backend.
 

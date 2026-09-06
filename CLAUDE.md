@@ -34,7 +34,7 @@ Both services are live — no manual setup required.
 - **Backend**: Cloud Run at `https://glv-backend-gxoc276j2a-ew.a.run.app`
   - Deployed via `cloudbuild.yaml` (manual) or `.github/workflows/deploy-backend.yml`
   - `CORS_ORIGIN` is set to `https://glv-dashboard.web.app` in the Cloud Run env vars, plus
-    `CORS_PREVIEW_ORIGIN_PATTERNS=https://glv-dashboard--*.web.app` for PR preview channels
+    `CORS_PREVIEW_ORIGIN_PATTERNS=https://glv-dashboard--pr*-preview-????????.web.app` for PR preview channels
 - **Dashboard**: Firebase Hosting at `https://glv-dashboard.web.app`
   - Merges to `main` auto-deploy via `.github/workflows/firebase-hosting-merge.yml`
   - PRs get a preview channel deploy via `.github/workflows/firebase-hosting-pull-request.yml`

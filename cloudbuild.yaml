@@ -58,8 +58,10 @@ substitutions:
   _REGION: europe-west1
   _DASHBOARD_URL: https://glv-dashboard.web.app
   # Firebase Hosting preview channels, so PR previews can opt into live data.
-  # ';'-separated because gcloud splits --set-env-vars on commas.
-  _PREVIEW_ORIGIN_PATTERNS: https://glv-dashboard--*.web.app
+  # Pinned to the exact channel shape (pr<N>-preview-<8 char hash>): every
+  # matching hostname is >30 chars, so none is registrable as a Firebase site
+  # ID. ';'-separated because gcloud splits --set-env-vars on commas.
+  _PREVIEW_ORIGIN_PATTERNS: "https://glv-dashboard--pr*-preview-????????.web.app"
 
 images:
   - 'gcr.io/$PROJECT_ID/glv-backend:$BUILD_ID'
