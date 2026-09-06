@@ -5,6 +5,14 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    ignore:
+      # TypeScript 7 is held back by typescript-eslint, which declares
+      # `peer typescript@">=4.8.4 <6.1.0"` as of 8.69.0 (current latest).
+      # Proposing TS 7 makes the graph unsatisfiable, so `npm ci` fails with
+      # ERESOLVE before any CI job can run -- see #225, #238.
+      # Remove this entry once typescript-eslint widens its peer range.
+      - dependency-name: "typescript"
+        versions: ["7.x"]
     groups:
       dashboard-deps:
         patterns:
