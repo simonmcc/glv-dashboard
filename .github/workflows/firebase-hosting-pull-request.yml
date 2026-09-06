@@ -8,7 +8,10 @@ permissions:
   pull-requests: write
 
 env:
+  # Preview builds default to mock data. VITE_MOCK_MODE also enables the in-app
+  # switch that lets a reviewer opt into the live backend proxy for this preview.
   VITE_MOCK_MODE: 'true'
+  VITE_BACKEND_URL: https://glv-backend-gxoc276j2a-ew.a.run.app
   BUILD_SHA: ${{ github.event.pull_request.head.sha }}
 
 jobs:
@@ -62,5 +65,11 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `Visit the preview URL for this PR (updated for commit ${{ github.event.pull_request.head.sha }}):\n\n${{ steps.deploy.outputs.preview_url }}`
+              body: [
+                `Visit the preview URL for this PR (updated for commit ${{ github.event.pull_request.head.sha }}):`,
+                ``,
+                `${{ steps.deploy.outputs.preview_url }}`,
+                ``,
+                `Previews use **mock data** by default. To check the UI against the real backend, use the "Use live backend data" switch on the sign-in screen, or open [${{ steps.deploy.outputs.preview_url }}?data=live](${{ steps.deploy.outputs.preview_url }}?data=live) and sign in with your Scouts portal credentials.`,
+              ].join('\n')
             })

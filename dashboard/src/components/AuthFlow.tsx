@@ -11,6 +11,7 @@ import { trace, SpanStatusCode } from "@opentelemetry/api";
 import type { AuthState } from "../types";
 import { hashPassword, saveCredentials, loadCredentials } from "../session";
 import { VersionFooter } from "./VersionFooter";
+import { DataSourceBanner } from "./DataSourceBanner";
 
 const tracer = trace.getTracer("glv-dashboard", "1.0.0");
 
@@ -248,15 +249,7 @@ export function AuthFlow({
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          {mockMode && (
-            <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded text-amber-800 text-sm">
-              <p className="font-semibold">🔍 Preview Mode (Mock Data)</p>
-              <p className="mt-1">
-                This is a PR preview using mock data. Sign in with any email and
-                password.
-              </p>
-            </div>
-          )}
+          <DataSourceBanner />
 
           {authState.status === "error" && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">

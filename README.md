@@ -124,6 +124,7 @@ See [docs/CODEQL.md](docs/CODEQL.md) for more details on the security scanning s
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VITE_BACKEND_URL` | `http://localhost:3001` | Backend API URL |
+| `VITE_MOCK_MODE` | _(unset)_ | Set to `true` to build a preview bundle: mock data by default, with an in-app switch to the live backend |
 | `VITE_OTEL_ENABLED` | _(unset)_ | Set to `true` to enable frontend OpenTelemetry tracing |
 
 ### Backend
@@ -132,6 +133,7 @@ See [docs/CODEQL.md](docs/CODEQL.md) for more details on the security scanning s
 |----------|---------|-------------|
 | `PORT` | `3001` | Server port |
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed CORS origin |
+| `CORS_PREVIEW_ORIGIN_PATTERNS` | _(unset)_ | `;`-separated globs of extra allowed origins, e.g. `https://glv-dashboard--*.web.app` for Firebase preview channels. `*` never spans `.` or `/`. |
 | `OTEL_ENABLED` | _(unset)_ | Set to `true` to enable OpenTelemetry tracing |
 | `GOOGLE_CLOUD_PROJECT` | _(unset)_ | GCP project ID — enables Cloud Trace export and log correlation |
 | `DEBUG` | _(unset)_ | Set to `true` to emit debug-level log output |
@@ -143,10 +145,26 @@ Both services are live — no manual setup required.
 - **Backend**: Cloud Run at `https://glv-backend-gxoc276j2a-ew.a.run.app`
   - Deployed via `cloudbuild.yaml` (manual) or `.github/workflows/deploy-backend.yml`
   - `CORS_ORIGIN` is set to `https://glv-dashboard.web.app` in the Cloud Run env vars
+  - `CORS_PREVIEW_ORIGIN_PATTERNS` is set to `https://glv-dashboard--*.web.app` so PR previews can call the proxy
 - **Dashboard**: Firebase Hosting at `https://glv-dashboard.web.app`
   - Merges to `main` auto-deploy via `.github/workflows/firebase-hosting-merge.yml`
   - PRs get a preview channel deploy via `.github/workflows/firebase-hosting-pull-request.yml`
   - `VITE_BACKEND_URL` is injected as the Cloud Run URL in the deploy workflow
+
+### PR preview data source
+
+PR previews are built with `VITE_MOCK_MODE=true` and **default to mock data** — sign in with any
+email and password. To check a UI change against real data, switch the preview to the live backend
+proxy:
+
+- click **Use live backend data** in the preview banner on the sign-in screen (or in the dashboard
+  header once signed in), or
+- open the preview URL with `?data=live` appended.
+
+The choice is stored in `localStorage` under `glv-dashboard-data-source` and persists for that
+preview until you switch back. Switching either way clears the cached session, because a mock token
+is meaningless to the real backend and vice versa. In live mode you sign in with your real Scouts
+portal credentials and the preview talks to the production Cloud Run proxy.
 
 ### Metrics & Telemetry
 

@@ -13,6 +13,7 @@ import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { authenticate, checkLearningByMembershipNumbers, TokenExpiredError, type ProgressCallback } from './auth-service.js';
 import { forwardTraces } from './traces-proxy.js';
 import { log, logError, logDebug } from './logger.js';
+import { createOriginMatcher, describeAllowedOrigins } from './cors-origins.js';
 
 const tracer = trace.getTracer('glv-backend-server', '1.0.0');
 
@@ -94,9 +95,10 @@ function validateTraceOrigin(req: express.Request, res: express.Response, next: 
 
   const requestOrigin = req.headers.origin as string | undefined;
   const referer = req.headers.referer as string | undefined;
+  const isOriginAllowed = createOriginMatcher();
 
-  // Direct origin match
-  if (requestOrigin === allowedOrigin) {
+  // Direct origin match (production origin or a preview channel pattern)
+  if (requestOrigin && isOriginAllowed(requestOrigin)) {
     return next();
   }
 
@@ -104,7 +106,7 @@ function validateTraceOrigin(req: express.Request, res: express.Response, next: 
   if (referer) {
     try {
       const refererUrl = new URL(referer);
-      if (refererUrl.origin === allowedOrigin) {
+      if (isOriginAllowed(refererUrl.origin)) {
         return next();
       }
     } catch {
@@ -121,8 +123,9 @@ function validateTraceOrigin(req: express.Request, res: express.Response, next: 
 }
 
 // Middleware
+const isOriginAllowed = createOriginMatcher();
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: (origin, callback) => callback(null, isOriginAllowed(origin)),
   credentials: true,
 }));
 app.use(express.json({ limit: '4mb' }));
@@ -406,7 +409,7 @@ app.post('/v1/traces', tracesLimiter, validateTraceOrigin, async (req, res) => {
 // Start server
 app.listen(PORT, () => {
   log(`[Server] GLV Dashboard backend running on http://localhost:${PORT}`);
-  log(`[Server] CORS origin: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
+  log(`[Server] CORS origin: ${describeAllowedOrigins()}`);
 });
 
 export default app;

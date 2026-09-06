@@ -13,8 +13,10 @@ import type { Dispatch, SetStateAction } from "react";
 import { trace, SpanStatusCode } from "@opentelemetry/api";
 import { ScoutsApiClient } from "../api-client";
 import { MockScoutsApiClient } from "../mock-api-client";
+import { isMockMode } from "../data-source";
+import { DataSourceBanner } from "./DataSourceBanner";
 
-const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === "true";
+const MOCK_MODE = isMockMode();
 
 const tracer = trace.getTracer("glv-dashboard", "1.0.0");
 import { transformLearningResults, isExpiringSoon } from "../utils";
@@ -866,6 +868,7 @@ export function Dashboard({
           </div>
           {/* Metadata + sync status row */}
           <div className="mt-2 space-y-1">
+            <DataSourceBanner compact />
             {username && (
               <div className="hidden sm:block text-sm text-gray-500">
                 Signed in as{" "}

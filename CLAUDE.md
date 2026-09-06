@@ -33,10 +33,12 @@ Both services are live — no manual setup required.
 
 - **Backend**: Cloud Run at `https://glv-backend-gxoc276j2a-ew.a.run.app`
   - Deployed via `cloudbuild.yaml` (manual) or `.github/workflows/deploy-backend.yml`
-  - `CORS_ORIGIN` is set to `https://glv-dashboard.web.app` in the Cloud Run env vars
+  - `CORS_ORIGIN` is set to `https://glv-dashboard.web.app` in the Cloud Run env vars, plus
+    `CORS_PREVIEW_ORIGIN_PATTERNS=https://glv-dashboard--*.web.app` for PR preview channels
 - **Dashboard**: Firebase Hosting at `https://glv-dashboard.web.app`
   - Merges to `main` auto-deploy via `.github/workflows/firebase-hosting-merge.yml`
   - PRs get a preview channel deploy via `.github/workflows/firebase-hosting-pull-request.yml`
+    (mock data by default; reviewers can switch to the live backend in-app or with `?data=live`)
   - `VITE_BACKEND_URL` is injected as the Cloud Run URL in the deploy workflow
 
 ## Commands
@@ -91,6 +93,8 @@ cd dashboard && npx vitest run src/utils.test.ts
 - `VITE_BACKEND_URL` — Backend URL for dashboard (default: `http://localhost:3001`)
 - `PORT` — Backend port (default: `3001`)
 - `CORS_ORIGIN` — Backend CORS origin (default: `http://localhost:5173`)
+- `CORS_PREVIEW_ORIGIN_PATTERNS` — `;`-separated globs of extra allowed origins (Firebase preview channels)
+- `VITE_MOCK_MODE` — Set to `true` for preview builds: mock data by default, with a runtime switch to the live backend (`dashboard/src/data-source.ts`)
 - `HEADLESS` — Set to `false` for visible browser in scraper/auth
 - `LEARNING_CONCURRENCY` — Number of parallel member lookups in `check-learning` (default: `10`)
 - `OTEL_ENABLED` — Set to `true` to enable backend OpenTelemetry tracing (or use `npm run dev:traced`)

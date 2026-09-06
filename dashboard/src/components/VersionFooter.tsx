@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { isMockMode } from "../data-source";
 
 interface VersionFooterProps {
   updateAvailable?: boolean;
@@ -12,7 +13,7 @@ interface VersionFooterProps {
 }
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
-const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === "true";
+const MOCK_MODE = isMockMode();
 
 // Truncate legacy full-SHA versions; pass through YYYYMMDD-sha7 and 'dev' as-is
 const shortVersion = (v: string) => (v.length > 16 ? v.substring(0, 7) : v);
