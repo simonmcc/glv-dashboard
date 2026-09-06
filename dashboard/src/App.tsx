@@ -11,8 +11,9 @@ import type { AuthState } from "./types";
 import { AuthFlow } from "./components/AuthFlow";
 import { Dashboard } from "./components/Dashboard";
 import { loadSession, saveSession, clearSession } from "./session";
+import { isMockMode } from "./data-source";
 
-const MOCK_MODE = import.meta.env.VITE_MOCK_MODE === "true";
+const MOCK_MODE = isMockMode();
 
 /** Load session from localStorage and convert to AuthState */
 function loadAuthState(): AuthState {

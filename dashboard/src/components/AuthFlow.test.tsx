@@ -14,6 +14,7 @@ vi.mock("../session", async (importOriginal) => {
 });
 
 import { hashPassword, loadCredentials, saveCredentials } from "../session";
+import * as dataSource from "../data-source";
 
 const defaultProps = {
   authState: { status: "unauthenticated" as const },
@@ -37,7 +38,16 @@ function makeSseStream(events: string): ReadableStream<Uint8Array> {
 }
 
 describe("AuthFlow - mock mode", () => {
-  it("shows mock mode banner when mockMode is true", () => {
+  // Restore the data-source spies so a preview-build test can't leak into the next
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // The preview banner is driven by the build's data source, not the mockMode
+  // prop — see DataSourceBanner.test.tsx for its own behaviour.
+  it("shows the preview banner on a preview build", () => {
+    vi.spyOn(dataSource, "isDataSourceSwitchable").mockReturnValue(true);
+    vi.spyOn(dataSource, "getDataSource").mockReturnValue("mock");
     render(<AuthFlow {...defaultProps} mockMode={true} />);
     expect(screen.getByText("🔍 Preview Mode (Mock Data)")).toBeInTheDocument();
     expect(
@@ -45,7 +55,7 @@ describe("AuthFlow - mock mode", () => {
     ).toBeInTheDocument();
   });
 
-  it("does not show mock mode banner when mockMode is false", () => {
+  it("does not show the preview banner on a production build", () => {
     render(<AuthFlow {...defaultProps} mockMode={false} />);
     expect(
       screen.queryByText("🔍 Preview Mode (Mock Data)"),
