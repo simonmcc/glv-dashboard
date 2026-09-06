@@ -624,12 +624,14 @@ export function Dashboard({
       setSelectedMember({ membershipNumber, name });
       // Don't trigger network loads while background auth is still in progress (no token yet)
       if (!token && !MOCK_MODE) return;
+
+      // Load every section that is still idle. The main dashboard's collapsed
+      // state is irrelevant here — MemberDashboard renders all of them.
       if (joiningJourney.state === "idle") loadJoiningJourney();
       if (disclosures.state === "idle") loadDisclosures();
-      if (!teamReviewsCollapsed && teamReviews.state === "idle")
-        loadTeamReviews();
-      if (!permitsCollapsed && permits.state === "idle") loadPermits();
-      if (!awardsCollapsed && awards.state === "idle") loadAwards();
+      if (teamReviews.state === "idle") loadTeamReviews();
+      if (permits.state === "idle") loadPermits();
+      if (awards.state === "idle") loadAwards();
     },
     [
       token,
@@ -637,13 +639,10 @@ export function Dashboard({
       loadJoiningJourney,
       disclosures.state,
       loadDisclosures,
-      teamReviewsCollapsed,
       teamReviews.state,
       loadTeamReviews,
-      permitsCollapsed,
       permits.state,
       loadPermits,
-      awardsCollapsed,
       awards.state,
       loadAwards,
     ],
