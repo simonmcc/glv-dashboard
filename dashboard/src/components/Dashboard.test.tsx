@@ -23,11 +23,15 @@ const api = vi.hoisted(() => ({
 
 // Mock API clients to avoid real network calls
 vi.mock("../api-client", () => ({
-  ScoutsApiClient: vi.fn().mockImplementation(() => api),
+  ScoutsApiClient: vi.fn(function () {
+    return api;
+  }),
 }));
 
 vi.mock("../mock-api-client", () => ({
-  MockScoutsApiClient: vi.fn().mockImplementation(() => api),
+  MockScoutsApiClient: vi.fn(function () {
+    return api;
+  }),
 }));
 
 // Mock IndexedDB cache module so tests don't touch real IDB
@@ -59,11 +63,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal(
     "IntersectionObserver",
-    vi.fn().mockImplementation(() => ({
-      observe: vi.fn(),
-      unobserve: vi.fn(),
-      disconnect: vi.fn(),
-    })),
+    vi.fn(function () {
+      return {
+        observe: vi.fn(),
+        unobserve: vi.fn(),
+        disconnect: vi.fn(),
+      };
+    }),
   );
 });
 
