@@ -30,12 +30,31 @@ import {
   mockMemberLearningResults,
 } from "./mock-data";
 
+import type { ScopeUnit } from "./scope";
+
 // Simulate network delay for realistic feel
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const randomDelay = () => delay(3000 + Math.floor(Math.random() * 2000));
 
+// A group plus one section, so the scope picker has something to show in previews.
+const MOCK_SCOPE_UNITS: ScopeUnit[] = [
+  {
+    unitId: "mock-group",
+    unitName: "1st Demo Group",
+    unitPrefix: "S0000001>>S0000002",
+    roles: ["Group Lead Volunteer"],
+  },
+  {
+    unitId: "mock-section",
+    unitName: "1st Demo Group - Scout 1",
+    unitPrefix: "S0000001>>S0000002>>S0000003",
+    roles: ["Team Member"],
+  },
+];
+
 export class MockScoutsApiClient {
   private contactId = "mock-contact-id";
+  private scopePrefix: string | null = MOCK_SCOPE_UNITS[0].unitPrefix;
 
   async initialize(): Promise<void> {
     console.log("[MockAPI] Initializing mock client");
@@ -44,6 +63,19 @@ export class MockScoutsApiClient {
 
   getContactId(): string | null {
     return this.contactId;
+  }
+
+  getScopeUnits(): ScopeUnit[] {
+    return MOCK_SCOPE_UNITS;
+  }
+
+  getScopePrefix(): string | null {
+    return this.scopePrefix;
+  }
+
+  setScopePrefix(prefix: string | null): void {
+    this.scopePrefix = prefix ?? MOCK_SCOPE_UNITS[0].unitPrefix;
+    console.log("[MockAPI] Scope set to", this.scopePrefix);
   }
 
   async getAllLearningCompliance(): Promise<ApiResponse<LearningRecord>> {
@@ -131,9 +163,7 @@ export class MockScoutsApiClient {
     return { success: true, data: [] };
   }
 
-  async checkLearningByMembershipNumbers(
-    membershipNumbers: string[],
-  ): Promise<{
+  async checkLearningByMembershipNumbers(membershipNumbers: string[]): Promise<{
     success: boolean;
     members?: MemberLearningResult[];
     error?: string;

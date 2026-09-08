@@ -46,8 +46,10 @@ import type { LoadState } from "./LazySection";
 import { MemberDashboard } from "./MemberDashboard";
 import { ModuleRulesPage } from "./ModuleRulesPage";
 import { SyncStatus } from "./SyncStatus";
+import { ScopeSelector } from "./ScopeSelector";
 import { VersionFooter } from "./VersionFooter";
-import { readCache, writeCache, readLastSync } from "../db";
+import { readCache, writeCache, readLastSync, clearCache } from "../db";
+import type { ScopeUnit } from "../scope";
 
 interface DashboardProps {
   token: string | null;
@@ -184,6 +186,11 @@ export function Dashboard({
   const [lastSync, setLastSync] = useState<number | null>(null);
   const [, setCacheUpdatedAt] = useState<number | null>(null);
 
+  // GLV scope — which unit (and everything below it) the dashboard is limited to.
+  const [scopeUnits, setScopeUnits] = useState<ScopeUnit[]>([]);
+  const [scopePrefix, setScopePrefix] = useState<string | null>(null);
+  const [scopeSwitching, setScopeSwitching] = useState(false);
+
   // Section refs for intersection observer
   const joiningJourneyRef = useRef<HTMLElement>(null);
   const disclosuresRef = useRef<HTMLElement>(null);
@@ -266,6 +273,11 @@ export function Dashboard({
             if (memberListResponse.error) {
               throw new Error(memberListResponse.error);
             }
+
+            // The client resolves the GLV scope on its first query, so it is
+            // known by the time the member list comes back.
+            setScopeUnits(client.getScopeUnits());
+            setScopePrefix(client.getScopePrefix());
 
             // Extract unique membership numbers
             const uniqueMembershipNumbers = [
@@ -600,6 +612,44 @@ export function Dashboard({
     await Promise.allSettled([fetchPrimaryData(), loadAllSections()]);
   }, [fetchPrimaryData, loadAllSections]);
 
+  // Switching scope invalidates everything on screen and in the cache: the rows
+  // belong to the unit we were looking at before.
+  const handleScopeChange = useCallback(
+    async (prefix: string) => {
+      if (prefix === scopePrefix) return;
+
+      setScopeSwitching(true);
+      client.setScopePrefix(prefix);
+      setScopePrefix(client.getScopePrefix());
+
+      try {
+        await clearCache(contactId);
+      } catch (err) {
+        console.warn("Failed to clear cache on scope change.", err);
+      }
+
+      setRecords([]);
+      setSummary(null);
+      setJoiningJourney({ state: "idle", data: [], error: null });
+      setDisclosures({
+        state: "idle",
+        data: { records: [], summary: null },
+        error: null,
+      });
+      setSuspensions({ state: "idle", data: [], error: null });
+      setTeamReviews({ state: "idle", data: [], error: null });
+      setPermits({ state: "idle", data: [], error: null });
+      setAwards({ state: "idle", data: [], error: null });
+
+      try {
+        await refreshAll();
+      } finally {
+        setScopeSwitching(false);
+      }
+    },
+    [client, contactId, refreshAll, scopePrefix],
+  );
+
   // When token transitions from null → string (background auth completes), trigger a full refresh
   const prevTokenRef = useRef<string | null>(token);
   useEffect(() => {
@@ -875,6 +925,12 @@ export function Dashboard({
                 <span className="font-medium text-gray-600">{username}</span>
               </div>
             )}
+            <ScopeSelector
+              units={scopeUnits}
+              value={scopePrefix}
+              onChange={handleScopeChange}
+              disabled={scopeSwitching}
+            />
             <SyncStatus
               lastSync={lastSync}
               isOnline={isOnline}

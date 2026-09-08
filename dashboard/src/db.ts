@@ -78,6 +78,27 @@ export async function writeCache<S extends CacheStore>(
   await db.put("meta", { lastSync: Date.now() }, contactId);
 }
 
+const CACHE_STORES: CacheStore[] = [
+  "learningRecords",
+  "disclosures",
+  "joiningJourney",
+  "suspensions",
+  "teamReviews",
+  "permits",
+  "awards",
+];
+
+/**
+ * Drop every cached view for a contact. Used when the GLV scope changes: the
+ * cached rows belong to the previous scope, so keeping them would show members
+ * from outside the newly selected unit until each section refetches.
+ */
+export async function clearCache(contactId: string): Promise<void> {
+  const db = await getDb();
+  await Promise.all(CACHE_STORES.map((store) => db.delete(store, contactId)));
+  await db.delete("meta", contactId);
+}
+
 export async function readLastSync(contactId: string): Promise<number | null> {
   const db = await getDb();
   const meta = await db.get("meta", contactId);

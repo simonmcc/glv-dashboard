@@ -18,8 +18,23 @@ import type {
   AwardRecord,
 } from "./types";
 import { clientHeaders } from "./session";
+import type { ScopeUnit } from "./scope";
+import {
+  ALL_UNITS,
+  buildScopeUnits,
+  combineQueries,
+  pickDefaultScopePrefix,
+  readStoredScope,
+  scopeQuery,
+  writeStoredScope,
+} from "./scope";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
+
+// Internal (queryable) column names for the signed-in volunteer's own roles.
+// `unitPrefix` and `unitId` are not in any view's default field set, so they
+// have to be asked for explicitly.
+const SCOPE_FIELDS = ["unitPrefix", "unitId", "unitName", "ROLE"];
 
 // Fields to request (camelCase in request, spaces in response)
 // NOTE: TeamName/RoleName cause API errors - not available in this view
@@ -44,6 +59,12 @@ interface DataExplorerRequest {
   distinct?: boolean;
   isDashboardQuery?: boolean;
   contactId?: string;
+  /**
+   * Skip the GLV scope filter. Only for the scope-resolution query itself
+   * (which cannot depend on a scope that is still being resolved) and for
+   * table discovery, where the table may not have a `unitPrefix` column.
+   */
+  skipScope?: boolean;
 }
 
 interface DataExplorerResponse<T> {
@@ -56,6 +77,13 @@ interface DataExplorerResponse<T> {
 export class ScoutsApiClient {
   private token: string;
   private contactId: string | null = null;
+
+  // GLV scope. Resolved lazily on the first scoped query and shared by every
+  // caller, so it works regardless of whether initialize() was called.
+  private scopePromise: Promise<void> | null = null;
+  private scopeResolved = false;
+  private scopeUnits: ScopeUnit[] = [];
+  private scopePrefix: string | null = null;
 
   constructor(token: string) {
     this.token = token;
@@ -120,14 +148,109 @@ export class ScoutsApiClient {
     return this.contactId;
   }
 
+  /** Units the signed-in volunteer holds a role in. Empty until scope resolves. */
+  getScopeUnits(): ScopeUnit[] {
+    return this.scopeUnits;
+  }
+
+  /** The unit prefix currently being filtered on, or null when unfiltered. */
+  getScopePrefix(): string | null {
+    return this.scopePrefix;
+  }
+
+  /**
+   * Override the scope. Pass ALL_UNITS to stop filtering, or null to go back to
+   * the automatic choice. The caller is responsible for refetching.
+   */
+  setScopePrefix(prefix: string | null): void {
+    writeStoredScope(prefix);
+    this.scopePrefix =
+      prefix === null ? pickDefaultScopePrefix(this.scopeUnits) : prefix;
+    console.log("[API] Scope set to", this.scopePrefix ?? "(unfiltered)");
+  }
+
+  /** Resolve the scope at most once per client. */
+  private ensureScope(): Promise<void> {
+    if (this.scopeResolved) return Promise.resolve();
+    if (!this.scopePromise) {
+      this.scopePromise = this.resolveScope().catch((err) => {
+        // Leave the dashboard usable — an unfiltered view is better than none.
+        console.warn("[API] Scope resolution failed, querying unfiltered", err);
+        this.scopeResolved = true;
+        this.scopePrefix = null;
+      });
+    }
+    return this.scopePromise;
+  }
+
+  private async resolveScope(): Promise<void> {
+    const contact = await this.request<{ id: string; membershipno?: string }>(
+      "/GetContactDetailAsync",
+      {},
+    );
+    if (!this.contactId) this.contactId = contact.id;
+
+    // MembershipNumber is an int column, so only digits may be interpolated.
+    const membershipNumber = String(contact.membershipno ?? "").trim();
+    if (!/^\d+$/.test(membershipNumber)) {
+      console.warn("[API] No usable membership number; querying unfiltered");
+      this.scopeResolved = true;
+      return;
+    }
+
+    const result = await this.query<Record<string, unknown>>({
+      table: "LearningComplianceDashboardView",
+      query: `MembershipNumber = ${membershipNumber}`,
+      selectFields: SCOPE_FIELDS,
+      pageNo: 1,
+      pageSize: 200,
+      distinct: true,
+      skipScope: true,
+    });
+
+    if (result.error) {
+      throw new Error(`Scope query failed: ${result.error}`);
+    }
+
+    this.scopeUnits = buildScopeUnits(result.data || []);
+
+    // An explicit choice wins, but only while it still matches a unit the
+    // volunteer holds a role in — roles change between sessions.
+    const stored = readStoredScope();
+    const storedIsUsable =
+      stored === ALL_UNITS ||
+      (stored !== null && this.scopeUnits.some((u) => u.unitPrefix === stored));
+
+    this.scopePrefix = storedIsUsable
+      ? stored
+      : pickDefaultScopePrefix(this.scopeUnits);
+
+    if (stored !== null && !storedIsUsable) writeStoredScope(null);
+
+    this.scopeResolved = true;
+    console.log(
+      `[API] Scope resolved: ${this.scopeUnits.length} unit(s), filtering on ${
+        this.scopePrefix ?? "(nothing)"
+      }`,
+    );
+  }
+
   private async query<T>(
     request: DataExplorerRequest,
     signal?: AbortSignal,
   ): Promise<DataExplorerResponse<T>> {
+    // Constrain every view to the volunteer's GLV scope. Without this the API
+    // returns the widest hierarchy any of their roles reaches into.
+    let query = request.query || "";
+    if (!request.skipScope) {
+      await this.ensureScope();
+      query = combineQueries(scopeQuery(this.scopePrefix), query);
+    }
+
     // NOTE: orderBy and order must be empty/null - non-empty values cause API errors
     const body = {
       table: request.table,
-      query: request.query || "",
+      query,
       selectFields: request.selectFields || [],
       pageNo: request.pageNo ?? 1,
       pageSize: request.pageSize ?? 50,
@@ -145,6 +268,7 @@ export class ScoutsApiClient {
       contactId: body.contactId || "(empty)",
       thisContactId: this.contactId || "(empty)",
       pageSize: body.pageSize,
+      query: body.query || "(none)",
     });
     return this.request<DataExplorerResponse<T>>(
       "/DataExplorer/GetResultsAsync",
@@ -500,6 +624,8 @@ export class ScoutsApiClient {
         pageNo: 1,
         pageSize: 5,
         distinct: true,
+        // Discovery probe: an unknown table may have no unitPrefix column.
+        skipScope: true,
       });
 
       if (result.error) {
