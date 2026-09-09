@@ -21,6 +21,7 @@ import { clientHeaders } from "./session";
 import type { ScopeUnit } from "./scope";
 import {
   ALL_UNITS,
+  isUnfiltered,
   buildScopeUnits,
   combineQueries,
   pickDefaultScopePrefix,
@@ -35,6 +36,15 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 // `unitPrefix` and `unitId` are not in any view's default field set, so they
 // have to be asked for explicitly.
 const SCOPE_FIELDS = ["unitPrefix", "unitId", "unitName", "ROLE"];
+
+/**
+ * Keep the shape of a query in the console — it is what makes scoping
+ * debuggable — without the membership number the scope lookup filters on.
+ */
+function redactQuery(query: string): string {
+  if (!query) return "(none)";
+  return query.replace(/(MembershipNumber\s*=\s*)\d+/gi, "$1<redacted>");
+}
 
 // Fields to request (camelCase in request, spaces in response)
 // NOTE: TeamName/RoleName cause API errors - not available in this view
@@ -175,7 +185,11 @@ export class ScoutsApiClient {
     return this.scopeUnits;
   }
 
-  /** The unit prefix currently being filtered on, or null when unfiltered. */
+  /**
+   * The current scope: a unit prefix, the ALL_UNITS sentinel when the volunteer
+   * asked for everything, or null when no unit could be resolved. The last two
+   * both mean "unfiltered" — use isUnfiltered() rather than a null check.
+   */
   getScopePrefix(): string | null {
     return this.scopePrefix;
   }
@@ -188,7 +202,10 @@ export class ScoutsApiClient {
     writeStoredScope(prefix);
     this.scopePrefix =
       prefix === null ? pickDefaultScopePrefix(this.scopeUnits) : prefix;
-    console.log("[API] Scope set to", this.scopePrefix ?? "(unfiltered)");
+    console.log(
+      "[API] Scope set to",
+      isUnfiltered(this.scopePrefix) ? "(unfiltered)" : this.scopePrefix,
+    );
   }
 
   /** Resolve the scope at most once per client. */
@@ -249,7 +266,7 @@ export class ScoutsApiClient {
     this.scopeResolved = true;
     console.log(
       `[API] Scope resolved: ${this.scopeUnits.length} unit(s), filtering on ${
-        this.scopePrefix ?? "(nothing)"
+        isUnfiltered(this.scopePrefix) ? "(nothing)" : this.scopePrefix
       }`,
     );
   }
@@ -287,7 +304,7 @@ export class ScoutsApiClient {
       contactId: body.contactId || "(empty)",
       thisContactId: this.contactId || "(empty)",
       pageSize: body.pageSize,
-      query: body.query || "(none)",
+      query: redactQuery(body.query),
     });
     return this.request<DataExplorerResponse<T>>(
       "/DataExplorer/GetResultsAsync",

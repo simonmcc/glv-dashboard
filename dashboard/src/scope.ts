@@ -130,12 +130,22 @@ export function pickDefaultScopePrefix(units: ScopeUnit[]): string | null {
 }
 
 /**
+ * Whether a scope value means "no filter". Two values do: null, when no unit
+ * could be resolved, and ALL_UNITS, when the volunteer deliberately asked for
+ * everything. Callers reasoning about the applied filter should use this rather
+ * than a null check, which would miss the explicit choice.
+ */
+export function isUnfiltered(prefix: string | null): boolean {
+  return !prefix || prefix === ALL_UNITS;
+}
+
+/**
  * Build the server-side filter for a scope, or null for "no filter".
  * Returns null for an unusable prefix rather than a filter that would silently
  * match everything.
  */
 export function scopeQuery(prefix: string | null): string | null {
-  if (!prefix || prefix === ALL_UNITS) return null;
+  if (!prefix || isUnfiltered(prefix)) return null;
   if (!isValidUnitPrefix(prefix)) {
     console.warn("[Scope] Refusing to filter on malformed unit prefix", prefix);
     return null;

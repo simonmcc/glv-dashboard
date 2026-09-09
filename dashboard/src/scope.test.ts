@@ -4,6 +4,7 @@ import {
   buildScopeUnits,
   combineQueries,
   isOversightRole,
+  isUnfiltered,
   isValidUnitPrefix,
   pickDefaultScopePrefix,
   readStoredScope,
@@ -113,6 +114,17 @@ describe("isValidUnitPrefix", () => {
     expect(isValidUnitPrefix("S1_")).toBe(false);
     expect(isValidUnitPrefix("S1' OR '1'='1")).toBe(false);
     expect(isValidUnitPrefix("")).toBe(false);
+  });
+});
+
+describe("isUnfiltered", () => {
+  it("treats both no-scope and the explicit all-units choice as unfiltered", () => {
+    expect(isUnfiltered(null)).toBe(true);
+    expect(isUnfiltered(ALL_UNITS)).toBe(true);
+  });
+
+  it("treats a real unit prefix as filtered", () => {
+    expect(isUnfiltered(GROUP)).toBe(false);
   });
 });
 
