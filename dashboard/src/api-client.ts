@@ -67,6 +67,11 @@ interface DataExplorerRequest {
   skipScope?: boolean;
 }
 
+interface ContactDetail {
+  id: string;
+  membershipno?: string;
+}
+
 interface DataExplorerResponse<T> {
   data: T[] | null;
   nextPage: string | null;
@@ -84,6 +89,7 @@ export class ScoutsApiClient {
   private scopeResolved = false;
   private scopeUnits: ScopeUnit[] = [];
   private scopePrefix: string | null = null;
+  private contactDetail: Promise<ContactDetail> | null = null;
 
   constructor(token: string) {
     this.token = token;
@@ -134,12 +140,28 @@ export class ScoutsApiClient {
     return result as T;
   }
 
+  /**
+   * The signed-in volunteer's contact record, fetched at most once per client.
+   * Both initialize() and scope resolution need it, and on the path where the
+   * contact id did not come from login they would otherwise each pay for their
+   * own round-trip on the critical path of the first view load.
+   */
+  private fetchContactDetail(): Promise<ContactDetail> {
+    if (!this.contactDetail) {
+      this.contactDetail = this.request<ContactDetail>(
+        "/GetContactDetailAsync",
+        {},
+      ).catch((err) => {
+        this.contactDetail = null;
+        throw err;
+      });
+    }
+    return this.contactDetail;
+  }
+
   async initialize(): Promise<void> {
     console.log("[API] Initializing - fetching contact details");
-    const contact = await this.request<{ id: string }>(
-      "/GetContactDetailAsync",
-      {},
-    );
+    const contact = await this.fetchContactDetail();
     this.contactId = contact.id;
     console.log("[API] Contact ID:", this.contactId);
   }
@@ -184,10 +206,7 @@ export class ScoutsApiClient {
   }
 
   private async resolveScope(): Promise<void> {
-    const contact = await this.request<{ id: string; membershipno?: string }>(
-      "/GetContactDetailAsync",
-      {},
-    );
+    const contact = await this.fetchContactDetail();
     if (!this.contactId) this.contactId = contact.id;
 
     // MembershipNumber is an int column, so only digits may be interpolated.

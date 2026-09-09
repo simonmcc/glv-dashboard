@@ -628,6 +628,10 @@ export function Dashboard({
         console.warn("Failed to clear cache on scope change.", err);
       }
 
+      // The timestamp described the scope we just left. Clearing it stops the
+      // header claiming a recent sync if the refresh below fails or we are
+      // offline, when there is now neither cached nor fresh data behind it.
+      setLastSync(null);
       setRecords([]);
       setSummary(null);
       setJoiningJourney({ state: "idle", data: [], error: null });

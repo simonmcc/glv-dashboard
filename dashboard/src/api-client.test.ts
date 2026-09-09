@@ -399,9 +399,11 @@ describe("GLV scope filtering", () => {
     },
   ) {
     const queries: { table: string; query: string }[] = [];
+    const endpoints: string[] = [];
 
     const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
       const outer = JSON.parse(String(init.body));
+      endpoints.push(outer.endpoint);
       if (outer.endpoint === "/GetContactDetailAsync") {
         return new Response(JSON.stringify(contact), { status: 200 });
       }
@@ -422,7 +424,7 @@ describe("GLV scope filtering", () => {
     });
 
     vi.stubGlobal("fetch", fetchMock);
-    return queries;
+    return { queries, endpoints };
   }
 
   function roleRow(unitPrefix: string, unitName: string, role: string) {
@@ -443,7 +445,7 @@ describe("GLV scope filtering", () => {
   });
 
   it("scopes queries to the group where the volunteer is GLV, not the district", async () => {
-    const queries = mockBackend([
+    const { queries } = mockBackend([
       roleRow(DISTRICT, "Lisburn District", "Team Member"),
       roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
     ]);
@@ -457,7 +459,7 @@ describe("GLV scope filtering", () => {
   });
 
   it("resolves the scope only once across many calls", async () => {
-    const queries = mockBackend([
+    const { queries } = mockBackend([
       roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
     ]);
 
@@ -475,7 +477,7 @@ describe("GLV scope filtering", () => {
   });
 
   it("applies the same filter to every view", async () => {
-    const queries = mockBackend([
+    const { queries } = mockBackend([
       roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
     ]);
 
@@ -499,7 +501,7 @@ describe("GLV scope filtering", () => {
     const SECTION = `${GROUP}>>S10051045`;
     localStorage.setItem("glv.scope.unitPrefix", SECTION);
 
-    const queries = mockBackend([
+    const { queries } = mockBackend([
       roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
       roleRow(SECTION, "Scout 1", "Team Member"),
     ]);
@@ -513,7 +515,7 @@ describe("GLV scope filtering", () => {
   it("discards a stored choice for a unit the volunteer no longer holds", async () => {
     localStorage.setItem("glv.scope.unitPrefix", "S9999999>>S8888888");
 
-    const queries = mockBackend([
+    const { queries } = mockBackend([
       roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
     ]);
 
@@ -527,7 +529,7 @@ describe("GLV scope filtering", () => {
   it("queries unfiltered when the volunteer chooses all units", async () => {
     localStorage.setItem("glv.scope.unitPrefix", "__all__");
 
-    const queries = mockBackend([
+    const { queries } = mockBackend([
       roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
     ]);
 
@@ -538,7 +540,7 @@ describe("GLV scope filtering", () => {
   });
 
   it("falls back to an unfiltered query when the contact has no membership number", async () => {
-    const queries = mockBackend([], { id: "contact-1" });
+    const { queries } = mockBackend([], { id: "contact-1" });
 
     const client = new ScoutsApiClient("test-token");
     await client.getAllLearningCompliance();
@@ -568,5 +570,20 @@ describe("GLV scope filtering", () => {
 
     expect(result.error).toBeNull();
     warn.mockRestore();
+  });
+
+  it("fetches the contact record once when initialize() also runs", async () => {
+    const { endpoints } = mockBackend([
+      roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
+    ]);
+
+    const client = new ScoutsApiClient("test-token");
+    await client.initialize();
+    await client.getAllLearningCompliance();
+
+    const contactCalls = endpoints.filter(
+      (e) => e === "/GetContactDetailAsync",
+    );
+    expect(contactCalls).toHaveLength(1);
   });
 });

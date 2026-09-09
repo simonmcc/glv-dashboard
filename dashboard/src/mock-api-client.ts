@@ -31,6 +31,12 @@ import {
 } from "./mock-data";
 
 import type { ScopeUnit } from "./scope";
+import {
+  ALL_UNITS,
+  pickDefaultScopePrefix,
+  readStoredScope,
+  writeStoredScope,
+} from "./scope";
 
 // Simulate network delay for realistic feel
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -52,9 +58,23 @@ const MOCK_SCOPE_UNITS: ScopeUnit[] = [
   },
 ];
 
+/**
+ * Resolve the stored scope the same way the live client does, so a preview
+ * exercises the real persistence path rather than an approximation of it.
+ */
+function resolveMockScope(): string | null {
+  const stored = readStoredScope();
+  const usable =
+    stored === ALL_UNITS ||
+    (stored !== null && MOCK_SCOPE_UNITS.some((u) => u.unitPrefix === stored));
+
+  if (stored !== null && !usable) writeStoredScope(null);
+  return usable ? stored : pickDefaultScopePrefix(MOCK_SCOPE_UNITS);
+}
+
 export class MockScoutsApiClient {
   private contactId = "mock-contact-id";
-  private scopePrefix: string | null = MOCK_SCOPE_UNITS[0].unitPrefix;
+  private scopePrefix: string | null = resolveMockScope();
 
   async initialize(): Promise<void> {
     console.log("[MockAPI] Initializing mock client");
@@ -74,7 +94,9 @@ export class MockScoutsApiClient {
   }
 
   setScopePrefix(prefix: string | null): void {
-    this.scopePrefix = prefix ?? MOCK_SCOPE_UNITS[0].unitPrefix;
+    writeStoredScope(prefix);
+    this.scopePrefix =
+      prefix === null ? pickDefaultScopePrefix(MOCK_SCOPE_UNITS) : prefix;
     console.log("[MockAPI] Scope set to", this.scopePrefix);
   }
 
