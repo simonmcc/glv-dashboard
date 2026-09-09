@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 
 // Shared spies so tests can assert which section endpoints were called.
 const api = vi.hoisted(() => ({
@@ -19,6 +19,22 @@ const api = vi.hoisted(() => ({
   getPermits: vi.fn().mockResolvedValue({ data: [], error: null }),
   getAwards: vi.fn().mockResolvedValue({ data: [], error: null }),
   testTable: vi.fn(),
+  getScopeUnits: vi.fn().mockReturnValue([
+    {
+      unitId: "g",
+      unitName: "1st Demo Group",
+      unitPrefix: "S1>>S2",
+      roles: ["Group Lead Volunteer"],
+    },
+    {
+      unitId: "s",
+      unitName: "1st Demo Group - Scout 1",
+      unitPrefix: "S1>>S2>>S3",
+      roles: ["Team Member"],
+    },
+  ]),
+  getScopePrefix: vi.fn().mockReturnValue("S1>>S2"),
+  setScopePrefix: vi.fn(),
 }));
 
 // Mock API clients to avoid real network calls
@@ -39,6 +55,7 @@ vi.mock("../db", () => ({
   readCache: vi.fn().mockResolvedValue(undefined),
   writeCache: vi.fn().mockResolvedValue(undefined),
   readLastSync: vi.fn().mockResolvedValue(null),
+  clearCache: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock OpenTelemetry tracer
@@ -228,5 +245,61 @@ describe("Dashboard footer", () => {
 
     const link = screen.getByRole("link", { name: /simonmcc\/glv-dashboard@/ });
     expect(link).toBeInTheDocument();
+  });
+});
+
+describe("Dashboard scope switching", () => {
+  it("does not let a load from the previous scope commit after the switch", async () => {
+    const { writeCache } = await import("../db");
+
+    // Hold the joining-journey fetch open so it is still in flight when the
+    // scope changes, then resolve it with rows from the scope we left.
+    let releaseStale: (v: unknown) => void = () => {};
+    api.getJoiningJourney.mockReturnValueOnce(
+      new Promise((resolve) => {
+        releaseStale = resolve;
+      }),
+    );
+
+    const { Dashboard } = await import("./Dashboard");
+    render(
+      <Dashboard
+        token="test-token"
+        contactId="test-contact"
+        isOnline={true}
+        onLogout={vi.fn()}
+        onTokenExpired={vi.fn()}
+      />,
+    );
+
+    // The picker only appears once scope has resolved off the primary fetch.
+    const select = await screen.findByLabelText("Showing");
+
+    vi.mocked(writeCache).mockClear();
+    fireEvent.change(select, { target: { value: "S1>>S2>>S3" } });
+
+    // The in-flight fetch from the old scope now comes back.
+    releaseStale({
+      data: [{ "Membership number": "999", Item: "Declaration" }],
+      error: null,
+    });
+
+    await waitFor(() => {
+      expect(api.setScopePrefix).toHaveBeenCalledWith("S1>>S2>>S3");
+    });
+
+    const staleWrites = vi
+      .mocked(writeCache)
+      .mock.calls.filter(
+        ([store, , value]) =>
+          store === "joiningJourney" &&
+          Array.isArray(value) &&
+          value.some(
+            (r) =>
+              (r as { "Membership number"?: string })["Membership number"] ===
+              "999",
+          ),
+      );
+    expect(staleWrites).toEqual([]);
   });
 });
