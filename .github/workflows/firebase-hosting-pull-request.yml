@@ -29,6 +29,8 @@ jobs:
           cache: 'npm'
           cache-dependency-path: dashboard/package-lock.json
       - run: npm ci
+      - name: Set build version
+        run: echo "VITE_APP_VERSION=$(TZ=UTC git log -1 --format=%cd --date=format:%Y%m%d)-${GITHUB_SHA:0:7}" >> $GITHUB_ENV
       - run: npm run build
       - name: Write Firebase credentials (fix deprecated token_uri)
         env:

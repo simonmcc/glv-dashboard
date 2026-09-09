@@ -14,6 +14,12 @@ import { authenticate, checkLearningByMembershipNumbers, TokenExpiredError, type
 import { forwardTraces } from './traces-proxy.js';
 import { log, logError, logDebug } from './logger.js';
 import { createOriginMatcher, describeAllowedOrigins } from './cors-origins.js';
+import {
+  requestContext,
+  addLabels,
+  currentLabels,
+  sessionIdFromToken,
+} from './request-context.js';
 
 const tracer = trace.getTracer('glv-backend-server', '1.0.0');
 
@@ -124,6 +130,7 @@ function validateTraceOrigin(req: express.Request, res: express.Response, next: 
 
 // Middleware
 const isOriginAllowed = createOriginMatcher();
+app.use(requestContext);
 app.use(cors({
   origin: (origin, callback) => callback(null, isOriginAllowed(origin)),
   credentials: true,
@@ -159,6 +166,12 @@ app.post('/auth/login', loginLimiter, async (req, res) => {
     const duration = Date.now() - startTime;
 
     if (result.success) {
+      // The one log line that joins a human to a session id; every later
+      // request carries the session id but not the username.
+      addLabels({
+        session: sessionIdFromToken(result.token),
+        contactId: result.contactId,
+      });
       log(`[Auth] Login successful for ${username} (${duration}ms)`);
       return res.json({
         success: true,
@@ -216,6 +229,11 @@ app.post('/auth/login-stream', loginLimiter, async (req, res) => {
   try {
     const result = await authenticate(username, password, onProgress);
     if (result.success) {
+      addLabels({
+        session: sessionIdFromToken(result.token),
+        contactId: result.contactId,
+      });
+      log(`[Auth] Login-stream successful for ${username}`);
       sendEvent('complete', { token: result.token, contactId: result.contactId });
     } else {
       sendEvent('error', { error: result.error || 'Authentication failed' });
@@ -232,6 +250,9 @@ app.post('/auth/login-stream', loginLimiter, async (req, res) => {
 // API proxy endpoint (forwards requests to Scouts API with the provided token)
 app.post('/api/proxy', async (req, res) => {
   const { endpoint, method = 'POST', body, token } = req.body;
+
+  // Label before the first log line so even rejected requests are attributable.
+  addLabels({ session: sessionIdFromToken(token) });
 
   const normalizedMethod = String(method || 'POST').toUpperCase();
   const validatedEndpoint = validateProxyEndpoint(endpoint);
@@ -285,6 +306,12 @@ app.post('/api/proxy', async (req, res) => {
   return await tracer.startActiveSpan('scouts.api.proxy', async (proxySpan) => {
       proxySpan.setAttribute('scouts.api.endpoint', validatedEndpoint);
       if (body?.table) proxySpan.setAttribute('scouts.api.table', body.table);
+      // Mirror the log labels onto the span so Trace Explorer can filter by
+      // the same client identity as the Logs Explorer.
+      const labels = currentLabels();
+      if (labels?.session) proxySpan.setAttribute('glv.session', labels.session);
+      if (labels?.client) proxySpan.setAttribute('glv.client', labels.client);
+      if (labels?.clientVersion) proxySpan.setAttribute('glv.client_version', labels.clientVersion);
 
       try {
         const startTime = Date.now();
@@ -370,6 +397,8 @@ app.post('/api/proxy', async (req, res) => {
 // Check learning by membership numbers - uses GetLmsDetailsAsync for accurate expiry dates
 app.post('/api/check-learning', async (req, res) => {
   const { token, membershipNumbers } = req.body;
+
+  addLabels({ session: sessionIdFromToken(token) });
 
   if (!token || !membershipNumbers || !Array.isArray(membershipNumbers)) {
     return res.status(400).json({

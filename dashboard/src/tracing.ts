@@ -10,6 +10,7 @@ import {
 } from "@opentelemetry/semantic-conventions";
 import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
+import { getClientId } from "./session";
 
 export function initTracing() {
   const backendUrl =
@@ -22,7 +23,10 @@ export function initTracing() {
   const provider = new WebTracerProvider({
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: "glv-dashboard",
-      [ATTR_SERVICE_VERSION]: "1.0.0",
+      [ATTR_SERVICE_VERSION]: import.meta.env.VITE_APP_VERSION || "dev",
+      // Same identity the backend puts on log labels, so traces and logs can
+      // be filtered by the same client.
+      "glv.client": getClientId(),
     }),
     spanProcessors: [new BatchSpanProcessor(exporter)],
   });

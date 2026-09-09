@@ -155,3 +155,46 @@ export function loadCredentials(): {
 export function clearCredentials(): void {
   localStorage.removeItem(CREDENTIALS_KEY);
 }
+
+/** localStorage key for the persistent per-browser client id. */
+const CLIENT_ID_KEY = "glv-dashboard-client-id";
+
+/** Header names the backend reads to label log entries. */
+export const CLIENT_ID_HEADER = "X-GLV-Client-Id";
+export const CLIENT_VERSION_HEADER = "X-GLV-Client-Version";
+
+/** Fallback id when localStorage is unavailable (private browsing). */
+const ephemeralClientId = "eph-" + Math.random().toString(36).slice(2, 12);
+
+/**
+ * Stable random id for this browser, created on first use and persisted.
+ *
+ * Sent with every backend request so Cloud Logging can group a browser's
+ * activity across logins and token refreshes. It is opaque and carries no
+ * personal data — it identifies an install, not a person.
+ */
+export function getClientId(): string {
+  try {
+    const existing = localStorage.getItem(CLIENT_ID_KEY);
+    if (existing) {
+      return existing;
+    }
+    const generated = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+    localStorage.setItem(CLIENT_ID_KEY, generated);
+    return generated;
+  } catch {
+    // Private browsing or blocked storage: fall back to a per-page-load id so
+    // requests within one session still correlate.
+    return ephemeralClientId;
+  }
+}
+
+/**
+ * Headers identifying this client, to merge into backend fetch calls.
+ */
+export function clientHeaders(): Record<string, string> {
+  return {
+    [CLIENT_ID_HEADER]: getClientId(),
+    [CLIENT_VERSION_HEADER]: import.meta.env.VITE_APP_VERSION || "dev",
+  };
+}

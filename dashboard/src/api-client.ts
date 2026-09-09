@@ -17,6 +17,7 @@ import type {
   PermitRecord,
   AwardRecord,
 } from "./types";
+import { clientHeaders } from "./session";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
@@ -74,6 +75,7 @@ export class ScoutsApiClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...clientHeaders(),
       },
       body: JSON.stringify({
         endpoint,
@@ -456,7 +458,7 @@ export class ScoutsApiClient {
     try {
       const response = await fetch(`${BACKEND_URL}/api/check-learning`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...clientHeaders() },
         body: JSON.stringify({
           token: this.token,
           membershipNumbers,
