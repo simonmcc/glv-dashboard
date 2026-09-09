@@ -9,7 +9,12 @@
 import { useState } from "react";
 import { trace, SpanStatusCode } from "@opentelemetry/api";
 import type { AuthState } from "../types";
-import { hashPassword, saveCredentials, loadCredentials } from "../session";
+import {
+  hashPassword,
+  saveCredentials,
+  loadCredentials,
+  clientHeaders,
+} from "../session";
 import { VersionFooter } from "./VersionFooter";
 import { DataSourceBanner } from "./DataSourceBanner";
 
@@ -139,6 +144,7 @@ export function AuthFlow({
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            ...clientHeaders(),
           },
           body: JSON.stringify({ username, password }),
         });

@@ -109,6 +109,27 @@ cd dashboard && npx vitest run src/utils.test.ts
 
 View production logs: Cloud Logging console → `resource.type="cloud_run_revision" resource.labels.service_name="glv-backend"`.
 
+### Identifying which client a log entry came from
+
+`backend/src/request-context.ts` establishes an `AsyncLocalStorage` context per request, so every log line emitted while handling that request is labelled automatically — including lines from deep inside the Playwright auth flow and the per-member API loops. The labels are promoted to Cloud Logging `LogEntry.labels` via the `logging.googleapis.com/labels` structured field, so they are filterable and clickable in the Logs Explorer:
+
+| Label | Source | Identifies |
+|---|---|---|
+| `labels.session` | SHA-256 of the bearer token, first 12 hex chars | One login session, from auth until the token expires |
+| `labels.contactId` | Scouts contact GUID, set on successful login | A person, across logins |
+| `labels.client` | Random id in the dashboard's `localStorage`, sent as `X-GLV-Client-Id` | A browser/device install, across logins |
+| `labels.clientVersion` | Dashboard build, sent as `X-GLV-Client-Version` | Which frontend build (catches stale service workers) |
+
+None of these are PII — the session id is a one-way hash, and the username is never logged outside the `[Auth]` login lines. Those login lines are the join from a session id back to a human:
+
+```
+resource.type="cloud_run_revision"
+resource.labels.service_name="glv-backend"
+labels.session="a3f91c02b7de"
+```
+
+The same values are set as `glv.session` / `glv.client` / `glv.client_version` span attributes on the proxy span, so Trace Explorer filters on the same identity. Locally (non-GCP) the session or client id is printed as a `[a3f91c02b7de]` prefix on each line.
+
 ### Tracing (OpenTelemetry)
 
 Tracing is opt-in and has zero overhead when disabled.

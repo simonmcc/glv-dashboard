@@ -8,6 +8,7 @@
  */
 
 import { trace, context } from '@opentelemetry/api';
+import { currentLabels } from './request-context.js';
 
 // Cloud Run sets K_SERVICE automatically
 const IS_GCP = Boolean(process.env.K_SERVICE);
@@ -37,14 +38,34 @@ function gcpEntry(severity: string, message: string, ...args: unknown[]): string
       : spanContext.traceId;
   }
 
+  // Promote per-request identity to LogEntry labels so the Logs Explorer can
+  // filter on `labels.session` / `labels.client` and show them in the summary.
+  const labels = currentLabels();
+  if (labels) {
+    const present = Object.entries(labels).filter(([, v]) => v !== undefined);
+    if (present.length) {
+      entry['logging.googleapis.com/labels'] = Object.fromEntries(present);
+    }
+  }
+
   return JSON.stringify(entry);
+}
+
+/**
+ * Compact identity prefix for human-readable local logs, e.g. "[a3f91c02b7de]".
+ * Empty outside a request or before any identity is known.
+ */
+function localPrefix(): string {
+  const labels = currentLabels();
+  const id = labels?.session || labels?.client;
+  return id ? `[${id}] ` : '';
 }
 
 export const log = (message: string, ...args: unknown[]) => {
   if (IS_GCP) {
     console.log(gcpEntry('INFO', message, ...args));
   } else {
-    console.log(`${timestamp()} ${message}`, ...args);
+    console.log(`${timestamp()} ${localPrefix()}${message}`, ...args);
   }
 };
 
@@ -52,7 +73,7 @@ export const logError = (message: string, ...args: unknown[]) => {
   if (IS_GCP) {
     console.error(gcpEntry('ERROR', message, ...args));
   } else {
-    console.error(`${timestamp()} ${message}`, ...args);
+    console.error(`${timestamp()} ${localPrefix()}${message}`, ...args);
   }
 };
 
@@ -61,7 +82,7 @@ export const logDebug = (message: string, ...args: unknown[]) => {
     if (IS_GCP) {
       console.log(gcpEntry('DEBUG', message, ...args));
     } else {
-      console.log(`${timestamp()} [DEBUG] ${message}`, ...args);
+      console.log(`${timestamp()} ${localPrefix()}[DEBUG] ${message}`, ...args);
     }
   }
 };
