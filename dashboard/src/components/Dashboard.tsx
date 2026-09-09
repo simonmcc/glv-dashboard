@@ -46,8 +46,10 @@ import type { LoadState } from "./LazySection";
 import { MemberDashboard } from "./MemberDashboard";
 import { ModuleRulesPage } from "./ModuleRulesPage";
 import { SyncStatus } from "./SyncStatus";
+import { ScopeSelector } from "./ScopeSelector";
 import { VersionFooter } from "./VersionFooter";
-import { readCache, writeCache, readLastSync } from "../db";
+import { readCache, writeCache, readLastSync, clearCache } from "../db";
+import type { ScopeUnit } from "../scope";
 
 interface DashboardProps {
   token: string | null;
@@ -184,6 +186,17 @@ export function Dashboard({
   const [lastSync, setLastSync] = useState<number | null>(null);
   const [, setCacheUpdatedAt] = useState<number | null>(null);
 
+  // GLV scope — which unit (and everything below it) the dashboard is limited to.
+  const [scopeUnits, setScopeUnits] = useState<ScopeUnit[]>([]);
+  const [scopePrefix, setScopePrefix] = useState<string | null>(null);
+  const [scopeSwitching, setScopeSwitching] = useState(false);
+
+  // Bumped on every scope change. A load that started under an older epoch must
+  // not commit: its rows belong to a unit we are no longer showing, and writing
+  // them would repopulate both the screen and IndexedDB with out-of-scope
+  // members — the exact thing the scope filter exists to prevent.
+  const scopeEpochRef = useRef(0);
+
   // Section refs for intersection observer
   const joiningJourneyRef = useRef<HTMLElement>(null);
   const disclosuresRef = useRef<HTMLElement>(null);
@@ -229,6 +242,7 @@ export function Dashboard({
   // when React StrictMode double-mounts the component in development.
   const fetchPrimaryData = useCallback(
     async (signal?: AbortSignal) => {
+      const epoch = scopeEpochRef.current;
       return tracer.startActiveSpan(
         "dashboard.fetchPrimaryData",
         async (span) => {
@@ -266,6 +280,11 @@ export function Dashboard({
             if (memberListResponse.error) {
               throw new Error(memberListResponse.error);
             }
+
+            // The client resolves the GLV scope on its first query, so it is
+            // known by the time the member list comes back.
+            setScopeUnits(client.getScopeUnits());
+            setScopePrefix(client.getScopePrefix());
 
             // Extract unique membership numbers
             const uniqueMembershipNumbers = [
@@ -315,6 +334,7 @@ export function Dashboard({
               undefined,
               memberStartDates,
             );
+            if (epoch !== scopeEpochRef.current) return;
             setRecords(data);
             setSummary(client.computeComplianceSummary(data));
 
@@ -333,7 +353,7 @@ export function Dashboard({
             span.recordException(err as Error);
             if (message === "TOKEN_EXPIRED") {
               onTokenExpired();
-            } else {
+            } else if (epoch === scopeEpochRef.current) {
               setPrimaryError(message);
             }
           } finally {
@@ -348,6 +368,7 @@ export function Dashboard({
 
   // Section loaders — fetch from network and write to cache on success.
   const loadJoiningJourney = useCallback(async () => {
+    const epoch = scopeEpochRef.current;
     setJoiningJourney((s) => ({ ...s, state: "loading", error: null }));
     return tracer.startActiveSpan(
       "dashboard.load.joiningJourney",
@@ -359,6 +380,7 @@ export function Dashboard({
           const data = response.data || [];
           span.setAttribute("records.count", data.length);
           span.setStatus({ code: SpanStatusCode.OK });
+          if (epoch !== scopeEpochRef.current) return;
           setJoiningJourney({ state: "loaded", data, error: null });
           await writeCache("joiningJourney", contactId, data);
           setLastSync(Date.now());
@@ -372,6 +394,7 @@ export function Dashboard({
             onTokenExpired();
             return;
           }
+          if (epoch !== scopeEpochRef.current) return;
           setJoiningJourney((s) => ({
             ...s,
             state: "error",
@@ -385,6 +408,7 @@ export function Dashboard({
   }, [client, contactId, ensureInitialized, onTokenExpired]);
 
   const loadDisclosures = useCallback(async () => {
+    const epoch = scopeEpochRef.current;
     setDisclosures((s) => ({ ...s, state: "loading", error: null }));
     return tracer.startActiveSpan(
       "dashboard.load.disclosures",
@@ -396,6 +420,7 @@ export function Dashboard({
           const records = response.data || [];
           span.setAttribute("records.count", records.length);
           span.setStatus({ code: SpanStatusCode.OK });
+          if (epoch !== scopeEpochRef.current) return;
           setDisclosures({
             state: "loaded",
             data: {
@@ -416,6 +441,7 @@ export function Dashboard({
             onTokenExpired();
             return;
           }
+          if (epoch !== scopeEpochRef.current) return;
           setDisclosures((s) => ({
             ...s,
             state: "error",
@@ -429,6 +455,7 @@ export function Dashboard({
   }, [client, contactId, ensureInitialized, onTokenExpired]);
 
   const loadSuspensions = useCallback(async () => {
+    const epoch = scopeEpochRef.current;
     setSuspensions((s) => ({ ...s, state: "loading", error: null }));
     return tracer.startActiveSpan(
       "dashboard.load.suspensions",
@@ -440,6 +467,7 @@ export function Dashboard({
           const data = response.data || [];
           span.setAttribute("records.count", data.length);
           span.setStatus({ code: SpanStatusCode.OK });
+          if (epoch !== scopeEpochRef.current) return;
           setSuspensions({ state: "loaded", data, error: null });
           await writeCache("suspensions", contactId, data);
           setLastSync(Date.now());
@@ -453,6 +481,7 @@ export function Dashboard({
             onTokenExpired();
             return;
           }
+          if (epoch !== scopeEpochRef.current) return;
           setSuspensions((s) => ({
             ...s,
             state: "error",
@@ -466,6 +495,7 @@ export function Dashboard({
   }, [client, contactId, ensureInitialized, onTokenExpired]);
 
   const loadTeamReviews = useCallback(async () => {
+    const epoch = scopeEpochRef.current;
     setTeamReviews((s) => ({ ...s, state: "loading", error: null }));
     return tracer.startActiveSpan(
       "dashboard.load.teamReviews",
@@ -477,6 +507,7 @@ export function Dashboard({
           const data = response.data || [];
           span.setAttribute("records.count", data.length);
           span.setStatus({ code: SpanStatusCode.OK });
+          if (epoch !== scopeEpochRef.current) return;
           setTeamReviews({ state: "loaded", data, error: null });
           await writeCache("teamReviews", contactId, data);
           setLastSync(Date.now());
@@ -490,6 +521,7 @@ export function Dashboard({
             onTokenExpired();
             return;
           }
+          if (epoch !== scopeEpochRef.current) return;
           setTeamReviews((s) => ({
             ...s,
             state: "error",
@@ -503,6 +535,7 @@ export function Dashboard({
   }, [client, contactId, ensureInitialized, onTokenExpired]);
 
   const loadPermits = useCallback(async () => {
+    const epoch = scopeEpochRef.current;
     setPermits((s) => ({ ...s, state: "loading", error: null }));
     return tracer.startActiveSpan("dashboard.load.permits", async (span) => {
       try {
@@ -512,6 +545,7 @@ export function Dashboard({
         const data = response.data || [];
         span.setAttribute("records.count", data.length);
         span.setStatus({ code: SpanStatusCode.OK });
+        if (epoch !== scopeEpochRef.current) return;
         setPermits({ state: "loaded", data, error: null });
         await writeCache("permits", contactId, data);
         setLastSync(Date.now());
@@ -525,6 +559,7 @@ export function Dashboard({
           onTokenExpired();
           return;
         }
+        if (epoch !== scopeEpochRef.current) return;
         setPermits((s) => ({
           ...s,
           state: "error",
@@ -537,6 +572,7 @@ export function Dashboard({
   }, [client, contactId, ensureInitialized, onTokenExpired]);
 
   const loadAwards = useCallback(async () => {
+    const epoch = scopeEpochRef.current;
     setAwards((s) => ({ ...s, state: "loading", error: null }));
     return tracer.startActiveSpan("dashboard.load.awards", async (span) => {
       try {
@@ -546,6 +582,7 @@ export function Dashboard({
         const data = response.data || [];
         span.setAttribute("records.count", data.length);
         span.setStatus({ code: SpanStatusCode.OK });
+        if (epoch !== scopeEpochRef.current) return;
         setAwards({ state: "loaded", data, error: null });
         await writeCache("awards", contactId, data);
         setLastSync(Date.now());
@@ -559,6 +596,7 @@ export function Dashboard({
           onTokenExpired();
           return;
         }
+        if (epoch !== scopeEpochRef.current) return;
         setAwards((s) => ({
           ...s,
           state: "error",
@@ -599,6 +637,52 @@ export function Dashboard({
   const refreshAll = useCallback(async () => {
     await Promise.allSettled([fetchPrimaryData(), loadAllSections()]);
   }, [fetchPrimaryData, loadAllSections]);
+
+  // Switching scope invalidates everything on screen and in the cache: the rows
+  // belong to the unit we were looking at before.
+  const handleScopeChange = useCallback(
+    async (prefix: string) => {
+      if (prefix === scopePrefix) return;
+
+      // Invalidate every load already in flight before anything else, so a
+      // slow fetch from the old scope cannot commit after we reset state.
+      scopeEpochRef.current += 1;
+
+      setScopeSwitching(true);
+      client.setScopePrefix(prefix);
+      setScopePrefix(client.getScopePrefix());
+
+      try {
+        await clearCache(contactId);
+      } catch (err) {
+        console.warn("Failed to clear cache on scope change.", err);
+      }
+
+      // The timestamp described the scope we just left. Clearing it stops the
+      // header claiming a recent sync if the refresh below fails or we are
+      // offline, when there is now neither cached nor fresh data behind it.
+      setLastSync(null);
+      setRecords([]);
+      setSummary(null);
+      setJoiningJourney({ state: "idle", data: [], error: null });
+      setDisclosures({
+        state: "idle",
+        data: { records: [], summary: null },
+        error: null,
+      });
+      setSuspensions({ state: "idle", data: [], error: null });
+      setTeamReviews({ state: "idle", data: [], error: null });
+      setPermits({ state: "idle", data: [], error: null });
+      setAwards({ state: "idle", data: [], error: null });
+
+      try {
+        await refreshAll();
+      } finally {
+        setScopeSwitching(false);
+      }
+    },
+    [client, contactId, refreshAll, scopePrefix],
+  );
 
   // When token transitions from null → string (background auth completes), trigger a full refresh
   const prevTokenRef = useRef<string | null>(token);
@@ -875,6 +959,12 @@ export function Dashboard({
                 <span className="font-medium text-gray-600">{username}</span>
               </div>
             )}
+            <ScopeSelector
+              units={scopeUnits}
+              value={scopePrefix}
+              onChange={handleScopeChange}
+              disabled={scopeSwitching}
+            />
             <SyncStatus
               lastSync={lastSync}
               isOnline={isOnline}

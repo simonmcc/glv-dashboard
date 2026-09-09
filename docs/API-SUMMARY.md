@@ -269,6 +269,85 @@ POST /api/GenerateSASTokenAsync
 
 2. Fetch from returned URL with the token.
 
+## Scoping Results to a Group (GLV scope)
+
+`GetResultsAsync` returns every row in the **widest** hierarchy the authenticated
+contact holds any role in. A volunteer who is GLV for one group but also sits on,
+say, a District Programme Team gets the entire district back on every view.
+
+### The `query` language uses internal column names
+
+The `query` expression is matched against each column's **internal** name, not
+the display name that comes back in the response. Using the display name is
+rejected with `error_GetResultsAsync`:
+
+```
+LocationGroup = '1st Maghaberry Scout Group'   OK
+Group = '1st Maghaberry Scout Group'           error_GetResultsAsync
+```
+
+Get the internal names from `POST /api/DataExplorer/GetMetadataAsync/{tableId}`,
+which returns `name` (queryable) alongside `displayName` (in responses) and a
+`canQuery` flag per field. Table ids come from `GetMetadataAsync` with no id.
+
+Key columns on `LearningComplianceDashboardView`
+(id `07b3b8bb-e64a-ee11-be6f-6045bdc1efd7`):
+
+| Query name | Response name | Notes |
+|-----------|---------------|-------|
+| `unitPrefix` | `Unit prefix` | `>>`-delimited ancestry path; not in the default field set |
+| `unitId` / `parentUnitId` | `Unit ID` | not in the default field set |
+| `unitName` | `Unit name` | |
+| `LocationGroup` | `Group` | null for group-level roles - see below |
+| `LocationDistrict` / `LocationCounty` | `District` / `County` | |
+| `MembershipNumber` | `Membership number` | int - do not quote |
+| `ROLE` / `RoleTypeName` | `Role` / `Roletype` | |
+
+Columns with `canView: false` (`unitPrefix`, `unitId`) are still returned when
+named explicitly in `selectFields`.
+
+### Filter on `unitPrefix`, not `LocationGroup`
+
+`LocationGroup` holds the parent group of a **section** and is **null for
+group-level roles**. Filtering on it silently drops the Leadership Team, the
+Trustee Board and the GLV themselves - 72 of 251 rows on a test account.
+
+`unitPrefix` is a materialised ancestry path, so a `LIKE` prefix match selects a
+unit and everything beneath it:
+
+```
+unitPrefix LIKE 'S10000004>>...>>S10016945%'    group + all its sections
+unitPrefix LIKE 'S10000004>>...>>S10016945>>%'  sections only
+unitPrefix =    'S10000004>>...>>S10016945'     group level only
+```
+
+This is applied server-side and works on all seven dashboard views. An unknown
+column returns `error_GetResultsAsync`, so a filter that is silently ignored is
+distinguishable from one that was applied.
+
+### Finding the volunteer's own units
+
+```json
+POST /GetContactDetailAsync {}
+-> membershipno
+
+POST /DataExplorer/GetResultsAsync
+{
+  "table": "LearningComplianceDashboardView",
+  "query": "MembershipNumber = <membershipno>",
+  "selectFields": ["unitPrefix", "unitId", "unitName", "ROLE"]
+}
+```
+
+Returns one row per role held, with the unit each is in. Take the `unitPrefix`
+of the row whose `Role` is `Group Lead Volunteer`. Implemented in
+`dashboard/src/scope.ts`.
+
+### Supported operators
+
+`=`, `<>`, `LIKE`, `IN (...)`, `AND`, `OR` and parentheses all work and compose.
+`orderBy`/`order` must still be empty/null.
+
 ## Important Notes
 
 1. **orderBy/order parameters**: Must be empty string and null respectively. Non-empty values cause API errors.

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ScoutsApiClient } from "./api-client";
 import type { LearningRecord, DisclosureRecord } from "./types";
 
@@ -380,5 +380,210 @@ describe("ScoutsApiClient", () => {
 
       expect(summary.valid).toBe(1);
     });
+  });
+});
+
+describe("GLV scope filtering", () => {
+  const GROUP = "S10000004>>S12272151>>000317172>>S10001979>>S10016945";
+  const DISTRICT = "S10000004>>S12272151>>000317172>>S10001979";
+
+  /**
+   * Stub the backend proxy. Returns the parsed body of every Data Explorer
+   * call so tests can assert on the `query` that was actually sent.
+   */
+  function mockBackend(
+    scopeRows: Record<string, unknown>[],
+    contact: Record<string, unknown> = {
+      id: "contact-1",
+      membershipno: "0012162494",
+    },
+  ) {
+    const queries: { table: string; query: string }[] = [];
+    const endpoints: string[] = [];
+
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const outer = JSON.parse(String(init.body));
+      endpoints.push(outer.endpoint);
+      if (outer.endpoint === "/GetContactDetailAsync") {
+        return new Response(JSON.stringify(contact), { status: 200 });
+      }
+      queries.push({ table: outer.body.table, query: outer.body.query });
+      // First Data Explorer call is the scope lookup; serve it the roles.
+      const isScopeLookup = String(outer.body.query).startsWith(
+        "MembershipNumber",
+      );
+      return new Response(
+        JSON.stringify({
+          data: isScopeLookup ? scopeRows : [],
+          nextPage: null,
+          count: 0,
+          error: null,
+        }),
+        { status: 200 },
+      );
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+    return { queries, endpoints };
+  }
+
+  function roleRow(unitPrefix: string, unitName: string, role: string) {
+    return {
+      "Unit prefix": unitPrefix,
+      "Unit ID": "u",
+      "Unit name": unitName,
+      Role: role,
+    };
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("scopes queries to the group where the volunteer is GLV, not the district", async () => {
+    const { queries } = mockBackend([
+      roleRow(DISTRICT, "Lisburn District", "Team Member"),
+      roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
+    ]);
+
+    const client = new ScoutsApiClient("test-token");
+    await client.getAllLearningCompliance();
+
+    const dataQuery = queries.at(-1)!;
+    expect(dataQuery.table).toBe("LearningComplianceDashboardView");
+    expect(dataQuery.query).toBe(`unitPrefix LIKE '${GROUP}%'`);
+  });
+
+  it("resolves the scope only once across many calls", async () => {
+    const { queries } = mockBackend([
+      roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
+    ]);
+
+    const client = new ScoutsApiClient("test-token");
+    await Promise.all([
+      client.getAllLearningCompliance(),
+      client.getSuspensions(),
+      client.getPermits(),
+    ]);
+
+    const scopeLookups = queries.filter((q) =>
+      q.query.startsWith("MembershipNumber"),
+    );
+    expect(scopeLookups).toHaveLength(1);
+  });
+
+  it("applies the same filter to every view", async () => {
+    const { queries } = mockBackend([
+      roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
+    ]);
+
+    const client = new ScoutsApiClient("test-token");
+    await client.getDisclosureCompliance();
+    await client.getSuspensions();
+    await client.getTeamReviews();
+    await client.getPermits();
+    await client.getAwards();
+
+    const dataQueries = queries.filter(
+      (q) => !q.query.startsWith("MembershipNumber"),
+    );
+    expect(dataQueries).toHaveLength(5);
+    for (const q of dataQueries) {
+      expect(q.query).toBe(`unitPrefix LIKE '${GROUP}%'`);
+    }
+  });
+
+  it("honours an explicit choice stored from a previous session", async () => {
+    const SECTION = `${GROUP}>>S10051045`;
+    localStorage.setItem("glv.scope.unitPrefix", SECTION);
+
+    const { queries } = mockBackend([
+      roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
+      roleRow(SECTION, "Scout 1", "Team Member"),
+    ]);
+
+    const client = new ScoutsApiClient("test-token");
+    await client.getAllLearningCompliance();
+
+    expect(queries.at(-1)!.query).toBe(`unitPrefix LIKE '${SECTION}%'`);
+  });
+
+  it("discards a stored choice for a unit the volunteer no longer holds", async () => {
+    localStorage.setItem("glv.scope.unitPrefix", "S9999999>>S8888888");
+
+    const { queries } = mockBackend([
+      roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
+    ]);
+
+    const client = new ScoutsApiClient("test-token");
+    await client.getAllLearningCompliance();
+
+    expect(queries.at(-1)!.query).toBe(`unitPrefix LIKE '${GROUP}%'`);
+    expect(localStorage.getItem("glv.scope.unitPrefix")).toBeNull();
+  });
+
+  it("queries unfiltered when the volunteer chooses all units", async () => {
+    localStorage.setItem("glv.scope.unitPrefix", "__all__");
+
+    const { queries } = mockBackend([
+      roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
+    ]);
+
+    const client = new ScoutsApiClient("test-token");
+    await client.getAllLearningCompliance();
+
+    expect(queries.at(-1)!.query).toBe("");
+  });
+
+  it("falls back to an unfiltered query when the contact has no membership number", async () => {
+    const { queries } = mockBackend([], { id: "contact-1" });
+
+    const client = new ScoutsApiClient("test-token");
+    await client.getAllLearningCompliance();
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0].query).toBe("");
+  });
+
+  it("stays usable when scope resolution fails outright", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const outer = JSON.parse(String(init.body));
+        if (outer.endpoint === "/GetContactDetailAsync") {
+          throw new Error("network down");
+        }
+        return new Response(
+          JSON.stringify({ data: [], nextPage: null, count: 0, error: null }),
+          { status: 200 },
+        );
+      }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const client = new ScoutsApiClient("test-token");
+    const result = await client.getAllLearningCompliance();
+
+    expect(result.error).toBeNull();
+    warn.mockRestore();
+  });
+
+  it("fetches the contact record once when initialize() also runs", async () => {
+    const { endpoints } = mockBackend([
+      roleRow(GROUP, "1st Maghaberry Scout Group", "Group Lead Volunteer"),
+    ]);
+
+    const client = new ScoutsApiClient("test-token");
+    await client.initialize();
+    await client.getAllLearningCompliance();
+
+    const contactCalls = endpoints.filter(
+      (e) => e === "/GetContactDetailAsync",
+    );
+    expect(contactCalls).toHaveLength(1);
   });
 });
