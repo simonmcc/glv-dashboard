@@ -140,6 +140,26 @@ export interface SuspensionRecord {
 }
 
 /**
+ * Appointment record from AppointmentsDashboardView — a member's actual
+ * section/board appointment (role, team, start date), used to build the
+ * Team Directory hierarchy. Distinct from TeamReviewRecord's "Role", which
+ * is only ever "Team Leader"/"Team Member" (the review relationship).
+ */
+export interface AppointmentRecord {
+  /** The view returns more fields than are mapped below; extras are kept for row detail */
+  [key: string]: unknown;
+  "First name"?: string;
+  "Last name"?: string;
+  "Membership number": string;
+  Role: string;
+  Team: string;
+  "Unit name": string;
+  "Start date": string | null;
+  Group?: string;
+  District?: string;
+}
+
+/**
  * Team directory review record from TeamDirectoryReviewsDashboardView
  */
 export interface TeamReviewRecord {

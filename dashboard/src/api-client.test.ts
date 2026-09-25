@@ -485,13 +485,14 @@ describe("GLV scope filtering", () => {
     await client.getDisclosureCompliance();
     await client.getSuspensions();
     await client.getTeamReviews();
+    await client.getAppointments();
     await client.getPermits();
     await client.getAwards();
 
     const dataQueries = queries.filter(
       (q) => !q.query.startsWith("MembershipNumber"),
     );
-    expect(dataQueries).toHaveLength(5);
+    expect(dataQueries).toHaveLength(6);
     for (const q of dataQueries) {
       expect(q.query).toBe(`unitPrefix LIKE '${GROUP}%'`);
     }

@@ -14,6 +14,7 @@ import type {
   JoiningJourneyRecord,
   SuspensionRecord,
   TeamReviewRecord,
+  AppointmentRecord,
   PermitRecord,
   AwardRecord,
 } from "./types";
@@ -878,6 +879,57 @@ export class ScoutsApiClient {
     );
 
     console.log(`[API] Transformed ${data.length} team review records`);
+
+    return {
+      data,
+      nextPage: result.nextPage,
+      count: result.count,
+      error: result.error,
+    };
+  }
+
+  /**
+   * Fetch section/board appointments from AppointmentsDashboardView — each
+   * member's actual role, section (Team) and role start date. Used to build
+   * the Team Directory hierarchy (as opposed to TeamReviewRecord's "Role",
+   * which is only ever the review relationship, "Team Leader"/"Team Member").
+   */
+  async getAppointments(
+    pageSize: number = 500,
+  ): Promise<ApiResponse<AppointmentRecord>> {
+    console.log("[API] Fetching appointments data");
+
+    const result = await this.query<Record<string, unknown>>({
+      table: "AppointmentsDashboardView",
+      selectFields: [],
+      query: "",
+      pageNo: 1,
+      pageSize,
+      distinct: true,
+    });
+
+    if (result.error) {
+      console.error("[API] Appointments query error:", result.error);
+      return { data: [], nextPage: null, count: 0, error: result.error };
+    }
+
+    const data = (result.data || []).map(
+      (record): AppointmentRecord => ({
+        // Keep the view's other fields — they tell otherwise-identical rows apart
+        ...record,
+        "First name": record["First name"] as string,
+        "Last name": record["Last name"] as string,
+        "Membership number": String(record["Membership number"] || ""),
+        Role: String(record["Role"] || ""),
+        Team: String(record["Team"] || ""),
+        "Unit name": String(record["Unit name"] || ""),
+        "Start date": record["Start date"] as string | null,
+        Group: record["Group"] as string,
+        District: record["District"] as string,
+      }),
+    );
+
+    console.log(`[API] Transformed ${data.length} appointment records`);
 
     return {
       data,
