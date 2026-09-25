@@ -120,23 +120,31 @@ export function TeamStructure({
       bySec.get(sec)!.push(record);
     }
 
-    // Sort groups alphabetically; sort sections by SECTION_ORDER; sort
-    // members within a section by role tier (leader/assistant/member), then name.
+    // Sort groups alphabetically; sort sections by SECTION_ORDER where the
+    // Team value matches one of the known labels, then any other Team values
+    // (the live data doesn't guarantee it uses these labels) alphabetically
+    // after; sort members within a section by role tier, then name.
     return Array.from(byGroup.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([group, bySec]) => ({
-        group,
-        sections: SECTION_ORDER.filter((s) => bySec.has(s)).map((s) => ({
-          section: s,
-          members: [...bySec.get(s)!].sort(
-            (a, b) =>
-              roleTier(a.Role || "") - roleTier(b.Role || "") ||
-              resolveName(a, memberNameMap).localeCompare(
-                resolveName(b, memberNameMap),
-              ),
-          ),
-        })),
-      }));
+      .map(([group, bySec]) => {
+        const known = SECTION_ORDER.filter((s) => bySec.has(s));
+        const unknown = Array.from(bySec.keys())
+          .filter((s) => !SECTION_ORDER.includes(s))
+          .sort((a, b) => a.localeCompare(b));
+        return {
+          group,
+          sections: [...known, ...unknown].map((s) => ({
+            section: s,
+            members: [...bySec.get(s)!].sort(
+              (a, b) =>
+                roleTier(a.Role || "") - roleTier(b.Role || "") ||
+                resolveName(a, memberNameMap).localeCompare(
+                  resolveName(b, memberNameMap),
+                ),
+            ),
+          })),
+        };
+      });
   }, [records, memberNameMap, searchTerm]);
 
   if (isLoading) {

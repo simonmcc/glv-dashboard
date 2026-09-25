@@ -124,4 +124,24 @@ describe("TeamStructure", () => {
     render(<TeamStructure records={[]} isLoading={false} />);
     expect(screen.getByText("No appointment records found")).toBeInTheDocument();
   });
+
+  it("still renders a section whose Team value isn't one of the known labels", () => {
+    // The live AppointmentsDashboardView Team field isn't guaranteed to use
+    // "Beavers"/"Cubs"/etc — it can be an arbitrary unit-specific name. Those
+    // must not be silently dropped just because they aren't in SECTION_ORDER.
+    const records: AppointmentRecord[] = [
+      record({
+        "First name": "Bob",
+        "Last name": "Smith",
+        "Membership number": "1",
+        Role: "Beaver Scout Leader",
+        Team: "Beaver Scout 1",
+      }),
+    ];
+
+    render(<TeamStructure records={records} isLoading={false} />);
+
+    expect(screen.getByText("Beaver Scout 1")).toBeInTheDocument();
+    expect(screen.getByText("Bob Smith")).toBeInTheDocument();
+  });
 });
