@@ -485,13 +485,14 @@ describe("GLV scope filtering", () => {
     await client.getDisclosureCompliance();
     await client.getSuspensions();
     await client.getTeamReviews();
+    await client.getAppointments();
     await client.getPermits();
     await client.getAwards();
 
     const dataQueries = queries.filter(
       (q) => !q.query.startsWith("MembershipNumber"),
     );
-    expect(dataQueries).toHaveLength(5);
+    expect(dataQueries).toHaveLength(6);
     for (const q of dataQueries) {
       expect(q.query).toBe(`unitPrefix LIKE '${GROUP}%'`);
     }
@@ -585,5 +586,95 @@ describe("GLV scope filtering", () => {
       (e) => e === "/GetContactDetailAsync",
     );
     expect(contactCalls).toHaveLength(1);
+  });
+});
+
+describe("getAppointments", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** Serves fixed appointment rows to whichever query isn't the scope lookup. */
+  function mockAppointmentsBackend(rows: Record<string, unknown>[]) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const outer = JSON.parse(String(init.body));
+        if (outer.endpoint === "/GetContactDetailAsync") {
+          return new Response(
+            JSON.stringify({ id: "contact-1", membershipno: "1" }),
+            { status: 200 },
+          );
+        }
+        const isScopeLookup = String(outer.body.query).startsWith(
+          "MembershipNumber",
+        );
+        return new Response(
+          JSON.stringify({
+            data: isScopeLookup ? [] : rows,
+            nextPage: null,
+            count: 0,
+            error: null,
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+  }
+
+  function appointment(overrides: Record<string, unknown>) {
+    return {
+      "First name": "Brian",
+      "Last name": "Hawthorn",
+      "Membership number": "1",
+      Role: "Team Member",
+      Team: "Leadership Team",
+      "Unit name": "1st Demo Group",
+      "Start date": "2025-01-01",
+      "End date": null,
+      ...overrides,
+    };
+  }
+
+  it("drops appointments that have ended", async () => {
+    mockAppointmentsBackend([
+      appointment({ "Start date": "2024-01-01", "End date": "2024-12-31" }),
+      appointment({ "Start date": "2025-01-01", "End date": null }),
+    ]);
+
+    const client = new ScoutsApiClient("test-token");
+    const result = await client.getAppointments();
+
+    expect(result.data).toHaveLength(1);
+    expect(result.data![0]["Start date"]).toBe("2025-01-01");
+  });
+
+  it("dedupes multiple active rows for the same Team/Role, keeping the latest Start date", async () => {
+    mockAppointmentsBackend([
+      appointment({ "Start date": "2025-11-10", "End date": null }),
+      appointment({ "Start date": "2026-01-09", "End date": null }),
+    ]);
+
+    const client = new ScoutsApiClient("test-token");
+    const result = await client.getAppointments();
+
+    expect(result.data).toHaveLength(1);
+    expect(result.data![0]["Start date"]).toBe("2026-01-09");
+  });
+
+  it("keeps distinct rows for the same person in different Teams or Roles", async () => {
+    mockAppointmentsBackend([
+      appointment({ Team: "Leadership Team", Role: "Team Member" }),
+      appointment({ Team: "Trustee Board", Role: "Trustee" }),
+    ]);
+
+    const client = new ScoutsApiClient("test-token");
+    const result = await client.getAppointments();
+
+    expect(result.data).toHaveLength(2);
   });
 });

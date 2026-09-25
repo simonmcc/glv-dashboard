@@ -28,6 +28,7 @@ import type {
   DisclosureSummary,
   SuspensionRecord,
   TeamReviewRecord,
+  AppointmentRecord,
   PermitRecord,
   AwardRecord,
 } from "../types";
@@ -70,7 +71,8 @@ const DATA_TYPE_LABELS = {
   joiningJourney: "onboarding",
   disclosures: "disclosures",
   suspensions: "suspensions",
-  teamReviews: "team directory",
+  teamReviews: "member role reviews",
+  appointments: "team directory",
   permits: "permits",
   awards: "awards",
 } as const;
@@ -146,13 +148,9 @@ export function Dashboard({
     "progress" | "items"
   >("progress");
 
-  // Team Directory view toggle
-  const [teamDirView, setTeamDirView] = useState<"directory" | "structure">(
-    "directory",
-  );
-
   // Collapsed state for lower-priority sections
   const [teamReviewsCollapsed, setTeamReviewsCollapsed] = useState(true);
+  const [appointmentsCollapsed, setAppointmentsCollapsed] = useState(true);
   const [permitsCollapsed, setPermitsCollapsed] = useState(true);
   const [awardsCollapsed, setAwardsCollapsed] = useState(true);
 
@@ -171,6 +169,9 @@ export function Dashboard({
   >({ state: "idle", data: [], error: null });
   const [teamReviews, setTeamReviews] = useState<
     SectionState<TeamReviewRecord[]>
+  >({ state: "idle", data: [], error: null });
+  const [appointments, setAppointments] = useState<
+    SectionState<AppointmentRecord[]>
   >({ state: "idle", data: [], error: null });
   const [permits, setPermits] = useState<SectionState<PermitRecord[]>>({
     state: "idle",
@@ -202,6 +203,7 @@ export function Dashboard({
   const disclosuresRef = useRef<HTMLElement>(null);
   const suspensionsRef = useRef<HTMLElement>(null);
   const teamReviewsRef = useRef<HTMLElement>(null);
+  const appointmentsRef = useRef<HTMLElement>(null);
   const permitsRef = useRef<HTMLElement>(null);
   const awardsRef = useRef<HTMLElement>(null);
 
@@ -534,6 +536,46 @@ export function Dashboard({
     );
   }, [client, contactId, ensureInitialized, onTokenExpired]);
 
+  const loadAppointments = useCallback(async () => {
+    const epoch = scopeEpochRef.current;
+    setAppointments((s) => ({ ...s, state: "loading", error: null }));
+    return tracer.startActiveSpan(
+      "dashboard.load.appointments",
+      async (span) => {
+        try {
+          await ensureInitialized();
+          const response = await client.getAppointments(500);
+          if (response.error) throw new Error(response.error);
+          const data = response.data || [];
+          span.setAttribute("records.count", data.length);
+          span.setStatus({ code: SpanStatusCode.OK });
+          if (epoch !== scopeEpochRef.current) return;
+          setAppointments({ state: "loaded", data, error: null });
+          await writeCache("appointments", contactId, data);
+          setLastSync(Date.now());
+        } catch (err) {
+          span.recordException(err as Error);
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: (err as Error).message,
+          });
+          if ((err as Error).message === "TOKEN_EXPIRED") {
+            onTokenExpired();
+            return;
+          }
+          if (epoch !== scopeEpochRef.current) return;
+          setAppointments((s) => ({
+            ...s,
+            state: "error",
+            error: (err as Error).message,
+          }));
+        } finally {
+          span.end();
+        }
+      },
+    );
+  }, [client, contactId, ensureInitialized, onTokenExpired]);
+
   const loadPermits = useCallback(async () => {
     const epoch = scopeEpochRef.current;
     setPermits((s) => ({ ...s, state: "loading", error: null }));
@@ -619,6 +661,7 @@ export function Dashboard({
       loadDisclosures,
       loadSuspensions,
       loadTeamReviews,
+      loadAppointments,
       loadPermits,
       loadAwards,
     ];
@@ -629,6 +672,7 @@ export function Dashboard({
     loadDisclosures,
     loadSuspensions,
     loadTeamReviews,
+    loadAppointments,
     loadPermits,
     loadAwards,
   ]);
@@ -802,6 +846,9 @@ export function Dashboard({
         readCache("teamReviews", contactId) as Promise<
           TeamReviewRecord[] | null
         >,
+        readCache("appointments", contactId) as Promise<
+          AppointmentRecord[] | null
+        >,
         readCache("permits", contactId) as Promise<PermitRecord[] | null>,
         readCache("awards", contactId) as Promise<AwardRecord[] | null>,
       ])
@@ -811,6 +858,7 @@ export function Dashboard({
             cachedJoiningJourney,
             cachedSuspensions,
             cachedTeamReviews,
+            cachedAppointments,
             cachedPermits,
             cachedAwards,
           ]) => {
@@ -834,6 +882,7 @@ export function Dashboard({
             seedSection(setJoiningJourney, cachedJoiningJourney);
             seedSection(setSuspensions, cachedSuspensions);
             seedSection(setTeamReviews, cachedTeamReviews);
+            seedSection(setAppointments, cachedAppointments);
             seedSection(setPermits, cachedPermits);
             seedSection(setAwards, cachedAwards);
           },
@@ -875,6 +924,8 @@ export function Dashboard({
       types.push(DATA_TYPE_LABELS.suspensions);
     if (teamReviews.state === "loading")
       types.push(DATA_TYPE_LABELS.teamReviews);
+    if (appointments.state === "loading")
+      types.push(DATA_TYPE_LABELS.appointments);
     if (permits.state === "loading") types.push(DATA_TYPE_LABELS.permits);
     if (awards.state === "loading") types.push(DATA_TYPE_LABELS.awards);
     return types;
@@ -884,6 +935,7 @@ export function Dashboard({
     disclosures.state,
     suspensions.state,
     teamReviews.state,
+    appointments.state,
     permits.state,
     awards.state,
   ]);
@@ -1255,10 +1307,41 @@ export function Dashboard({
           />
         </LazySection>
 
-        {/* Team Reviews - Lazy loaded, collapsed by default */}
+        {/* Team Directory - Lazy loaded, collapsed by default */}
+        <LazySection
+          ref={appointmentsRef}
+          title="Team Directory"
+          state={appointments.state}
+          error={appointments.error}
+          onRetry={() => {
+            if (!token && !MOCK_MODE) return;
+            loadAppointments();
+          }}
+          collapsed={appointmentsCollapsed}
+          onToggle={() => {
+            const next = !appointmentsCollapsed;
+            setAppointmentsCollapsed(next);
+            if (
+              !next &&
+              appointments.state === "idle" &&
+              (token || MOCK_MODE)
+            ) {
+              loadAppointments();
+            }
+          }}
+        >
+          <TeamStructure
+            records={appointments.data}
+            isLoading={appointments.state === "loading"}
+            memberNameMap={memberNameMap}
+            searchTerm={searchTerm}
+          />
+        </LazySection>
+
+        {/* Member Role Review - Lazy loaded, collapsed by default */}
         <LazySection
           ref={teamReviewsRef}
-          title="Team Directory"
+          title="Member Role Review"
           state={teamReviews.state}
           error={teamReviews.error}
           onRetry={() => {
@@ -1273,40 +1356,13 @@ export function Dashboard({
               loadTeamReviews();
             }
           }}
-          headerExtra={
-            teamReviews.state === "loaded" && teamReviews.data.length > 0 ? (
-              <div className="flex gap-1 rounded-lg overflow-hidden border border-gray-200 text-sm">
-                <button
-                  onClick={() => setTeamDirView("directory")}
-                  className={`px-3 py-1 ${teamDirView === "directory" ? "bg-purple-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
-                >
-                  Directory
-                </button>
-                <button
-                  onClick={() => setTeamDirView("structure")}
-                  className={`px-3 py-1 ${teamDirView === "structure" ? "bg-purple-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
-                >
-                  Structure
-                </button>
-              </div>
-            ) : undefined
-          }
         >
-          {teamDirView === "directory" ? (
-            <TeamReviewsTable
-              records={teamReviews.data}
-              isLoading={teamReviews.state === "loading"}
-              searchTerm={searchTerm}
-              memberNameMap={memberNameMap}
-            />
-          ) : (
-            <TeamStructure
-              records={teamReviews.data}
-              isLoading={teamReviews.state === "loading"}
-              memberNameMap={memberNameMap}
-              searchTerm={searchTerm}
-            />
-          )}
+          <TeamReviewsTable
+            records={teamReviews.data}
+            isLoading={teamReviews.state === "loading"}
+            searchTerm={searchTerm}
+            memberNameMap={memberNameMap}
+          />
         </LazySection>
 
         {/* Permits - Lazy loaded, collapsed by default */}

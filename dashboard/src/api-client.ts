@@ -14,6 +14,7 @@ import type {
   JoiningJourneyRecord,
   SuspensionRecord,
   TeamReviewRecord,
+  AppointmentRecord,
   PermitRecord,
   AwardRecord,
 } from "./types";
@@ -885,6 +886,90 @@ export class ScoutsApiClient {
       count: result.count,
       error: result.error,
     };
+  }
+
+  /**
+   * Fetch section/board appointments from AppointmentsDashboardView — each
+   * member's actual role, section (Team) and role start date. Used to build
+   * the Team Directory hierarchy (as opposed to TeamReviewRecord's "Role",
+   * which is only ever the review relationship, "Team Leader"/"Team Member").
+   */
+  async getAppointments(
+    pageSize: number = 500,
+  ): Promise<ApiResponse<AppointmentRecord>> {
+    console.log("[API] Fetching appointments data");
+
+    const result = await this.query<Record<string, unknown>>({
+      table: "AppointmentsDashboardView",
+      selectFields: [],
+      query: "",
+      pageNo: 1,
+      pageSize,
+      distinct: true,
+    });
+
+    if (result.error) {
+      console.error("[API] Appointments query error:", result.error);
+      return { data: [], nextPage: null, count: 0, error: result.error };
+    }
+
+    // AppointmentsDashboardView includes ended appointments (a populated "End
+    // date") alongside the current one, e.g. a role renewal — drop those so
+    // each person shows once per Team/Role under their current appointment.
+    const active = (result.data || []).filter((record) => !record["End date"]);
+
+    const data = active.map(
+      (record): AppointmentRecord => ({
+        // Keep the view's other fields — they tell otherwise-identical rows apart
+        ...record,
+        "First name": record["First name"] as string,
+        "Last name": record["Last name"] as string,
+        "Membership number": String(record["Membership number"] || ""),
+        Role: String(record["Role"] || ""),
+        Team: String(record["Team"] || ""),
+        "Unit name": String(record["Unit name"] || ""),
+        "Start date": record["Start date"] as string | null,
+        "End date": record["End date"] as string | null,
+        Group: record["Group"] as string,
+        District: record["District"] as string,
+      }),
+    );
+
+    const deduped = this.deduplicateAppointments(data);
+
+    console.log(
+      `[API] Transformed ${data.length} appointment records, deduplicated to ${deduped.length}`,
+    );
+
+    return {
+      data: deduped,
+      nextPage: result.nextPage,
+      count: result.count,
+      error: result.error,
+    };
+  }
+
+  /**
+   * Collapse duplicate rows for the same person's appointment (same Team +
+   * Role) down to one, keeping the latest Start date. AppointmentsDashboardView
+   * can still return more than one "active" (no End date) row for the same
+   * appointment, e.g. either side of a renewal recorded without an End date.
+   */
+  private deduplicateAppointments(
+    records: AppointmentRecord[],
+  ): AppointmentRecord[] {
+    const startMs = (r: AppointmentRecord) =>
+      r["Start date"] ? new Date(r["Start date"]).getTime() : -Infinity;
+
+    const seen = new Map<string, AppointmentRecord>();
+    for (const record of records) {
+      const key = `${record["Membership number"]}-${record.Team}-${record.Role}`;
+      const existing = seen.get(key);
+      if (!existing || startMs(record) > startMs(existing)) {
+        seen.set(key, record);
+      }
+    }
+    return Array.from(seen.values());
   }
 
   /**
