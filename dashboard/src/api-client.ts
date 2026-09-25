@@ -913,7 +913,12 @@ export class ScoutsApiClient {
       return { data: [], nextPage: null, count: 0, error: result.error };
     }
 
-    const data = (result.data || []).map(
+    // AppointmentsDashboardView includes ended appointments (a populated "End
+    // date") alongside the current one, e.g. a role renewal — drop those so
+    // each person shows once per Team/Role under their current appointment.
+    const active = (result.data || []).filter((record) => !record["End date"]);
+
+    const data = active.map(
       (record): AppointmentRecord => ({
         // Keep the view's other fields — they tell otherwise-identical rows apart
         ...record,
@@ -924,19 +929,47 @@ export class ScoutsApiClient {
         Team: String(record["Team"] || ""),
         "Unit name": String(record["Unit name"] || ""),
         "Start date": record["Start date"] as string | null,
+        "End date": record["End date"] as string | null,
         Group: record["Group"] as string,
         District: record["District"] as string,
       }),
     );
 
-    console.log(`[API] Transformed ${data.length} appointment records`);
+    const deduped = this.deduplicateAppointments(data);
+
+    console.log(
+      `[API] Transformed ${data.length} appointment records, deduplicated to ${deduped.length}`,
+    );
 
     return {
-      data,
+      data: deduped,
       nextPage: result.nextPage,
       count: result.count,
       error: result.error,
     };
+  }
+
+  /**
+   * Collapse duplicate rows for the same person's appointment (same Team +
+   * Role) down to one, keeping the latest Start date. AppointmentsDashboardView
+   * can still return more than one "active" (no End date) row for the same
+   * appointment, e.g. either side of a renewal recorded without an End date.
+   */
+  private deduplicateAppointments(
+    records: AppointmentRecord[],
+  ): AppointmentRecord[] {
+    const startMs = (r: AppointmentRecord) =>
+      r["Start date"] ? new Date(r["Start date"]).getTime() : -Infinity;
+
+    const seen = new Map<string, AppointmentRecord>();
+    for (const record of records) {
+      const key = `${record["Membership number"]}-${record.Team}-${record.Role}`;
+      const existing = seen.get(key);
+      if (!existing || startMs(record) > startMs(existing)) {
+        seen.set(key, record);
+      }
+    }
+    return Array.from(seen.values());
   }
 
   /**

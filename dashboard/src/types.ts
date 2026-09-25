@@ -155,6 +155,7 @@ export interface AppointmentRecord {
   Team: string;
   "Unit name": string;
   "Start date": string | null;
+  "End date"?: string | null;
   Group?: string;
   District?: string;
 }
