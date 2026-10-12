@@ -47,6 +47,7 @@ import type { LoadState } from "./LazySection";
 import { MemberDashboard } from "./MemberDashboard";
 import { ModuleRulesPage } from "./ModuleRulesPage";
 import { SyncStatus } from "./SyncStatus";
+import { InstallPrompt } from "./InstallPrompt";
 import { ScopeSelector } from "./ScopeSelector";
 import { VersionFooter } from "./VersionFooter";
 import { readCache, writeCache, readLastSync, clearCache } from "../db";
@@ -1031,6 +1032,8 @@ export function Dashboard({
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        <InstallPrompt />
+
         {primaryError && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
             <div className="font-medium">Error loading data</div>
@@ -1079,7 +1082,7 @@ export function Dashboard({
 
         {/* Summary Tiles - Always load immediately */}
         <section>
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
             <h2 className="text-lg font-semibold text-gray-900">
               Compliance Summary
             </h2>
@@ -1122,7 +1125,7 @@ export function Dashboard({
 
         {/* Training & Onboarding - merged section */}
         <section ref={joiningJourneyRef} id="section-learning">
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
             <h2 className="text-lg font-semibold text-gray-900">
               Training &amp; Onboarding
             </h2>

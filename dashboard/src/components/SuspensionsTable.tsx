@@ -6,6 +6,7 @@
 
 import { useState, useMemo } from "react";
 import type { SuspensionRecord } from "../types";
+import { MobileSort } from "./MobileSort";
 
 interface SuspensionsTableProps {
   records: SuspensionRecord[];
@@ -120,14 +121,28 @@ export function SuspensionsTable({
 
   return (
     <div className="bg-white rounded-lg shadow-sm border">
-      <div className="p-4 border-b">
+      <div className="p-4 border-b space-y-3">
+        <MobileSort
+          options={[
+            { field: "name", label: "Name" },
+            { field: "role", label: "Role" },
+            { field: "date", label: "Suspension Date" },
+          ]}
+          field={sortField}
+          order={sortOrder}
+          onChange={(field, order) => {
+            setSortField(field);
+            setSortOrder(order);
+          }}
+        />
+
         <div className="text-sm text-gray-500">
           Showing {filteredRecords.length} of {records.length} records
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full stack-table">
           <thead className="bg-gray-50 text-left">
             <tr>
               <th
@@ -194,19 +209,31 @@ export function SuspensionsTable({
                   <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
                     {record["Membership number"]}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900">
+                  <td
+                    data-label="Role"
+                    className="px-4 py-3 text-sm text-gray-900"
+                  >
                     {record["Role"]}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td
+                    data-label="Team / Unit"
+                    className="px-4 py-3 text-sm text-gray-600"
+                  >
                     {record["Team"] && <div>{record["Team"]}</div>}
                     {record["Unit name"] && (
                       <div className="text-gray-400">{record["Unit name"]}</div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td
+                    data-label="Suspension Date"
+                    className="px-4 py-3 text-sm text-gray-600"
+                  >
                     {formatDate(record["Suspension date"])}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td
+                    data-label="Reason"
+                    className="px-4 py-3 text-sm text-gray-600"
+                  >
                     {record["Suspension reason"] || "-"}
                   </td>
                 </tr>

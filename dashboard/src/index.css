@@ -3,3 +3,47 @@
 body {
   @apply bg-gray-50 text-gray-900 min-h-screen;
 }
+
+/*
+ * Stacked tables: below the `sm` breakpoint each row becomes a card and each
+ * cell a "label: value" line, using the cell's data-label as the label.
+ * Lives in the components layer so utilities (e.g. `hidden sm:table-cell`)
+ * still win, which keeps desktop-only columns hidden on phones.
+ */
+@layer components {
+  @media (width < 40rem) {
+    .stack-table thead {
+      display: none;
+    }
+    .stack-table,
+    .stack-table tbody,
+    .stack-table tr {
+      display: block;
+    }
+    .stack-table tr {
+      padding: 0.75rem 1rem;
+    }
+    /* Label floats left; the cell's content (which may be several lines)
+       sits right-aligned beside it */
+    .stack-table td {
+      display: flow-root;
+      padding: 0.25rem 0 !important;
+      text-align: right;
+    }
+    .stack-table td::before {
+      content: attr(data-label);
+      float: left;
+      margin-right: 1rem;
+      line-height: 1.25rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--color-gray-500);
+      text-align: left;
+    }
+    /* Cells without a label (the name cell, empty-state rows) span the card */
+    .stack-table td:not([data-label]) {
+      display: block;
+      text-align: left;
+    }
+  }
+}
