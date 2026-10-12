@@ -366,7 +366,7 @@ export function Dashboard({
         },
       );
     },
-    [client, contactId, ensureInitialized, onTokenExpired],
+    [client, contactId, ensureInitialized, onTokenExpired, token],
   );
 
   // Section loaders — fetch from network and write to cache on success.
