@@ -2,22 +2,23 @@
  * Install Prompt Component
  *
  * Offers to install the dashboard as a home-screen app.
- * - Chromium (Android, desktop Chrome/Edge): captures `beforeinstallprompt`
- *   and shows an Install button that triggers the native dialog.
+ * - Chromium (Android, desktop Chrome/Edge): shows an Install button that
+ *   triggers the native dialog, using the `beforeinstallprompt` event
+ *   captured at startup by ../install-prompt.
  * - iOS Safari: has no install event, so shows "Share → Add to Home Screen"
  *   instructions instead.
  * Hidden when already running as an installed app, or once dismissed.
  */
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import {
+  clearDeferredPrompt,
+  getDeferredPrompt,
+  subscribeInstallPrompt,
+  wasInstalled,
+} from "../install-prompt";
 
 export const INSTALL_DISMISSED_KEY = "glv-install-dismissed";
-
-/** Chromium-only event; not in the TypeScript DOM lib. */
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
 
 function isStandalone(): boolean {
   return (
@@ -46,30 +47,15 @@ function loadDismissed(): boolean {
 }
 
 export function InstallPrompt() {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
-    null,
+  const deferred = useSyncExternalStore(
+    subscribeInstallPrompt,
+    getDeferredPrompt,
   );
+  const installed =
+    useSyncExternalStore(subscribeInstallPrompt, wasInstalled) ||
+    isStandalone();
   const [dismissed, setDismissed] = useState(loadDismissed);
-  const [installed, setInstalled] = useState(isStandalone);
   const [showIos] = useState(() => isIosSafari() && !isStandalone());
-
-  useEffect(() => {
-    const onBeforeInstall = (e: Event) => {
-      // Suppress Chrome's mini-infobar; we show our own banner instead
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
-    };
-    const onInstalled = () => {
-      setInstalled(true);
-      setDeferred(null);
-    };
-    window.addEventListener("beforeinstallprompt", onBeforeInstall);
-    window.addEventListener("appinstalled", onInstalled);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
-  }, []);
 
   const dismiss = () => {
     setDismissed(true);
@@ -84,8 +70,7 @@ export function InstallPrompt() {
     if (!deferred) return;
     await deferred.prompt();
     const { outcome } = await deferred.userChoice;
-    // The event can only be used once
-    setDeferred(null);
+    clearDeferredPrompt();
     if (outcome === "dismissed") dismiss();
   };
 

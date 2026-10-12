@@ -12,8 +12,14 @@ body {
  */
 @layer components {
   @media (width < 40rem) {
+    /* Visually hidden, but kept for screen readers' column headers */
     .stack-table thead {
-      display: none;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
     .stack-table,
     .stack-table tbody,
@@ -30,7 +36,7 @@ body {
       padding: 0.25rem 0 !important;
       text-align: right;
     }
-    .stack-table td::before {
+    .stack-table td[data-label]::before {
       content: attr(data-label);
       float: left;
       margin-right: 1rem;

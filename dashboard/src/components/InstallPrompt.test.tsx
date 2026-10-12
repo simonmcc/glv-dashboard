@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { InstallPrompt, INSTALL_DISMISSED_KEY } from "./InstallPrompt";
+import {
+  resetInstallPromptCapture,
+  startInstallPromptCapture,
+} from "../install-prompt";
 
 const IPHONE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
@@ -34,9 +38,11 @@ describe("InstallPrompt", () => {
   beforeEach(() => {
     localStorage.clear();
     setStandalone(false);
+    startInstallPromptCapture();
   });
 
   afterEach(() => {
+    resetInstallPromptCapture();
     vi.restoreAllMocks();
   });
 
@@ -48,6 +54,26 @@ describe("InstallPrompt", () => {
     const { event } = fireBeforeInstallPrompt("accepted");
     expect(event.defaultPrevented).toBe(true);
     expect(screen.getByRole("button", { name: "Install" })).toBeInTheDocument();
+  });
+
+  it("shows the Install button when the event fired before mounting", () => {
+    // e.g. Chrome fired it while the user was still on the sign-in screen
+    setUserAgent(ANDROID_UA);
+    const { event } = fireBeforeInstallPrompt("accepted");
+    expect(event.defaultPrevented).toBe(true);
+
+    render(<InstallPrompt />);
+    expect(screen.getByRole("button", { name: "Install" })).toBeInTheDocument();
+  });
+
+  it("hides after the appinstalled event", () => {
+    setUserAgent(ANDROID_UA);
+    render(<InstallPrompt />);
+    fireBeforeInstallPrompt("accepted");
+    act(() => {
+      window.dispatchEvent(new Event("appinstalled"));
+    });
+    expect(screen.queryByRole("region", { name: "Install app" })).toBeNull();
   });
 
   it("triggers the native prompt and hides once accepted", async () => {
