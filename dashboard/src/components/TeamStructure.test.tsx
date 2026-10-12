@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { TeamStructure } from "./TeamStructure";
 import type { AppointmentRecord } from "../types";
 
@@ -122,7 +122,9 @@ describe("TeamStructure", () => {
 
   it("shows an empty state when there are no records", () => {
     render(<TeamStructure records={[]} isLoading={false} />);
-    expect(screen.getByText("No appointment records found")).toBeInTheDocument();
+    expect(
+      screen.getByText("No appointment records found"),
+    ).toBeInTheDocument();
   });
 
   it("still renders a section whose Team value isn't one of the known labels", () => {
@@ -143,5 +145,38 @@ describe("TeamStructure", () => {
 
     expect(screen.getByText("Beaver Scout 1")).toBeInTheDocument();
     expect(screen.getByText("Bob Smith")).toBeInTheDocument();
+  });
+
+  it("opens the member profile when a name is clicked", () => {
+    const onMemberSelect = vi.fn();
+    render(
+      <TeamStructure
+        records={[
+          record({
+            "First name": "Bob",
+            "Last name": "Smith",
+            "Membership number": "123",
+          }),
+        ]}
+        isLoading={false}
+        onMemberSelect={onMemberSelect}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Bob Smith" }));
+
+    expect(onMemberSelect).toHaveBeenCalledWith("123", "Bob Smith");
+  });
+
+  it("renders names as plain text without onMemberSelect", () => {
+    render(
+      <TeamStructure
+        records={[record({ "First name": "Bob", "Last name": "Smith" })]}
+        isLoading={false}
+      />,
+    );
+
+    expect(screen.getByText("Bob Smith")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });
