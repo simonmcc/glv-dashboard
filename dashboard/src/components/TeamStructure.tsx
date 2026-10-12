@@ -6,6 +6,7 @@ interface TeamStructureProps {
   isLoading: boolean;
   memberNameMap?: Map<string, string>;
   searchTerm?: string;
+  onMemberSelect?: (membershipNumber: string, name: string) => void;
 }
 
 function resolveName(
@@ -96,6 +97,7 @@ export function TeamStructure({
   isLoading,
   memberNameMap,
   searchTerm = "",
+  onMemberSelect,
 }: TeamStructureProps) {
   const grouped = useMemo(() => {
     let filtered = records;
@@ -198,7 +200,21 @@ export function TeamStructure({
                       className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
                     >
                       <div className="font-medium text-gray-900 truncate">
-                        {resolveName(record, memberNameMap)}
+                        {onMemberSelect ? (
+                          <button
+                            onClick={() =>
+                              onMemberSelect(
+                                record["Membership number"],
+                                resolveName(record, memberNameMap),
+                              )
+                            }
+                            className="max-w-full truncate text-left hover:text-purple-700 hover:underline focus:outline-none focus:underline"
+                          >
+                            {resolveName(record, memberNameMap)}
+                          </button>
+                        ) : (
+                          resolveName(record, memberNameMap)
+                        )}
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5 truncate">
                         {record["Role"]}

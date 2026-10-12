@@ -1338,6 +1338,7 @@ export function Dashboard({
             isLoading={appointments.state === "loading"}
             memberNameMap={memberNameMap}
             searchTerm={searchTerm}
+            onMemberSelect={handleMemberSelect}
           />
         </LazySection>
 
