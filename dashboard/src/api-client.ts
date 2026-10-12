@@ -283,12 +283,14 @@ export class ScoutsApiClient {
 
   /**
    * Preferred names for members in the current scope, fetched at most once
-   * per scope. A failed lookup yields an empty map — legal names are a better
-   * fallback than failing the view that asked.
+   * per scope and load. A failed lookup yields an empty map — legal names are
+   * a better fallback than failing the view that asked — and that is cached
+   * too, so every view in a load agrees on names. Changing scope or calling
+   * refreshPreferredNames() clears it.
    */
   private getPreferredNames(): Promise<Map<string, string>> {
     if (!this.preferredNames) {
-      const lookup = this.query<Record<string, unknown>>({
+      this.preferredNames = this.query<Record<string, unknown>>({
         table: "AppointmentsDashboardView",
         selectFields: PREFERRED_NAME_FIELDS,
         query: "",
@@ -302,12 +304,15 @@ export class ScoutsApiClient {
         })
         .catch((err) => {
           console.warn("[API] Preferred name lookup failed", err);
-          if (this.preferredNames === lookup) this.preferredNames = null;
           return new Map<string, string>();
         });
-      this.preferredNames = lookup;
     }
     return this.preferredNames;
+  }
+
+  /** Look preferred names up again on the next load, e.g. on a full refresh. */
+  refreshPreferredNames(): void {
+    this.preferredNames = null;
   }
 
   private async query<T>(

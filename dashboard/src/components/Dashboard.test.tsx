@@ -35,6 +35,7 @@ const api = vi.hoisted(() => ({
   ]),
   getScopePrefix: vi.fn().mockReturnValue("S1>>S2"),
   setScopePrefix: vi.fn(),
+  refreshPreferredNames: vi.fn(),
 }));
 
 // Mock API clients to avoid real network calls

@@ -818,6 +818,36 @@ describe("preferred names", () => {
     ).toHaveLength(1);
   });
 
+  it("keeps a failed lookup for the load, and retries after a refresh", async () => {
+    const views: Record<string, Record<string, unknown>[] | string> = {
+      LearningComplianceDashboardView: [learningRow("2000037793", "Brian")],
+      DisclosureComplianceDashboardView: [
+        { "First name": "Brian", "Membership number": "2000037793" },
+      ],
+      AppointmentsDashboardView: "error_GetResultsAsync",
+    };
+    const { tables } = mockViews(views);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const lookups = () =>
+      tables.filter((t) => t === "AppointmentsDashboardView").length;
+
+    const client = new ScoutsApiClient("test-token");
+    await client.getAllLearningCompliance();
+    const disclosures = await client.getDisclosureCompliance();
+
+    // Both views agree on the legal name; the failure is not retried mid-load
+    expect(disclosures.data![0]["First name"]).toBe("Brian");
+    expect(lookups()).toBe(1);
+
+    views.AppointmentsDashboardView = PREFERRED_NAMES;
+    client.refreshPreferredNames();
+    const learning = await client.getAllLearningCompliance();
+
+    expect(learning.data![0]["First name"]).toBe("Chris");
+    expect(lookups()).toBe(2);
+    warn.mockRestore();
+  });
+
   it("uses the appointments view's own Preferred name column", async () => {
     mockViews({
       AppointmentsDashboardView: [

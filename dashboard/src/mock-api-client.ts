@@ -102,6 +102,9 @@ export class MockScoutsApiClient {
     console.log("[MockAPI] Scope set to", this.scopePrefix);
   }
 
+  /** Mock data already carries preferred names; nothing to refresh. */
+  refreshPreferredNames(): void {}
+
   async getAllLearningCompliance(): Promise<ApiResponse<LearningRecord>> {
     console.log("[MockAPI] Returning mock learning compliance data");
     await randomDelay();
