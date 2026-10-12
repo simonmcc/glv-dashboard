@@ -8,6 +8,7 @@ import { useState, useMemo } from "react";
 import type { LearningRecord } from "../types";
 import { MODULE_CONFIG, getDeadlineInfo } from "../utils";
 import { MobileSort } from "./MobileSort";
+import { firstNameMatches } from "../preferred-name";
 
 interface ComplianceTableProps {
   records: LearningRecord[];
@@ -112,7 +113,7 @@ export function ComplianceTable({
       const term = searchTerm.toLowerCase();
       result = result.filter(
         (r) =>
-          r["First name"].toLowerCase().includes(term) ||
+          firstNameMatches(r, term) ||
           r["Last name"].toLowerCase().includes(term) ||
           r["Membership number"].includes(term),
       );

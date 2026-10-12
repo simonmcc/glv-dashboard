@@ -680,8 +680,10 @@ export function Dashboard({
 
   // Refresh everything — primary data and all sections together.
   const refreshAll = useCallback(async () => {
+    // Every section in this refresh shares one fresh preferred name lookup.
+    client.refreshPreferredNames();
     await Promise.allSettled([fetchPrimaryData(), loadAllSections()]);
-  }, [fetchPrimaryData, loadAllSections]);
+  }, [client, fetchPrimaryData, loadAllSections]);
 
   // Switching scope invalidates everything on screen and in the cache: the rows
   // belong to the unit we were looking at before.

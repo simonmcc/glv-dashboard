@@ -30,6 +30,7 @@ import {
   scopeQuery,
   writeStoredScope,
 } from "./scope";
+import { buildPreferredNameMap, withPreferredName } from "./preferred-name";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
@@ -37,6 +38,10 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 // `unitPrefix` and `unitId` are not in any view's default field set, so they
 // have to be asked for explicitly.
 const SCOPE_FIELDS = ["unitPrefix", "unitId", "unitName", "ROLE"];
+
+// AppointmentsDashboardView is the only view with a PreferredName column; it
+// is the lookup for views that put the legal first name in "First name".
+const PREFERRED_NAME_FIELDS = ["PreferredName", "MembershipNumber"];
 
 /**
  * Keep the shape of a query in the console — it is what makes scoping
@@ -101,6 +106,9 @@ export class ScoutsApiClient {
   private scopeUnits: ScopeUnit[] = [];
   private scopePrefix: string | null = null;
   private contactDetail: Promise<ContactDetail> | null = null;
+
+  // Membership number → preferred name, for the current scope.
+  private preferredNames: Promise<Map<string, string>> | null = null;
 
   constructor(token: string) {
     this.token = token;
@@ -203,6 +211,7 @@ export class ScoutsApiClient {
     writeStoredScope(prefix);
     this.scopePrefix =
       prefix === null ? pickDefaultScopePrefix(this.scopeUnits) : prefix;
+    this.preferredNames = null;
     console.log(
       "[API] Scope set to",
       isUnfiltered(this.scopePrefix) ? "(unfiltered)" : this.scopePrefix,
@@ -272,6 +281,40 @@ export class ScoutsApiClient {
     );
   }
 
+  /**
+   * Preferred names for members in the current scope, fetched at most once
+   * per scope and load. A failed lookup yields an empty map — legal names are
+   * a better fallback than failing the view that asked — and that is cached
+   * too, so every view in a load agrees on names. Changing scope or calling
+   * refreshPreferredNames() clears it.
+   */
+  private getPreferredNames(): Promise<Map<string, string>> {
+    if (!this.preferredNames) {
+      this.preferredNames = this.query<Record<string, unknown>>({
+        table: "AppointmentsDashboardView",
+        selectFields: PREFERRED_NAME_FIELDS,
+        query: "",
+        pageNo: 1,
+        pageSize: 1000,
+        distinct: true,
+      })
+        .then((result) => {
+          if (result.error) throw new Error(result.error);
+          return buildPreferredNameMap(result.data || []);
+        })
+        .catch((err) => {
+          console.warn("[API] Preferred name lookup failed", err);
+          return new Map<string, string>();
+        });
+    }
+    return this.preferredNames;
+  }
+
+  /** Look preferred names up again on the next load, e.g. on a full refresh. */
+  refreshPreferredNames(): void {
+    this.preferredNames = null;
+  }
+
   private async query<T>(
     request: DataExplorerRequest,
     signal?: AbortSignal,
@@ -320,17 +363,20 @@ export class ScoutsApiClient {
   ): Promise<ApiResponse<LearningRecord>> {
     console.log("[API] Fetching learning compliance data");
 
-    const result = await this.query<Record<string, unknown>>(
-      {
-        table: "LearningComplianceDashboardView",
-        selectFields: LEARNING_COMPLIANCE_FIELDS,
-        query: "",
-        pageNo: 1,
-        pageSize,
-        distinct: true,
-      },
-      signal,
-    );
+    const [result, preferredNames] = await Promise.all([
+      this.query<Record<string, unknown>>(
+        {
+          table: "LearningComplianceDashboardView",
+          selectFields: LEARNING_COMPLIANCE_FIELDS,
+          query: "",
+          pageNo: 1,
+          pageSize,
+          distinct: true,
+        },
+        signal,
+      ),
+      this.getPreferredNames(),
+    ]);
 
     if (result.error) {
       console.error("[API] Query error:", result.error);
@@ -338,37 +384,42 @@ export class ScoutsApiClient {
     }
 
     // Transform API response to use our interface field names
-    const rawData = (result.data || []).map(
-      (record): LearningRecord => ({
-        "First name": String(record["First name"] || record["FirstName"] || ""),
-        "Last name": String(record["Last name"] || record["LastName"] || ""),
-        "Membership number": String(
-          record["Membership number"] || record["MembershipNumber"] || "",
-        ),
-        "Team name":
-          (record["Team name"] as string | undefined) ||
-          (record["TeamName"] as string | undefined),
-        "Role name":
-          (record["Role name"] as string | undefined) ||
-          (record["RoleName"] as string | undefined),
-        Learning: String(record["Learning"] || record["Name"] || ""),
-        Status: String(record["Status"] || ""),
-        "Expiry date":
-          (record["Expiry date"] as string | null) ||
-          (record["ExpiryDate"] as string | null),
-        "Start date":
-          (record["Start date"] as string | null) ||
-          (record["StartDate"] as string | null),
-        "Days since expiry":
-          (record["Days since expiry"] as number | null) ||
-          (record["DaysSinceExpiry"] as number | null),
-        "Email address":
-          (record["Email address"] as string | undefined) ||
-          (record["EmailAddress"] as string | undefined),
-        "Member suspended":
-          (record["Member suspended"] as string | undefined) ||
-          (record["MemberSuspended"] as string | undefined),
-      }),
+    const rawData = (result.data || []).map((record) =>
+      withPreferredName<LearningRecord>(
+        {
+          "First name": String(
+            record["First name"] || record["FirstName"] || "",
+          ),
+          "Last name": String(record["Last name"] || record["LastName"] || ""),
+          "Membership number": String(
+            record["Membership number"] || record["MembershipNumber"] || "",
+          ),
+          "Team name":
+            (record["Team name"] as string | undefined) ||
+            (record["TeamName"] as string | undefined),
+          "Role name":
+            (record["Role name"] as string | undefined) ||
+            (record["RoleName"] as string | undefined),
+          Learning: String(record["Learning"] || record["Name"] || ""),
+          Status: String(record["Status"] || ""),
+          "Expiry date":
+            (record["Expiry date"] as string | null) ||
+            (record["ExpiryDate"] as string | null),
+          "Start date":
+            (record["Start date"] as string | null) ||
+            (record["StartDate"] as string | null),
+          "Days since expiry":
+            (record["Days since expiry"] as number | null) ||
+            (record["DaysSinceExpiry"] as number | null),
+          "Email address":
+            (record["Email address"] as string | undefined) ||
+            (record["EmailAddress"] as string | undefined),
+          "Member suspended":
+            (record["Member suspended"] as string | undefined) ||
+            (record["MemberSuspended"] as string | undefined),
+        },
+        preferredNames,
+      ),
     );
 
     // Deduplicate by membership number + learning type
@@ -745,39 +796,43 @@ export class ScoutsApiClient {
   ): Promise<ApiResponse<DisclosureRecord>> {
     console.log("[API] Fetching disclosure compliance data");
 
-    const result = await this.query<Record<string, unknown>>({
-      table: "DisclosureComplianceDashboardView",
-      selectFields: [],
-      query: "",
-      pageNo: 1,
-      pageSize,
-      distinct: true,
-    });
+    const [result, preferredNames] = await Promise.all([
+      this.query<Record<string, unknown>>({
+        table: "DisclosureComplianceDashboardView",
+        selectFields: [],
+        query: "",
+        pageNo: 1,
+        pageSize,
+        distinct: true,
+      }),
+      this.getPreferredNames(),
+    ]);
 
     if (result.error) {
       console.error("[API] Disclosure compliance query error:", result.error);
       return { data: [], nextPage: null, count: 0, error: result.error };
     }
 
-    const data = (result.data || []).map(
-      (record): DisclosureRecord => ({
-        "First name": String(record["First name"] || ""),
-        "Last name": String(record["Surname"] || record["Last name"] || ""),
-        "Membership number": String(record["Membership number"] || ""),
-        "Communication email": record["Communication email"] as string,
-        "Unit name": record["Unit name"] as string,
-        "Team name": record["Team"] as string,
-        "Role name": record["Role"] as string,
-        "Disclosure authority": String(record["Disclosure authority"] || ""),
-        "Disclosure status": String(record["Disclosure status"] || ""),
-        "Disclosure issue date": record["Disclosure issue date"] as
-          | string
-          | null,
-        "Disclosure expiry date": record["Disclosure expiry date"] as
-          | string
-          | null,
-        "Days since expiry": record["Days since expiry"] as number | null,
-      }),
+    const data = (result.data || []).map((record) =>
+      withPreferredName<DisclosureRecord>(
+        {
+          "First name": String(record["First name"] || ""),
+          "Last name": String(record["Surname"] || record["Last name"] || ""),
+          "Membership number": String(record["Membership number"] || ""),
+          "Communication email": record["Communication email"] as string,
+          "Unit name": record["Unit name"] as string,
+          "Team name": record["Team"] as string,
+          "Role name": record["Role"] as string,
+          "Disclosure authority": String(record["Disclosure authority"] || ""),
+          "Disclosure status": String(record["Disclosure status"] || ""),
+          "Disclosure issue date": record["Disclosure issue date"] as
+            string | null,
+          "Disclosure expiry date": record["Disclosure expiry date"] as
+            string | null,
+          "Days since expiry": record["Days since expiry"] as number | null,
+        },
+        preferredNames,
+      ),
     );
 
     console.log(
@@ -800,32 +855,38 @@ export class ScoutsApiClient {
   ): Promise<ApiResponse<SuspensionRecord>> {
     console.log("[API] Fetching suspensions data");
 
-    const result = await this.query<Record<string, unknown>>({
-      table: "SuspensionDashboardView",
-      selectFields: [],
-      query: "",
-      pageNo: 1,
-      pageSize,
-      distinct: true,
-    });
+    const [result, preferredNames] = await Promise.all([
+      this.query<Record<string, unknown>>({
+        table: "SuspensionDashboardView",
+        selectFields: [],
+        query: "",
+        pageNo: 1,
+        pageSize,
+        distinct: true,
+      }),
+      this.getPreferredNames(),
+    ]);
 
     if (result.error) {
       console.error("[API] Suspensions query error:", result.error);
       return { data: [], nextPage: null, count: 0, error: result.error };
     }
 
-    const data = (result.data || []).map(
-      (record): SuspensionRecord => ({
-        "First name": String(record["First name"] || ""),
-        "Last name": String(record["Last name"] || ""),
-        "Membership number": String(record["Membership number"] || ""),
-        Role: String(record["Role"] || ""),
-        Team: String(record["Team"] || ""),
-        "Unit name": String(record["Unit name"] || ""),
-        "Suspension date": record["Suspension date"] as string | null,
-        "Suspension reason": record["Suspension reason"] as string,
-        "Communication email": record["Communication email"] as string,
-      }),
+    const data = (result.data || []).map((record) =>
+      withPreferredName<SuspensionRecord>(
+        {
+          "First name": String(record["First name"] || ""),
+          "Last name": String(record["Last name"] || ""),
+          "Membership number": String(record["Membership number"] || ""),
+          Role: String(record["Role"] || ""),
+          Team: String(record["Team"] || ""),
+          "Unit name": String(record["Unit name"] || ""),
+          "Suspension date": record["Suspension date"] as string | null,
+          "Suspension reason": record["Suspension reason"] as string,
+          "Communication email": record["Communication email"] as string,
+        },
+        preferredNames,
+      ),
     );
 
     console.log(`[API] Transformed ${data.length} suspension records`);
@@ -860,23 +921,19 @@ export class ScoutsApiClient {
       return { data: [], nextPage: null, count: 0, error: result.error };
     }
 
-    const data = (result.data || []).map(
-      (record): TeamReviewRecord => ({
-        // Keep the view's other fields — they tell otherwise-identical rows apart
-        ...record,
-        "First name": record["First name"] as string,
-        "Last name": record["Last name"] as string,
-        "Membership number": String(record["Membership number"] || ""),
-        Role: String(record["Role"] || ""),
-        "Team leader": String(record["Team leader"] || ""),
-        "Scheduled review date": record["Scheduled review date"] as
-          | string
-          | null,
-        "Review overdue": String(record["Review overdue"] || ""),
-        Group: record["Group"] as string,
-        District: record["District"] as string,
-      }),
-    );
+    const data = (result.data || []).map((record): TeamReviewRecord => ({
+      // Keep the view's other fields — they tell otherwise-identical rows apart
+      ...record,
+      "First name": record["First name"] as string,
+      "Last name": record["Last name"] as string,
+      "Membership number": String(record["Membership number"] || ""),
+      Role: String(record["Role"] || ""),
+      "Team leader": String(record["Team leader"] || ""),
+      "Scheduled review date": record["Scheduled review date"] as string | null,
+      "Review overdue": String(record["Review overdue"] || ""),
+      Group: record["Group"] as string,
+      District: record["District"] as string,
+    }));
 
     console.log(`[API] Transformed ${data.length} team review records`);
 
@@ -918,21 +975,27 @@ export class ScoutsApiClient {
     // each person shows once per Team/Role under their current appointment.
     const active = (result.data || []).filter((record) => !record["End date"]);
 
-    const data = active.map(
-      (record): AppointmentRecord => ({
-        // Keep the view's other fields — they tell otherwise-identical rows apart
-        ...record,
-        "First name": record["First name"] as string,
-        "Last name": record["Last name"] as string,
-        "Membership number": String(record["Membership number"] || ""),
-        Role: String(record["Role"] || ""),
-        Team: String(record["Team"] || ""),
-        "Unit name": String(record["Unit name"] || ""),
-        "Start date": record["Start date"] as string | null,
-        "End date": record["End date"] as string | null,
-        Group: record["Group"] as string,
-        District: record["District"] as string,
-      }),
+    // Unlike the other views, this one carries "Preferred name" itself.
+    const preferredNames = buildPreferredNameMap(active);
+
+    const data = active.map((record) =>
+      withPreferredName<AppointmentRecord>(
+        {
+          // Keep the view's other fields — they tell otherwise-identical rows apart
+          ...record,
+          "First name": record["First name"] as string | undefined,
+          "Last name": record["Last name"] as string,
+          "Membership number": String(record["Membership number"] || ""),
+          Role: String(record["Role"] || ""),
+          Team: String(record["Team"] || ""),
+          "Unit name": String(record["Unit name"] || ""),
+          "Start date": record["Start date"] as string | null,
+          "End date": record["End date"] as string | null,
+          Group: record["Group"] as string,
+          District: record["District"] as string,
+        },
+        preferredNames,
+      ),
     );
 
     const deduped = this.deduplicateAppointments(data);
@@ -992,25 +1055,23 @@ export class ScoutsApiClient {
       return { data: [], nextPage: null, count: 0, error: result.error };
     }
 
-    const data = (result.data || []).map(
-      (record): PermitRecord => ({
-        // Keep the view's other fields — they tell otherwise-identical rows apart
-        ...record,
-        "First name": String(record["First name"] || ""),
-        "Last name": String(record["Last name"] || ""),
-        "Membership number": String(record["Membership number"] || ""),
-        "Permit category": String(record["Permit category"] || ""),
-        "Permit type": record["Permit type"] as string,
-        "Permit status": String(record["Permit status"] || ""),
-        "Permit expiry date": record["Permit expiry date"] as string | null,
-        "Permit restriction details": record[
-          "Permit restriction details"
-        ] as string,
-        "Unit name": record["Unit name"] as string,
-        Team: record["Team"] as string,
-        "Communication email": record["Communication email"] as string,
-      }),
-    );
+    const data = (result.data || []).map((record): PermitRecord => ({
+      // Keep the view's other fields — they tell otherwise-identical rows apart
+      ...record,
+      "First name": String(record["First name"] || ""),
+      "Last name": String(record["Last name"] || ""),
+      "Membership number": String(record["Membership number"] || ""),
+      "Permit category": String(record["Permit category"] || ""),
+      "Permit type": record["Permit type"] as string,
+      "Permit status": String(record["Permit status"] || ""),
+      "Permit expiry date": record["Permit expiry date"] as string | null,
+      "Permit restriction details": record[
+        "Permit restriction details"
+      ] as string,
+      "Unit name": record["Unit name"] as string,
+      Team: record["Team"] as string,
+      "Communication email": record["Communication email"] as string,
+    }));
 
     console.log(`[API] Transformed ${data.length} permit records`);
 
@@ -1042,19 +1103,17 @@ export class ScoutsApiClient {
       return { data: [], nextPage: null, count: 0, error: result.error };
     }
 
-    const data = (result.data || []).map(
-      (record): AwardRecord => ({
-        "First name": String(record["First name"] || ""),
-        "Last name": String(record["Last name"] || ""),
-        "Membership number": String(record["Membership number"] || ""),
-        Accreditation: String(record["Accreditation"] || ""),
-        Role: String(record["Role"] || ""),
-        Team: record["Team"] as string,
-        "Unit name": record["Unit name"] as string,
-        "Contact number": record["Contact number"] as string,
-        "Communication email": record["Communication email"] as string,
-      }),
-    );
+    const data = (result.data || []).map((record): AwardRecord => ({
+      "First name": String(record["First name"] || ""),
+      "Last name": String(record["Last name"] || ""),
+      "Membership number": String(record["Membership number"] || ""),
+      Accreditation: String(record["Accreditation"] || ""),
+      Role: String(record["Role"] || ""),
+      Team: record["Team"] as string,
+      "Unit name": record["Unit name"] as string,
+      "Contact number": record["Contact number"] as string,
+      "Communication email": record["Communication email"] as string,
+    }));
 
     console.log(`[API] Transformed ${data.length} award records`);
 
