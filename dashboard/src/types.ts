@@ -4,6 +4,8 @@
 
 export interface LearningRecord {
   "First name": string;
+  /** The name the view returned, when "First name" was swapped for a preferred name */
+  "Legal first name"?: string;
   "Last name": string;
   "Membership number": string;
   "Team name"?: string;
@@ -36,6 +38,8 @@ export interface ApiResponse<T> {
 
 export interface DisclosureRecord {
   "First name": string;
+  /** The name the view returned, when "First name" was swapped for a preferred name */
+  "Legal first name"?: string;
   "Last name": string;
   "Membership number": string;
   "Communication email"?: string;
@@ -129,6 +133,8 @@ export interface MemberLearningResult {
  */
 export interface SuspensionRecord {
   "First name": string;
+  /** The name the view returned, when "First name" was swapped for a preferred name */
+  "Legal first name"?: string;
   "Last name": string;
   "Membership number": string;
   Role: string;
@@ -149,6 +155,8 @@ export interface AppointmentRecord {
   /** The view returns more fields than are mapped below; extras are kept for row detail */
   [key: string]: unknown;
   "First name"?: string;
+  /** The name the view returned, when "First name" was swapped for a preferred name */
+  "Legal first name"?: string;
   "Last name"?: string;
   "Membership number": string;
   Role: string;

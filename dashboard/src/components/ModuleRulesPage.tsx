@@ -11,9 +11,9 @@ function formatDeadline(deadlineDays: number | null): string {
 }
 
 export function ModuleRulesPage({ onBack }: ModuleRulesPageProps) {
-  const groups = Array.from(
-    new Set(MODULE_CONFIG.map((m) => m.group)),
-  ) as (string | null)[];
+  const groups = Array.from(new Set(MODULE_CONFIG.map((m) => m.group))) as (
+    string | null
+  )[];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -48,7 +48,10 @@ export function ModuleRulesPage({ onBack }: ModuleRulesPageProps) {
           const sectionTitle = group ?? "Standalone";
 
           return (
-            <section key={sectionTitle} className="bg-white rounded-lg shadow-sm border">
+            <section
+              key={sectionTitle}
+              className="bg-white rounded-lg shadow-sm border"
+            >
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 border-b bg-gray-50 rounded-t-lg">
                 {sectionTitle}
               </h2>

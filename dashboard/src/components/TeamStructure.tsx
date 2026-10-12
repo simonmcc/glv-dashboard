@@ -106,6 +106,7 @@ export function TeamStructure({
       filtered = records.filter(
         (r) =>
           resolveName(r, memberNameMap).toLowerCase().includes(term) ||
+          (r["Legal first name"] ?? "").toLowerCase().includes(term) ||
           (r["Role"] || "").toLowerCase().includes(term) ||
           r["Membership number"].includes(term),
       );

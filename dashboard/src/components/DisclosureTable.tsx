@@ -8,6 +8,7 @@ import { useState, useMemo } from "react";
 import type { DisclosureRecord, DisclosureSummary } from "../types";
 import { isExpiringSoon } from "../utils";
 import { MobileSort } from "./MobileSort";
+import { firstNameMatches } from "../preferred-name";
 
 interface DisclosureTableProps {
   records: DisclosureRecord[];
@@ -84,7 +85,7 @@ export function DisclosureTable({
       const term = searchTerm.toLowerCase();
       result = result.filter(
         (r) =>
-          r["First name"].toLowerCase().includes(term) ||
+          firstNameMatches(r, term) ||
           r["Last name"].toLowerCase().includes(term) ||
           r["Membership number"].includes(term),
       );

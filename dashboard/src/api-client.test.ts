@@ -427,6 +427,17 @@ describe("GLV scope filtering", () => {
     return { queries, endpoints };
   }
 
+  /**
+   * The Learning Compliance data query. It runs alongside the preferred name
+   * lookup, so it is not necessarily the last query sent; the scope lookup
+   * reads the same view first.
+   */
+  function learningQuery(queries: { table: string; query: string }[]) {
+    return queries
+      .filter((q) => q.table === "LearningComplianceDashboardView")
+      .at(-1)!;
+  }
+
   function roleRow(unitPrefix: string, unitName: string, role: string) {
     return {
       "Unit prefix": unitPrefix,
@@ -453,9 +464,7 @@ describe("GLV scope filtering", () => {
     const client = new ScoutsApiClient("test-token");
     await client.getAllLearningCompliance();
 
-    const dataQuery = queries.at(-1)!;
-    expect(dataQuery.table).toBe("LearningComplianceDashboardView");
-    expect(dataQuery.query).toBe(`unitPrefix LIKE '${GROUP}%'`);
+    expect(learningQuery(queries).query).toBe(`unitPrefix LIKE '${GROUP}%'`);
   });
 
   it("resolves the scope only once across many calls", async () => {
@@ -492,7 +501,8 @@ describe("GLV scope filtering", () => {
     const dataQueries = queries.filter(
       (q) => !q.query.startsWith("MembershipNumber"),
     );
-    expect(dataQueries).toHaveLength(6);
+    // Six views, plus the preferred name lookup the first one triggers
+    expect(dataQueries).toHaveLength(7);
     for (const q of dataQueries) {
       expect(q.query).toBe(`unitPrefix LIKE '${GROUP}%'`);
     }
@@ -510,7 +520,7 @@ describe("GLV scope filtering", () => {
     const client = new ScoutsApiClient("test-token");
     await client.getAllLearningCompliance();
 
-    expect(queries.at(-1)!.query).toBe(`unitPrefix LIKE '${SECTION}%'`);
+    expect(learningQuery(queries).query).toBe(`unitPrefix LIKE '${SECTION}%'`);
   });
 
   it("discards a stored choice for a unit the volunteer no longer holds", async () => {
@@ -523,7 +533,7 @@ describe("GLV scope filtering", () => {
     const client = new ScoutsApiClient("test-token");
     await client.getAllLearningCompliance();
 
-    expect(queries.at(-1)!.query).toBe(`unitPrefix LIKE '${GROUP}%'`);
+    expect(learningQuery(queries).query).toBe(`unitPrefix LIKE '${GROUP}%'`);
     expect(localStorage.getItem("glv.scope.unitPrefix")).toBeNull();
   });
 
@@ -537,7 +547,7 @@ describe("GLV scope filtering", () => {
     const client = new ScoutsApiClient("test-token");
     await client.getAllLearningCompliance();
 
-    expect(queries.at(-1)!.query).toBe("");
+    expect(learningQuery(queries).query).toBe("");
   });
 
   it("falls back to an unfiltered query when the contact has no membership number", async () => {
@@ -546,8 +556,7 @@ describe("GLV scope filtering", () => {
     const client = new ScoutsApiClient("test-token");
     await client.getAllLearningCompliance();
 
-    expect(queries).toHaveLength(1);
-    expect(queries[0].query).toBe("");
+    expect(queries.every((q) => q.query === "")).toBe(true);
   });
 
   it("stays usable when scope resolution fails outright", async () => {
@@ -676,5 +685,160 @@ describe("getAppointments", () => {
     const result = await client.getAppointments();
 
     expect(result.data).toHaveLength(2);
+  });
+});
+
+describe("preferred names", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /**
+   * Serve rows per view. A view mapped to a string returns that error, so a
+   * failing preferred name lookup can be simulated.
+   */
+  function mockViews(
+    views: Record<string, Record<string, unknown>[] | string>,
+  ) {
+    const tables: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const outer = JSON.parse(String(init.body));
+        if (outer.endpoint === "/GetContactDetailAsync") {
+          return new Response(JSON.stringify({ id: "contact-1" }), {
+            status: 200,
+          });
+        }
+        tables.push(outer.body.table);
+        const view = views[outer.body.table] ?? [];
+        const body =
+          typeof view === "string"
+            ? { data: null, nextPage: null, count: 0, error: view }
+            : { data: view, nextPage: null, count: view.length, error: null };
+        return new Response(JSON.stringify(body), { status: 200 });
+      }),
+    );
+    return { tables };
+  }
+
+  const PREFERRED_NAMES = [
+    { "Membership number": "2000037793", "Preferred name": "Chris" },
+    { "Membership number": "2000037794", "Preferred name": "Steph" },
+  ];
+
+  function learningRow(membershipNumber: string, firstName: string) {
+    return {
+      "First name": firstName,
+      "Last name": "Hawthorn",
+      "Membership number": membershipNumber,
+      Learning: "Safeguarding",
+      Status: "In-Date",
+      "Expiry date": "2027-01-01",
+    };
+  }
+
+  it("shows the preferred name on learning records and keeps the legal one", async () => {
+    mockViews({
+      LearningComplianceDashboardView: [learningRow("2000037793", "Brian")],
+      AppointmentsDashboardView: PREFERRED_NAMES,
+    });
+
+    const client = new ScoutsApiClient("test-token");
+    const result = await client.getAllLearningCompliance();
+
+    expect(result.data![0]["First name"]).toBe("Chris");
+    expect(result.data![0]["Legal first name"]).toBe("Brian");
+  });
+
+  it("trims names and leaves members without a different preferred name alone", async () => {
+    mockViews({
+      LearningComplianceDashboardView: [
+        learningRow("0012310332", "Emma "),
+        learningRow("0000000001", "Nobody"),
+      ],
+      AppointmentsDashboardView: [
+        { "Membership number": "0012310332", "Preferred name": "Emma" },
+      ],
+    });
+
+    const client = new ScoutsApiClient("test-token");
+    const result = await client.getAllLearningCompliance();
+
+    const byNumber = new Map(
+      result.data!.map((r) => [r["Membership number"], r]),
+    );
+    expect(byNumber.get("0012310332")!["First name"]).toBe("Emma");
+    expect(byNumber.get("0012310332")!["Legal first name"]).toBeUndefined();
+    expect(byNumber.get("0000000001")!["First name"]).toBe("Nobody");
+  });
+
+  it("falls back to legal names when the lookup fails", async () => {
+    mockViews({
+      LearningComplianceDashboardView: [learningRow("2000037793", "Brian")],
+      AppointmentsDashboardView: "error_GetResultsAsync",
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const client = new ScoutsApiClient("test-token");
+    const result = await client.getAllLearningCompliance();
+
+    expect(result.error).toBeNull();
+    expect(result.data![0]["First name"]).toBe("Brian");
+    warn.mockRestore();
+  });
+
+  it("looks preferred names up once across views", async () => {
+    const { tables } = mockViews({
+      LearningComplianceDashboardView: [learningRow("2000037793", "Brian")],
+      DisclosureComplianceDashboardView: [
+        { "First name": "Brian", "Membership number": "2000037793" },
+      ],
+      SuspensionDashboardView: [
+        { "First name": "Stephanie", "Membership number": "2000037794" },
+      ],
+      AppointmentsDashboardView: PREFERRED_NAMES,
+    });
+
+    const client = new ScoutsApiClient("test-token");
+    const [, disclosures, suspensions] = await Promise.all([
+      client.getAllLearningCompliance(),
+      client.getDisclosureCompliance(),
+      client.getSuspensions(),
+    ]);
+
+    expect(disclosures.data![0]["First name"]).toBe("Chris");
+    expect(suspensions.data![0]["First name"]).toBe("Steph");
+    expect(
+      tables.filter((t) => t === "AppointmentsDashboardView"),
+    ).toHaveLength(1);
+  });
+
+  it("uses the appointments view's own Preferred name column", async () => {
+    mockViews({
+      AppointmentsDashboardView: [
+        {
+          "First name": "Brian",
+          "Preferred name": "Chris",
+          "Last name": "Hawthorn",
+          "Membership number": "2000037793",
+          Role: "Section Team Member",
+          Team: "Beaver Scout 1",
+          "Unit name": "1st Maghaberry Scout Group - Beaver Scout 1",
+          "Start date": "2025-01-01",
+          "End date": null,
+        },
+      ],
+    });
+
+    const client = new ScoutsApiClient("test-token");
+    const result = await client.getAppointments();
+
+    expect(result.data![0]["First name"]).toBe("Chris");
+    expect(result.data![0]["Legal first name"]).toBe("Brian");
   });
 });

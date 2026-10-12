@@ -75,7 +75,9 @@ export const MODULE_CONFIG: ReadonlyArray<{
 
 /** Returns true if the module title is a known Growing Roots module */
 export function isGrowingRootsModule(title: string): boolean {
-  return MODULE_CONFIG.some((m) => m.group === "Growing Roots" && m.name === title);
+  return MODULE_CONFIG.some(
+    (m) => m.group === "Growing Roots" && m.name === title,
+  );
 }
 
 /**
@@ -207,8 +209,7 @@ export function transformLearningResults(
     // Include modules with expiry dates, or any module known to MODULE_CONFIG
     const includedModules = member.modules.filter(
       (m) =>
-        m.expiryDate !== null ||
-        MODULE_CONFIG.some((c) => c.name === m.title),
+        m.expiryDate !== null || MODULE_CONFIG.some((c) => c.name === m.title),
     );
 
     for (const module of includedModules) {
