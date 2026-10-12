@@ -7,6 +7,7 @@
 import { useState, useMemo } from "react";
 import type { PermitRecord } from "../types";
 import { isExpiringSoon } from "../utils";
+import { MobileSort } from "./MobileSort";
 
 interface PermitsTableProps {
   records: PermitRecord[];
@@ -160,13 +161,28 @@ export function PermitsTable({
             ))}
           </select>
         </div>
+        <MobileSort
+          options={[
+            { field: "name", label: "Name" },
+            { field: "category", label: "Category" },
+            { field: "status", label: "Status" },
+            { field: "expiry", label: "Expiry" },
+          ]}
+          field={sortField}
+          order={sortOrder}
+          onChange={(field, order) => {
+            setSortField(field);
+            setSortOrder(order);
+          }}
+        />
+
         <div className="text-sm text-gray-500">
           Showing {filteredRecords.length} of {records.length} records
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full stack-table">
           <thead className="bg-gray-50 text-left">
             <tr>
               <th
@@ -249,10 +265,16 @@ export function PermitsTable({
                     <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
                       {record["Membership number"]}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
+                    <td
+                      data-label="Category"
+                      className="px-4 py-3 text-sm text-gray-900"
+                    >
                       {record["Permit category"]}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td
+                      data-label="Type"
+                      className="px-4 py-3 text-sm text-gray-600"
+                    >
                       {record["Permit type"] || "-"}
                       {record["Permit restriction details"] && (
                         <div className="text-xs text-gray-400">
@@ -260,7 +282,7 @@ export function PermitsTable({
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td data-label="Status" className="px-4 py-3">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[record["Permit status"]] || "bg-gray-100 text-gray-800"}`}
                       >
@@ -268,6 +290,7 @@ export function PermitsTable({
                       </span>
                     </td>
                     <td
+                      data-label="Expiry"
                       className={`px-4 py-3 text-sm font-medium ${permitExpiringSoon ? "text-amber-700" : "text-gray-600"}`}
                     >
                       {formatDate(record["Permit expiry date"])}

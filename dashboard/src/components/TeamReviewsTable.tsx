@@ -6,6 +6,7 @@
 
 import { useState, useMemo } from "react";
 import type { TeamReviewRecord } from "../types";
+import { MobileSort } from "./MobileSort";
 
 interface TeamReviewsTableProps {
   records: TeamReviewRecord[];
@@ -175,13 +176,27 @@ export function TeamReviewsTable({
             </button>
           )}
         </div>
+        <MobileSort
+          options={[
+            { field: "leader", label: "Team Leader" },
+            { field: "date", label: "Review Date" },
+            { field: "overdue", label: "Status" },
+          ]}
+          field={sortField}
+          order={sortOrder}
+          onChange={(field, order) => {
+            setSortField(field);
+            setSortOrder(order);
+          }}
+        />
+
         <div className="text-sm text-gray-500">
           Showing {filteredRecords.length} of {records.length} records
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full stack-table">
           <thead className="bg-gray-50 text-left">
             <tr>
               <th
@@ -238,16 +253,25 @@ export function TeamReviewsTable({
                     <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
                       {record["Membership number"]}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
+                    <td
+                      data-label="Role"
+                      className="px-4 py-3 text-sm text-gray-900"
+                    >
                       {record["Role"]}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td
+                      data-label="Group"
+                      className="px-4 py-3 text-sm text-gray-600"
+                    >
                       {record["Group"] || "-"}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td
+                      data-label="Review Date"
+                      className="px-4 py-3 text-sm text-gray-600"
+                    >
                       {formatDate(record["Scheduled review date"])}
                     </td>
-                    <td className="px-4 py-3">
+                    <td data-label="Status" className="px-4 py-3">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                           isOverdue

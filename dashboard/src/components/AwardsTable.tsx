@@ -6,6 +6,7 @@
 
 import { useState, useMemo } from "react";
 import type { AwardRecord } from "../types";
+import { MobileSort } from "./MobileSort";
 
 interface AwardsTableProps {
   records: AwardRecord[];
@@ -133,13 +134,27 @@ export function AwardsTable({
             ))}
           </select>
         </div>
+        <MobileSort
+          options={[
+            { field: "name", label: "Name" },
+            { field: "accreditation", label: "Accreditation" },
+            { field: "role", label: "Role" },
+          ]}
+          field={sortField}
+          order={sortOrder}
+          onChange={(field, order) => {
+            setSortField(field);
+            setSortOrder(order);
+          }}
+        />
+
         <div className="text-sm text-gray-500">
           Showing {filteredRecords.length} of {awarded.length} records
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full stack-table">
           <thead className="bg-gray-50 text-left">
             <tr>
               <th
@@ -208,15 +223,21 @@ export function AwardsTable({
                   <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
                     {record["Membership number"]}
                   </td>
-                  <td className="px-4 py-3">
+                  <td data-label="Accreditation" className="px-4 py-3">
                     <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
                       {record["Accreditation"]}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900">
+                  <td
+                    data-label="Role"
+                    className="px-4 py-3 text-sm text-gray-900"
+                  >
                     {record["Role"]}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td
+                    data-label="Team / Unit"
+                    className="px-4 py-3 text-sm text-gray-600"
+                  >
                     {record["Team"] && <div>{record["Team"]}</div>}
                     {record["Unit name"] && (
                       <div className="text-gray-400">{record["Unit name"]}</div>
