@@ -123,7 +123,7 @@ describe("TeamStructure", () => {
   it("orders units Group, Squirrel, Beaver, Cub, Scout", () => {
     const units = [
       "1st Demo Scout Group - Scout 1",
-      "1st Demo Scout Group - Squirrel 1",
+      "1st Demo Scout Group - Squirrel Scouts",
       "1st Demo Scout Group - Cub Scout 1",
       "1st Demo Scout Group",
       "1st Demo Scout Group - Beaver Scout 1",
@@ -139,7 +139,7 @@ describe("TeamStructure", () => {
       .map((el) => el.textContent);
     expect(headings).toEqual([
       "1st Demo Scout Group",
-      "1st Demo Scout Group - Squirrel 1",
+      "1st Demo Scout Group - Squirrel Scouts",
       "1st Demo Scout Group - Beaver Scout 1",
       "1st Demo Scout Group - Cub Scout 1",
       "1st Demo Scout Group - Scout 1",
