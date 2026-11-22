@@ -146,6 +146,36 @@ describe("TeamStructure", () => {
     ]);
   });
 
+  it("places a blank-Team Squirrel role under Squirrels, before Beavers", () => {
+    const records: AppointmentRecord[] = [
+      record({
+        "First name": "Bea",
+        "Membership number": "1",
+        Role: "Beaver Scout Leader",
+        Team: "",
+      }),
+      record({
+        "First name": "Sam",
+        "Membership number": "2",
+        Role: "Squirrel Scout Leader",
+        Team: "",
+      }),
+    ];
+
+    render(<TeamStructure records={records} isLoading={false} />);
+
+    expect(screen.queryByText("Scouts")).not.toBeInTheDocument();
+    const squirrels = screen.getByText("Squirrels");
+    const beavers = screen.getByText("Beavers");
+    expect(
+      squirrels.compareDocumentPosition(beavers) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(squirrels.parentElement!.textContent!.includes("Sam Last")).toBe(
+      true,
+    );
+  });
+
   it("shows an empty state when there are no records", () => {
     render(<TeamStructure records={[]} isLoading={false} />);
     expect(
