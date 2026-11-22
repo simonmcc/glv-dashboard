@@ -41,6 +41,7 @@ function isBoardRole(role: string): boolean {
 // unexpected blank Team doesn't silently drop someone into "Other".
 function sectionFamilyFromRole(role: string): string {
   const r = role.toLowerCase();
+  if (r.includes("squirrel")) return "Squirrels";
   if (r.includes("beaver")) return "Beavers";
   if (r.includes("cub")) return "Cubs";
   if (r.includes("explorer")) return "Explorers";
@@ -61,6 +62,7 @@ function sectionFor(record: AppointmentRecord): string {
 
 const SECTION_ORDER = [
   "Group",
+  "Squirrels",
   "Beavers",
   "Cubs",
   "Scouts",
@@ -70,6 +72,26 @@ const SECTION_ORDER = [
   "District",
   "Other",
 ];
+
+// Unit names are "<Group>" for the group itself and "<Group> - <Section> N"
+// for a section, e.g. "1st Demo Scout Group - Beaver Scout 1". Rank by the
+// suffix so units follow the age order rather than the alphabet.
+// "scout" is checked last because "Beaver Scout" and "Cub Scout" contain it.
+const UNIT_KEYWORDS: [string, number][] = [
+  ["squirrel", 1],
+  ["beaver", 2],
+  ["cub", 3],
+  ["explorer", 5],
+  ["network", 6],
+  ["scout", 4],
+];
+
+function unitRank(unitName: string): number {
+  const sep = unitName.lastIndexOf(" - ");
+  if (sep === -1) return 0;
+  const suffix = unitName.slice(sep + 3).toLowerCase();
+  return UNIT_KEYWORDS.find(([kw]) => suffix.includes(kw))?.[1] ?? 7;
+}
 
 // Leaders before Assistants/Helpers before plain Team Members.
 function roleTier(role: string): number {
@@ -123,12 +145,12 @@ export function TeamStructure({
       bySec.get(sec)!.push(record);
     }
 
-    // Sort groups alphabetically; sort sections by SECTION_ORDER where the
-    // Team value matches one of the known labels, then any other Team values
+    // Sort units by section age order (group first), then name; sort sections
+    // by SECTION_ORDER where the Team value matches one of the known labels, then any other Team values
     // (the live data doesn't guarantee it uses these labels) alphabetically
     // after; sort members within a section by role tier, then name.
     return Array.from(byGroup.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
+      .sort(([a], [b]) => unitRank(a) - unitRank(b) || a.localeCompare(b))
       .map(([group, bySec]) => {
         const known = SECTION_ORDER.filter((s) => bySec.has(s));
         const unknown = Array.from(bySec.keys())

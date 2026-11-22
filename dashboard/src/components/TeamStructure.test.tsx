@@ -120,6 +120,32 @@ describe("TeamStructure", () => {
     expect(screen.getByText("Since 1 Jun 2024")).toBeInTheDocument();
   });
 
+  it("orders units Group, Squirrel, Beaver, Cub, Scout", () => {
+    const units = [
+      "1st Demo Scout Group - Scout 1",
+      "1st Demo Scout Group - Squirrel 1",
+      "1st Demo Scout Group - Cub Scout 1",
+      "1st Demo Scout Group",
+      "1st Demo Scout Group - Beaver Scout 1",
+    ];
+    const records = units.map((u, i) =>
+      record({ "Unit name": u, "Membership number": String(i) }),
+    );
+
+    render(<TeamStructure records={records} isLoading={false} />);
+
+    const headings = screen
+      .getAllByText(/^1st Demo Scout Group/)
+      .map((el) => el.textContent);
+    expect(headings).toEqual([
+      "1st Demo Scout Group",
+      "1st Demo Scout Group - Squirrel 1",
+      "1st Demo Scout Group - Beaver Scout 1",
+      "1st Demo Scout Group - Cub Scout 1",
+      "1st Demo Scout Group - Scout 1",
+    ]);
+  });
+
   it("shows an empty state when there are no records", () => {
     render(<TeamStructure records={[]} isLoading={false} />);
     expect(
