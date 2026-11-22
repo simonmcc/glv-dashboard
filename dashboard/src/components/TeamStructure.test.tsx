@@ -120,6 +120,62 @@ describe("TeamStructure", () => {
     expect(screen.getByText("Since 1 Jun 2024")).toBeInTheDocument();
   });
 
+  it("orders units Group, Squirrel, Beaver, Cub, Scout", () => {
+    const units = [
+      "1st Demo Scout Group - Scout 1",
+      "1st Demo Scout Group - Squirrel Scouts",
+      "1st Demo Scout Group - Cub Scout 1",
+      "1st Demo Scout Group",
+      "1st Demo Scout Group - Beaver Scout 1",
+    ];
+    const records = units.map((u, i) =>
+      record({ "Unit name": u, "Membership number": String(i) }),
+    );
+
+    render(<TeamStructure records={records} isLoading={false} />);
+
+    const headings = screen
+      .getAllByText(/^1st Demo Scout Group/)
+      .map((el) => el.textContent);
+    expect(headings).toEqual([
+      "1st Demo Scout Group",
+      "1st Demo Scout Group - Squirrel Scouts",
+      "1st Demo Scout Group - Beaver Scout 1",
+      "1st Demo Scout Group - Cub Scout 1",
+      "1st Demo Scout Group - Scout 1",
+    ]);
+  });
+
+  it("places a blank-Team Squirrel role under Squirrels, before Beavers", () => {
+    const records: AppointmentRecord[] = [
+      record({
+        "First name": "Bea",
+        "Membership number": "1",
+        Role: "Beaver Scout Leader",
+        Team: "",
+      }),
+      record({
+        "First name": "Sam",
+        "Membership number": "2",
+        Role: "Squirrel Scout Leader",
+        Team: "",
+      }),
+    ];
+
+    render(<TeamStructure records={records} isLoading={false} />);
+
+    expect(screen.queryByText("Scouts")).not.toBeInTheDocument();
+    const squirrels = screen.getByText("Squirrels");
+    const beavers = screen.getByText("Beavers");
+    expect(
+      squirrels.compareDocumentPosition(beavers) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(squirrels.parentElement!.textContent!.includes("Sam Last")).toBe(
+      true,
+    );
+  });
+
   it("shows an empty state when there are no records", () => {
     render(<TeamStructure records={[]} isLoading={false} />);
     expect(
