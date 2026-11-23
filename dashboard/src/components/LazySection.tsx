@@ -39,7 +39,7 @@ export const LazySection = forwardRef<HTMLElement, LazySectionProps>(
   ) {
     return (
       <section ref={ref} id={id}>
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex flex-wrap items-center gap-3 mb-4">
           {onToggle && (
             <button
               onClick={onToggle}

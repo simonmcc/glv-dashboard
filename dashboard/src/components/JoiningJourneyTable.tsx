@@ -6,6 +6,7 @@
 
 import { useState, useMemo } from "react";
 import type { JoiningJourneyRecord } from "../types";
+import { MobileSort } from "./MobileSort";
 
 interface JoiningJourneyTableProps {
   records: JoiningJourneyRecord[];
@@ -202,6 +203,20 @@ export function JoiningJourneyTable({
           )}
         </div>
 
+        <MobileSort
+          options={[
+            { field: "name", label: "Name" },
+            { field: "item", label: "Item" },
+            { field: "status", label: "Status" },
+          ]}
+          field={sortField}
+          order={sortOrder}
+          onChange={(field, order) => {
+            setSortField(field);
+            setSortOrder(order);
+          }}
+        />
+
         <div className="text-sm text-gray-500">
           Showing {filteredRecords.length} of {records.length} records
         </div>
@@ -209,7 +224,7 @@ export function JoiningJourneyTable({
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full stack-table">
           <thead className="bg-gray-50 text-left">
             <tr>
               <th
@@ -270,10 +285,13 @@ export function JoiningJourneyTable({
                   <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
                     {record["Membership number"]}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900">
+                  <td
+                    data-label="Item"
+                    className="px-4 py-3 text-sm text-gray-900"
+                  >
                     {record.Item}
                   </td>
-                  <td className="px-4 py-3">
+                  <td data-label="Status" className="px-4 py-3">
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[record.Status] || "bg-gray-100 text-gray-800"}`}
                     >

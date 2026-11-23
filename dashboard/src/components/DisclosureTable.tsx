@@ -7,6 +7,8 @@
 import { useState, useMemo } from "react";
 import type { DisclosureRecord, DisclosureSummary } from "../types";
 import { isExpiringSoon } from "../utils";
+import { MobileSort } from "./MobileSort";
+import { firstNameMatches } from "../preferred-name";
 
 interface DisclosureTableProps {
   records: DisclosureRecord[];
@@ -83,7 +85,7 @@ export function DisclosureTable({
       const term = searchTerm.toLowerCase();
       result = result.filter(
         (r) =>
-          r["First name"].toLowerCase().includes(term) ||
+          firstNameMatches(r, term) ||
           r["Last name"].toLowerCase().includes(term) ||
           r["Membership number"].includes(term),
       );
@@ -235,6 +237,21 @@ export function DisclosureTable({
           )}
         </div>
 
+        <MobileSort
+          options={[
+            { field: "name", label: "Name" },
+            { field: "authority", label: "Authority" },
+            { field: "status", label: "Status" },
+            { field: "expiry", label: "Expiry Date" },
+          ]}
+          field={sortField}
+          order={sortOrder}
+          onChange={(field, order) => {
+            setSortField(field);
+            setSortOrder(order);
+          }}
+        />
+
         <div className="text-sm text-gray-500">
           Showing {filteredRecords.length} of {records.length} records
         </div>
@@ -242,7 +259,7 @@ export function DisclosureTable({
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full stack-table">
           <thead className="bg-gray-50 text-left">
             <tr>
               <th
@@ -325,10 +342,13 @@ export function DisclosureTable({
                     <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
                       {record["Membership number"]}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
+                    <td
+                      data-label="Authority"
+                      className="px-4 py-3 text-sm text-gray-900"
+                    >
                       {record["Disclosure authority"]}
                     </td>
-                    <td className="px-4 py-3">
+                    <td data-label="Status" className="px-4 py-3">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[record["Disclosure status"]] || "bg-gray-100 text-gray-800"}`}
                       >
@@ -342,6 +362,7 @@ export function DisclosureTable({
                         )}
                     </td>
                     <td
+                      data-label="Expiry Date"
                       className={`px-4 py-3 text-sm font-medium ${disclosureExpiringSoon ? "text-amber-700" : "text-gray-600"}`}
                     >
                       {formatDate(record["Disclosure expiry date"])}
@@ -351,7 +372,10 @@ export function DisclosureTable({
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td
+                      data-label="Unit / Role"
+                      className="px-4 py-3 text-sm text-gray-600"
+                    >
                       {record["Unit name"] && <div>{record["Unit name"]}</div>}
                       {record["Role name"] && (
                         <div className="text-gray-400">

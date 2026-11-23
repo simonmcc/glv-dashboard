@@ -50,6 +50,7 @@ export const mockLearningRecords: LearningRecord[] = [
   },
   {
     "First name": "Bob",
+    "Legal first name": "Robert",
     "Last name": "Smith",
     "Membership number": "23456789",
     Learning: "Safety",
@@ -87,6 +88,7 @@ export const mockLearningRecords: LearningRecord[] = [
   },
   {
     "First name": "Bob",
+    "Legal first name": "Robert",
     "Last name": "Smith",
     "Membership number": "23456789",
     Learning: "Safeguarding",
@@ -201,6 +203,7 @@ export const mockDisclosureRecords: DisclosureRecord[] = [
   },
   {
     "First name": "Bob",
+    "Legal first name": "Robert",
     "Last name": "Smith",
     "Membership number": "23456789",
     "Disclosure authority": "DBS England",
@@ -334,6 +337,7 @@ export const mockAppointmentRecords: AppointmentRecord[] = [
   },
   {
     "First name": "Bob",
+    "Legal first name": "Robert",
     "Last name": "Smith",
     "Membership number": "23456789",
     Role: "Beaver Scout Leader",
