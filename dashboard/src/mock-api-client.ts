@@ -11,6 +11,7 @@ import type {
   JoiningJourneyRecord,
   SuspensionRecord,
   TeamReviewRecord,
+  AppointmentRecord,
   PermitRecord,
   AwardRecord,
   ApiResponse,
@@ -25,6 +26,7 @@ import {
   mockJoiningJourneyRecords,
   mockSuspensionRecords,
   mockTeamReviewRecords,
+  mockAppointmentRecords,
   mockPermitRecords,
   mockAwardRecords,
   mockMemberLearningResults,
@@ -100,6 +102,9 @@ export class MockScoutsApiClient {
     console.log("[MockAPI] Scope set to", this.scopePrefix);
   }
 
+  /** Mock data already carries preferred names; nothing to refresh. */
+  refreshPreferredNames(): void {}
+
   async getAllLearningCompliance(): Promise<ApiResponse<LearningRecord>> {
     console.log("[MockAPI] Returning mock learning compliance data");
     await randomDelay();
@@ -151,6 +156,17 @@ export class MockScoutsApiClient {
       data: mockTeamReviewRecords,
       nextPage: null,
       count: mockTeamReviewRecords.length,
+      error: null,
+    };
+  }
+
+  async getAppointments(): Promise<ApiResponse<AppointmentRecord>> {
+    console.log("[MockAPI] Returning mock appointments data");
+    await randomDelay();
+    return {
+      data: mockAppointmentRecords,
+      nextPage: null,
+      count: mockAppointmentRecords.length,
       error: null,
     };
   }

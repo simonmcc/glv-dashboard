@@ -7,6 +7,8 @@
 import { useState, useMemo } from "react";
 import type { LearningRecord } from "../types";
 import { MODULE_CONFIG, getDeadlineInfo } from "../utils";
+import { MobileSort } from "./MobileSort";
+import { firstNameMatches } from "../preferred-name";
 
 interface ComplianceTableProps {
   records: LearningRecord[];
@@ -111,7 +113,7 @@ export function ComplianceTable({
       const term = searchTerm.toLowerCase();
       result = result.filter(
         (r) =>
-          r["First name"].toLowerCase().includes(term) ||
+          firstNameMatches(r, term) ||
           r["Last name"].toLowerCase().includes(term) ||
           r["Membership number"].includes(term),
       );
@@ -259,6 +261,21 @@ export function ComplianceTable({
           )}
         </div>
 
+        <MobileSort
+          options={[
+            { field: "name", label: "Name" },
+            { field: "learning", label: "Learning" },
+            { field: "status", label: "Status" },
+            { field: "expiry", label: "Expiry Date" },
+          ]}
+          field={sortField}
+          order={sortOrder}
+          onChange={(field, order) => {
+            setSortField(field);
+            setSortOrder(order);
+          }}
+        />
+
         <div className="text-sm text-gray-500">
           Showing {filteredRecords.length} of {records.length} records
         </div>
@@ -266,7 +283,7 @@ export function ComplianceTable({
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full stack-table">
           <thead className="bg-gray-50 text-left">
             <tr>
               <th
@@ -338,10 +355,13 @@ export function ComplianceTable({
                   <td className="hidden sm:table-cell px-4 py-3 text-sm text-gray-600 font-mono">
                     {record["Membership number"]}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900">
+                  <td
+                    data-label="Learning"
+                    className="px-4 py-3 text-sm text-gray-900"
+                  >
                     {record.Learning}
                   </td>
-                  <td className="px-4 py-3">
+                  <td data-label="Status" className="px-4 py-3">
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusColors[record.Status] || "bg-gray-100 text-gray-800"}`}
                     >
@@ -367,7 +387,10 @@ export function ComplianceTable({
                       return null;
                     })()}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td
+                    data-label="Expiry Date"
+                    className="px-4 py-3 text-sm text-gray-600"
+                  >
                     {record["Expiry date"] ? (
                       formatDate(record["Expiry date"])
                     ) : record.Status === "In-Progress" &&

@@ -13,6 +13,7 @@ import type {
   JoiningJourneyRecord,
   SuspensionRecord,
   TeamReviewRecord,
+  AppointmentRecord,
   PermitRecord,
   AwardRecord,
 } from "./types";
@@ -23,6 +24,7 @@ interface GLVDatabase extends DBSchema {
   joiningJourney: { key: string; value: JoiningJourneyRecord[] };
   suspensions: { key: string; value: SuspensionRecord[] };
   teamReviews: { key: string; value: TeamReviewRecord[] };
+  appointments: { key: string; value: AppointmentRecord[] };
   permits: { key: string; value: PermitRecord[] };
   awards: { key: string; value: AwardRecord[] };
   meta: { key: string; value: { lastSync: number } };
@@ -34,7 +36,7 @@ let _db: IDBPDatabase<GLVDatabase> | null = null;
 
 async function getDb(): Promise<IDBPDatabase<GLVDatabase>> {
   if (_db) return _db;
-  _db = await openDB<GLVDatabase>("glv-dashboard", 2, {
+  _db = await openDB<GLVDatabase>("glv-dashboard", 3, {
     upgrade(db, oldVersion) {
       if (oldVersion < 1) {
         db.createObjectStore("learningRecords");
@@ -54,6 +56,9 @@ async function getDb(): Promise<IDBPDatabase<GLVDatabase>> {
         db.deleteObjectStore("permits");
         db.createObjectStore("teamReviews");
         db.createObjectStore("permits");
+      }
+      if (oldVersion < 3) {
+        db.createObjectStore("appointments");
       }
     },
   });
@@ -84,6 +89,7 @@ const CACHE_STORES: CacheStore[] = [
   "joiningJourney",
   "suspensions",
   "teamReviews",
+  "appointments",
   "permits",
   "awards",
 ];
